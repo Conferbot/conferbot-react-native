@@ -79,6 +79,23 @@ export default function HomeScreen() {
 }
 ```
 
+## Example App
+
+Want to see it in action? Check out the **example app** in the `/example` directory.
+
+```bash
+cd example
+npm install
+npm run ios    # or npm run android
+```
+
+The example demonstrates:
+- ✅ Drop-in widget (easiest integration)
+- ✅ Headless SDK (custom UI)
+- ✅ Mix & match (pre-built + custom components)
+
+See [example/README.md](example/README.md) for detailed setup instructions.
+
 ## Features
 
 - ✅ Native React Native components (no WebView)
