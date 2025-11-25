@@ -10,6 +10,7 @@
     "clean": "rm -rf lib",
     "prepare": "npm run clean && npm run build",
     "test": "jest",
+    "test:connection": "node tests/test-connection.js",
     "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
