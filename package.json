@@ -28,7 +28,6 @@
     "android"
   ],
   "author": "Conferbot <support@conferbot.com>",
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/conferbot/react-native-sdk.git"

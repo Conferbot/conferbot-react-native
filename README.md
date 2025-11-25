@@ -304,10 +304,6 @@ Ensure type definitions are installed:
 npm install --save-dev @types/react @types/react-native
 ```
 
-## License
-
-MIT
-
 ## Support
 
 - **Documentation:** https://docs.conferbot.com
