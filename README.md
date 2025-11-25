@@ -170,23 +170,6 @@ useEffect(() => {
 
 ## Advanced Usage
 
-### Custom Server URL
-
-Connect to your own embed server instance:
-
-```tsx
-<ConferBotProvider
-  apiKey="your-api-key"
-  botId="your-bot-id"
-  config={{
-    socketUrl: 'https://your-server.com',
-    baseURL: 'https://your-server.com/api/v1/mobile',
-  }}
->
-  {children}
-</ConferBotProvider>
-```
-
 ### Handling Live Agent Handover
 
 ```tsx
