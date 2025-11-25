@@ -40,6 +40,7 @@ export type MessageType =
   | 'visitor-reconnected-message'
   | 'bot-message'
   | 'user-message'
+  | 'user-input-response' // User input response from chatbot flow
   | 'system-message';
 
 // Agent details structure from embed-server
@@ -107,6 +108,13 @@ export interface UserMessageRecord extends BaseRecordItem {
   [key: string]: any;
 }
 
+// User input response record item (from chatbot flow)
+export interface UserInputResponseRecord extends BaseRecordItem {
+  type: 'user-input-response';
+  text: string;
+  [key: string]: any;
+}
+
 // System message record item
 export interface SystemMessageRecord extends BaseRecordItem {
   type: 'system-message';
@@ -123,6 +131,7 @@ export type RecordItem =
   | VisitorReconnectedMessageRecord
   | BotMessageRecord
   | UserMessageRecord
+  | UserInputResponseRecord
   | SystemMessageRecord;
 
 // Message attachment

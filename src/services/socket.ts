@@ -310,8 +310,10 @@ class ConferBotSocket {
   }
 
   // Send response record (visitor message)
+  // Matches embed-server/socket.js 'response-record' event
   sendResponseRecord(data: {
     chatSessionId: string;
+    botId?: string; // Optional, falls back to instance botId
     record: any;
     answerVariables?: any;
   }): void {
@@ -322,7 +324,13 @@ class ConferBotSocket {
       return;
     }
 
-    this.socket.emit(SocketEvents.RESPONSE_RECORD, data);
+    // Include botId from instance if not provided
+    const payload = {
+      ...data,
+      botId: data.botId || this.botId,
+    };
+
+    this.socket.emit(SocketEvents.RESPONSE_RECORD, payload);
 
     if (__DEV__) {
       console.log('[ConferBot Socket] Response record sent');

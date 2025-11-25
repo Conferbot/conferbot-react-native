@@ -55,7 +55,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   useEffect(() => {
     const initializeSDK = async () => {
       try {
-        // Create API client
+        // Create API client (for future REST endpoints)
         apiClient.current = new ConferBotAPI(apiKey, botId);
 
         // Create Socket client
@@ -66,20 +66,16 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
           autoConnect: config?.autoConnect !== false,
         });
 
-        // Fetch chatbot configuration
-        const configResponse = await apiClient.current.getChatbotConfig();
-        if (configResponse.success && configResponse.data) {
-          setChatbotConfig(configResponse.data);
-        }
+        // Set up socket event listeners BEFORE connecting
+        // This ensures we catch the fetched-chatbot-data event
+        setupSocketListeners();
 
         // Connect socket if autoConnect is enabled
+        // Socket connection automatically fetches chatbot data via 'get-chatbot-data' event
         if (config?.autoConnect !== false) {
           await socketClient.current.connect(user?.id);
           setIsConnected(true);
         }
-
-        // Set up socket event listeners
-        setupSocketListeners();
 
         setIsInitialized(true);
 
@@ -88,6 +84,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
         }
       } catch (error) {
         console.error('[ConferBot] Initialization error:', error);
+        // Still mark as initialized but not connected
+        setIsInitialized(true);
+        setIsConnected(false);
       }
     };
 
@@ -104,6 +103,25 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   // Set up socket event listeners
   const setupSocketListeners = useCallback(() => {
     if (!socketClient.current) return;
+
+    // Chatbot data fetched (triggered on connection)
+    socketClient.current.on(SocketEvents.FETCHED_CHATBOT_DATA, (data: any) => {
+      if (__DEV__) {
+        console.log('[ConferBot] Chatbot data received:', data);
+      }
+      if (data.chatbotData) {
+        // Map the chatbot data to our ChatbotConfig interface
+        setChatbotConfig({
+          id: data.chatbotData._id || data.chatbotData.id,
+          name: data.chatbotData.name || 'Conferbot',
+          description: data.chatbotData.description,
+          avatar: data.chatbotData.avatar,
+          welcomeMessage: data.chatbotData.welcomeMessage,
+          customizations: data.chatbotData.customizations,
+          features: data.chatbotData.features,
+        });
+      }
+    });
 
     // Bot response received (contains record update)
     socketClient.current.on(SocketEvents.BOT_RESPONSE, (data: any) => {
@@ -125,10 +143,15 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       }
     });
 
-    // Agent accepted handover
+    // Agent accepted handover (embed-server sends agentDetails)
     socketClient.current.on(SocketEvents.AGENT_ACCEPTED, (data: any) => {
-      if (data.agent) {
-        setCurrentAgent(data.agent);
+      if (data.agentDetails) {
+        // Map agentDetails to Agent interface
+        setCurrentAgent({
+          id: data.agentDetails._id,
+          name: data.agentDetails.name,
+          email: data.agentDetails.email,
+        });
       }
     });
 

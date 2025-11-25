@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../theme';
 import { Avatar } from '../Avatar';
 import type { ConferBotTheme } from '../../theme/types';
-import type { RecordItem, Agent } from '../../types';
+import type { RecordItem, AgentDetails } from '../../types';
 
 /**
  * MessageBubble Props
@@ -62,7 +62,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const styles = createStyles(theme);
 
   // Determine message type
-  const isUser = message.type === 'user-message';
+  const isUser = message.type === 'user-message' || message.type === 'user-input-response';
   const isAgent = message.type === 'agent-message';
   const isSystem = message.type === 'system-message';
 
@@ -111,8 +111,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return `${hour12}:${minuteStr} ${ampm}`;
   };
 
-  // Get agent info if available
-  const agent: Agent | undefined = (message as any).agent;
+  // Get agent info if available (embed-server sends agentDetails)
+  const agentDetails: AgentDetails | undefined = (message as any).agentDetails;
 
   const bubbleContent = (
     <View style={[styles.container, { maxWidth: theme.layout.maxBubbleWidth }]}>
@@ -120,8 +120,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {!isUser && !isSystem && showAvatar && (
         <View style={styles.avatarContainer}>
           <Avatar
-            source={agent?.avatar}
-            name={agent?.name || 'Bot'}
+            source={undefined} // AgentDetails doesn't have avatar in embed-server
+            name={agentDetails?.name || 'Bot'}
             size={theme.layout.avatarSize}
           />
         </View>
@@ -130,9 +130,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {/* Message bubble */}
       <View style={[styles.bubble, getBubbleStyle()]}>
         {/* Agent name for agent messages */}
-        {isAgent && agent && (
+        {isAgent && agentDetails && (
           <Text style={[styles.agentName, { color: getTextColor() }]}>
-            {agent.name}
+            {agentDetails.name}
           </Text>
         )}
 
