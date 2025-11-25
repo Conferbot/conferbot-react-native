@@ -1,0 +1,50 @@
+# Source files (compiled versions in lib/ will be included)
+src/
+
+# Tests
+tests/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+coverage/
+.nyc_output/
+
+# Build tools
+tsconfig.json
+.eslintrc.js
+.prettierrc
+.npmrc
+
+# Documentation (only README.md is included)
+docs/
+example/
+COMPONENT_ARCHITECTURE.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc
+.env
+.env.*
+node_modules/
+*.tgz
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
