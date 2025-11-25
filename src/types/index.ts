@@ -139,6 +139,7 @@ export interface MessageAttachment {
 export interface Agent {
   id: string;
   name: string;
+  email?: string;
   avatar?: string;
   title?: string;
   status?: 'online' | 'offline' | 'away';
