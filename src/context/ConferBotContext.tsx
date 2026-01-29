@@ -2,6 +2,14 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Platform } from 'react-native';
 import ConferBotAPI from '../services/api';
 import ConferBotSocket from '../services/socket';
+import {
+  NodeFlowEngine,
+  ChatState,
+  NodeHandlerRegistry,
+  registerAllDisplayHandlers,
+  NodeUIState,
+  FlowDefinition,
+} from '../core';
 import type {
   ConferBotConfig,
   ConferBotUser,
@@ -13,9 +21,18 @@ import type {
 } from '../types';
 import { SocketEvents } from '../types';
 
+// ********** Extended Context Types ********** //
+interface ExtendedConferBotContext extends ConferBotContextType {
+  currentUIState: NodeUIState | null;
+  isNodeProcessing: boolean;
+  flowEngine: NodeFlowEngine | null;
+  chatState: ChatState | null;
+  submitNodeResponse: (response: any, portName?: string) => void;
+}
+
 // ********** Context Creation ********** //
 // Create ConferBot context
-const ConferBotContext = createContext<ConferBotContextType | null>(null);
+const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
 
 // ********** Provider Props ********** //
 interface ConferBotProviderProps {
@@ -46,9 +63,59 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   const [record, setRecord] = useState<any[]>([]);
   const [chatbotConfig, setChatbotConfig] = useState<ChatbotConfig | undefined>(undefined);
 
+  // Node Flow Engine State
+  const [currentUIState, setCurrentUIState] = useState<NodeUIState | null>(null);
+  const [isNodeProcessing, setIsNodeProcessing] = useState(false);
+
   // ********** Service References ********** //
   const apiClient = useRef<ConferBotAPI | null>(null);
   const socketClient = useRef<ConferBotSocket | null>(null);
+
+  // Node Flow Engine References
+  const flowEngine = useRef<NodeFlowEngine | null>(null);
+  const chatStateRef = useRef<ChatState | null>(null);
+
+  // ********** Node Flow Engine Initialization ********** //
+  const initializeFlowEngine = useCallback((sessionId: string) => {
+    if (!socketClient.current) {
+      console.warn('[ConferBot] Cannot initialize flow engine: socket not available');
+      return;
+    }
+
+    // Initialize handler registry
+    const registry = NodeHandlerRegistry.getInstance();
+    registerAllDisplayHandlers(registry);
+
+    // Create chat state
+    chatStateRef.current = new ChatState(sessionId, botId);
+
+    // Create flow engine
+    flowEngine.current = new NodeFlowEngine(chatStateRef.current, registry, {
+      socketClient: socketClient.current,
+      onUIStateChange: (uiState) => {
+        setCurrentUIState(uiState);
+        setIsNodeProcessing(false);
+      },
+      onWaitingForInput: (_nodeId, _uiState) => {
+        setIsNodeProcessing(false);
+      },
+      onFlowComplete: (reason) => {
+        if (__DEV__) {
+          console.log('[ConferBot] Flow complete:', reason);
+        }
+        setIsNodeProcessing(false);
+      },
+      onError: (error, nodeId) => {
+        console.error('[ConferBot] Flow engine error:', error.message, { nodeId });
+        setIsNodeProcessing(false);
+      },
+      debug: __DEV__,
+    });
+
+    if (__DEV__) {
+      console.log('[ConferBot] Flow engine initialized for session:', sessionId);
+    }
+  }, [botId]);
 
   // ********** Initialization ********** //
   // Initialize SDK on mount
@@ -96,6 +163,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     // Cleanup on unmount
     return () => {
       socketClient.current?.disconnect();
+      flowEngine.current?.reset();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, botId]);
@@ -105,13 +173,28 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   const setupSocketListeners = useCallback(() => {
     if (!socketClient.current) return;
 
-    // Bot response received (contains record update)
+    // Bot response received (contains record update and potentially flow data)
     socketClient.current.on(SocketEvents.BOT_RESPONSE, (data: any) => {
       if (data.record) {
         setRecord(data.record);
       }
       if (!isOpen) {
         setUnreadCount((prev) => prev + 1);
+      }
+
+      // Handle flow processing if flow data is present
+      if (data.flow && data.startNode && flowEngine.current) {
+        setIsNodeProcessing(true);
+        const flowDefinition: FlowDefinition = {
+          nodes: data.flow.nodes || [],
+          edges: data.flow.edges || [],
+          startNodeId: data.startNode,
+        };
+        flowEngine.current.loadFlow(flowDefinition);
+        flowEngine.current.start().catch((error) => {
+          console.error('[ConferBot] Failed to start flow:', error);
+          setIsNodeProcessing(false);
+        });
       }
     });
 
@@ -144,12 +227,20 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       if (data.record) {
         setRecord(data.record);
       }
+      // Reset flow engine on chat end
+      flowEngine.current?.reset();
+      setCurrentUIState(null);
+      setIsNodeProcessing(false);
     });
 
     // Visitor disconnected
     socketClient.current.on(SocketEvents.VISITOR_DISCONNECTED, () => {
       setChatSessionId(undefined);
       setCurrentAgent(undefined);
+      // Reset flow engine on disconnect
+      flowEngine.current?.reset();
+      setCurrentUIState(null);
+      setIsNodeProcessing(false);
     });
 
     // Connection status
@@ -169,24 +260,28 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       try {
         const response = await apiClient.current.initSession(user?.id);
         if (response.success && response.data) {
-          setChatSessionId(response.data.chatSessionId);
+          const sessionId = response.data.chatSessionId;
+          setChatSessionId(sessionId);
+
+          // Initialize flow engine with the new session
+          initializeFlowEngine(sessionId);
 
           // Load session history (record)
-          const historyResponse = await apiClient.current.getSessionHistory(response.data.chatSessionId);
+          const historyResponse = await apiClient.current.getSessionHistory(sessionId);
           if (historyResponse.success && historyResponse.data && historyResponse.data.record) {
             setRecord(historyResponse.data.record);
           }
 
           // Join chat room via socket
           if (socketClient.current && socketClient.current.isConnected()) {
-            socketClient.current.joinChatRoomVisitor(response.data.chatSessionId);
+            socketClient.current.joinChatRoomVisitor(sessionId);
           }
         }
       } catch (error) {
         console.error('[ConferBot] Failed to initialize session:', error);
       }
     }
-  }, [chatSessionId, user?.id]);
+  }, [chatSessionId, user?.id, initializeFlowEngine]);
 
   // Close chat
   const closeChat = useCallback(() => {
@@ -232,6 +327,20 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     [chatSessionId, record]
   );
 
+  // Submit node response (for flow engine interactions)
+  const submitNodeResponse = useCallback((response: any, portName?: string) => {
+    if (!flowEngine.current) {
+      console.warn('[ConferBot] Cannot submit response: flow engine not initialized');
+      return;
+    }
+
+    setIsNodeProcessing(true);
+    flowEngine.current.submitResponse(response, portName).catch((error) => {
+      console.error('[ConferBot] Failed to submit node response:', error);
+      setIsNodeProcessing(false);
+    });
+  }, []);
+
   // Register push token
   const registerPushToken = useCallback(
     async (token: string): Promise<void> => {
@@ -273,7 +382,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   }, []);
 
   // ********** Context Value ********** //
-  const contextValue: ConferBotContextType = {
+  const contextValue: ExtendedConferBotContext = {
     // State
     isInitialized,
     isConnected,
@@ -284,6 +393,12 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     record,
     chatbotConfig,
 
+    // Node Flow Engine State
+    currentUIState,
+    isNodeProcessing,
+    flowEngine: flowEngine.current,
+    chatState: chatStateRef.current,
+
     // Actions
     openChat,
     closeChat,
@@ -291,6 +406,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     registerPushToken,
     on,
     off,
+
+    // Node Flow Engine Actions
+    submitNodeResponse,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
@@ -298,7 +416,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
 // ********** Custom Hook ********** //
 // useConferBot hook for consuming context
-export const useConferBot = (): ConferBotContextType => {
+export const useConferBot = (): ExtendedConferBotContext => {
   const context = useContext(ConferBotContext);
 
   if (!context) {
