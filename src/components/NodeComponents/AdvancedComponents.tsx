@@ -17,13 +17,26 @@ import {
   Dimensions,
   Platform,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import {
+  FilePicker,
+  FilePickerResult,
+  FilePickerError,
+  formatFileSize,
+  isFilePickerAvailable,
+  isImagePickerAvailable,
+} from '../../utils/FilePicker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_WIDTH = SCREEN_WIDTH - 24;
+
+// Maximum file size (5MB default)
+const DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 // ========================================
 // CALENDAR PICKER
@@ -752,80 +765,326 @@ export const MultiFieldForm: React.FC<MultiFieldFormProps> = ({
 
 interface FileUploadButtonProps extends NodeUIState.FileUpload {
   onSubmit: (response: any, portName?: string) => void;
+  /** Optional API upload function */
+  uploadFile?: (file: FilePickerResult) => Promise<{ url: string; fileName: string }>;
+  /** Bot ID for file upload endpoint */
+  botId?: string;
+  /** Base API URL for file upload */
+  apiBaseUrl?: string;
 }
 
 /**
  * FileUploadButton component
  *
- * Displays a file upload button/trigger.
- * Note: Requires react-native-document-picker or expo-document-picker for actual file picking.
+ * Displays a file upload button with support for:
+ * - Document selection (PDF, Word, Excel, etc.)
+ * - Image selection from gallery
+ * - Camera capture
+ * - Video selection
+ *
+ * Requires one of these libraries to be installed:
+ * - react-native-document-picker (for documents)
+ * - expo-document-picker (for documents)
+ * - react-native-image-picker (for images/camera)
+ * - expo-image-picker (for images/camera)
  */
 export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
   nodeId,
   question,
   variableName,
   acceptedTypes,
-  maxSize,
+  maxSize = DEFAULT_MAX_FILE_SIZE,
   multiple = false,
   onSubmit,
+  uploadFile: externalUploadFile,
+  botId,
+  apiBaseUrl = 'https://embed.conferbot.com',
 }) => {
   const theme = useTheme();
-  const [selectedFiles, setSelectedFiles] = useState<Array<{ name: string; size: number; uri: string }>>([]);
+  const [selectedFiles, setSelectedFiles] = useState<FilePickerResult[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadedUrls, setUploadedUrls] = useState<Record<string, string>>({});
 
-  const formatSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+  // Check which pickers are available
+  const hasFilePicker = isFilePickerAvailable();
+  const hasImagePicker = isImagePickerAvailable();
+  const hasAnyPicker = hasFilePicker || hasImagePicker;
 
-  const handleFilePick = useCallback(async () => {
-    // In a real implementation, use react-native-document-picker or expo-document-picker
-    // For now, show an alert indicating the feature
-    Alert.alert(
-      'File Picker',
-      'This would open the native file picker. Integrate with react-native-document-picker or expo-document-picker for full functionality.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Simulate Upload',
-          onPress: () => {
-            // Simulate file selection for demo purposes
-            const simulatedFile = {
-              name: 'example-document.pdf',
-              size: 1024 * 500, // 500 KB
-              uri: 'file://example/path/document.pdf',
-            };
+  /**
+   * Upload a file to the server
+   */
+  const uploadFileToServer = useCallback(async (file: FilePickerResult): Promise<string> => {
+    // If an external upload function is provided, use it
+    if (externalUploadFile) {
+      const result = await externalUploadFile(file);
+      return result.url;
+    }
 
-            if (multiple) {
-              setSelectedFiles(prev => [...prev, simulatedFile]);
-            } else {
-              setSelectedFiles([simulatedFile]);
-            }
-          },
+    // Otherwise, use the default upload endpoint
+    if (!botId) {
+      throw new Error('Bot ID is required for file upload');
+    }
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      type: file.type,
+      name: file.name,
+    } as any);
+
+    // Simulate progress for demo (actual progress requires XMLHttpRequest)
+    setUploadProgress(prev => ({ ...prev, [file.id]: 0 }));
+
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        const current = prev[file.id] || 0;
+        if (current >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return { ...prev, [file.id]: current + 10 };
+      });
+    }, 200);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/v1/bot/${botId}/media`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
         },
-      ]
-    );
-  }, [multiple]);
+      });
 
-  const handleRemoveFile = useCallback((index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+      clearInterval(progressInterval);
+      setUploadProgress(prev => ({ ...prev, [file.id]: 100 }));
+
+      if (!response.ok) {
+        throw new Error(`Upload failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.url;
+    } catch (error) {
+      clearInterval(progressInterval);
+      throw error;
+    }
+  }, [externalUploadFile, botId, apiBaseUrl]);
+
+  /**
+   * Handle file picker action
+   */
+  const handleFilePick = useCallback(async (type: 'document' | 'image' | 'camera' | 'all') => {
+    setUploadError(null);
+
+    try {
+      let files: FilePickerResult[] = [];
+
+      switch (type) {
+        case 'document':
+          files = await FilePicker.pickDocuments({
+            multiple,
+            maxSize,
+            maxFiles: multiple ? 10 : 1,
+          });
+          break;
+
+        case 'image':
+          files = await FilePicker.pickImages({
+            multiple,
+            maxSize,
+            maxFiles: multiple ? 10 : 1,
+            quality: 0.8,
+          });
+          break;
+
+        case 'camera':
+          const photo = await FilePicker.takePhoto({
+            maxSize,
+            quality: 0.8,
+          });
+          if (photo) {
+            files = [photo];
+          }
+          break;
+
+        case 'all':
+          files = await FilePicker.pick({
+            multiple,
+            maxSize,
+            maxFiles: multiple ? 10 : 1,
+            types: ['all'],
+          });
+          break;
+      }
+
+      if (files.length > 0) {
+        if (multiple) {
+          setSelectedFiles(prev => [...prev, ...files]);
+        } else {
+          setSelectedFiles(files);
+        }
+      }
+    } catch (error) {
+      if (error instanceof FilePickerError) {
+        if (error.code === 'FILE_TOO_LARGE') {
+          setUploadError(`File too large. Maximum size is ${formatFileSize(maxSize)}`);
+        } else if (error.code !== 'NOT_AVAILABLE') {
+          setUploadError(error.message);
+        }
+      } else {
+        console.error('[FileUploadButton] Pick error:', error);
+        setUploadError('Failed to select file. Please try again.');
+      }
+    }
+  }, [multiple, maxSize]);
+
+  /**
+   * Show action sheet with picker options
+   */
+  const showPickerOptions = useCallback(() => {
+    const buttons: Array<{ text: string; onPress: () => void; style?: 'cancel' | 'destructive' }> = [];
+
+    if (hasImagePicker) {
+      buttons.push({
+        text: 'Take Photo',
+        onPress: () => handleFilePick('camera'),
+      });
+      buttons.push({
+        text: 'Choose from Gallery',
+        onPress: () => handleFilePick('image'),
+      });
+    }
+
+    if (hasFilePicker) {
+      buttons.push({
+        text: 'Choose Document',
+        onPress: () => handleFilePick('document'),
+      });
+    }
+
+    // Fallback if no pickers but still want to show UI
+    if (!hasAnyPicker) {
+      Alert.alert(
+        'File Picker Not Available',
+        'Please install react-native-document-picker, expo-document-picker, react-native-image-picker, or expo-image-picker to enable file selection.',
+        [{ text: 'OK', style: 'cancel' }]
+      );
+      return;
+    }
+
+    buttons.push({
+      text: 'Cancel',
+      style: 'cancel',
+      onPress: () => {},
+    });
+
+    Alert.alert('Select File', 'Choose how you want to add a file', buttons);
+  }, [hasFilePicker, hasImagePicker, hasAnyPicker, handleFilePick]);
+
+  /**
+   * Remove a selected file
+   */
+  const handleRemoveFile = useCallback((fileId: string) => {
+    setSelectedFiles(prev => prev.filter(f => f.id !== fileId));
+    setUploadProgress(prev => {
+      const newProgress = { ...prev };
+      delete newProgress[fileId];
+      return newProgress;
+    });
+    setUploadedUrls(prev => {
+      const newUrls = { ...prev };
+      delete newUrls[fileId];
+      return newUrls;
+    });
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  /**
+   * Submit files
+   */
+  const handleSubmit = useCallback(async () => {
     if (selectedFiles.length === 0) return;
 
     setIsUploading(true);
+    setUploadError(null);
 
-    // In a real implementation, upload files here
-    onSubmit({
-      files: selectedFiles,
-      variableName,
-    });
-  }, [selectedFiles, variableName, onSubmit]);
+    try {
+      const uploadResults: Array<{ name: string; url: string; size: number; type: string }> = [];
 
-  const acceptedTypesText = acceptedTypes?.join(', ') || 'All files';
-  const maxSizeText = maxSize ? formatSize(maxSize) : 'No limit';
+      for (const file of selectedFiles) {
+        // Check if already uploaded
+        if (uploadedUrls[file.id]) {
+          uploadResults.push({
+            name: file.name,
+            url: uploadedUrls[file.id],
+            size: file.size,
+            type: file.type,
+          });
+          continue;
+        }
+
+        // Upload the file
+        const url = await uploadFileToServer(file);
+
+        setUploadedUrls(prev => ({ ...prev, [file.id]: url }));
+
+        uploadResults.push({
+          name: file.name,
+          url,
+          size: file.size,
+          type: file.type,
+        });
+      }
+
+      // Submit the response
+      onSubmit({
+        files: uploadResults,
+        variableName,
+        // For single file, also include direct properties for backward compatibility
+        ...(uploadResults.length === 1 && {
+          fileName: uploadResults[0].name,
+          url: uploadResults[0].url,
+          fileSize: uploadResults[0].size,
+          fileType: uploadResults[0].type,
+        }),
+      });
+    } catch (error: any) {
+      console.error('[FileUploadButton] Upload error:', error);
+      setUploadError(error.message || 'Failed to upload file. Please try again.');
+      setIsUploading(false);
+    }
+  }, [selectedFiles, uploadedUrls, uploadFileToServer, onSubmit, variableName]);
+
+  /**
+   * Get accepted types text
+   */
+  const getAcceptedTypesText = (): string => {
+    if (!acceptedTypes || acceptedTypes.length === 0) {
+      return 'All files';
+    }
+    return acceptedTypes.map(t => t.replace('.', '').toUpperCase()).join(', ');
+  };
+
+  /**
+   * Check if file is an image
+   */
+  const isImageFile = (file: FilePickerResult): boolean => {
+    return file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(file.extension.toLowerCase());
+  };
+
+  /**
+   * Get file icon based on type
+   */
+  const getFileIcon = (file: FilePickerResult): string => {
+    if (isImageFile(file)) return '\uD83D\uDDBC'; // Picture frame
+    if (file.type.startsWith('video/')) return '\uD83C\uDFA5'; // Movie camera
+    if (file.type.startsWith('audio/')) return '\uD83C\uDFB5'; // Musical note
+    if (file.type === 'application/pdf') return '\uD83D\uDCC4'; // Page
+    if (file.type.includes('word') || file.type.includes('document')) return '\uD83D\uDCDD'; // Memo
+    if (file.type.includes('excel') || file.type.includes('spreadsheet')) return '\uD83D\uDCCA'; // Chart
+    return '\uD83D\uDCC1'; // Folder
+  };
 
   return (
     <View
@@ -850,16 +1109,17 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
         {question}
       </Text>
 
+      {/* Upload Area */}
       <TouchableOpacity
         style={[
           styles.uploadButton,
           {
             backgroundColor: theme.colors.background,
-            borderColor: theme.colors.border,
+            borderColor: uploadError ? theme.colors.error : theme.colors.border,
             borderRadius: theme.borderRadius.lg,
           },
         ]}
-        onPress={handleFilePick}
+        onPress={showPickerOptions}
         disabled={isUploading}
         accessibilityRole="button"
         accessibilityLabel="Select file to upload"
@@ -885,63 +1145,133 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
             },
           ]}
         >
-          {acceptedTypesText} (Max: {maxSizeText})
+          {getAcceptedTypesText()} (Max: {formatFileSize(maxSize)})
         </Text>
+        {!hasAnyPicker && (
+          <Text
+            style={[
+              styles.uploadWarning,
+              {
+                color: theme.colors.warning || '#F59E0B',
+                fontSize: theme.typography.fontSize.xs,
+              },
+            ]}
+          >
+            File picker library not installed
+          </Text>
+        )}
       </TouchableOpacity>
 
+      {/* Error Message */}
+      {uploadError && (
+        <Text style={[styles.errorText, { color: theme.colors.error }]}>
+          {uploadError}
+        </Text>
+      )}
+
+      {/* Selected Files List */}
       {selectedFiles.length > 0 && (
         <View style={styles.selectedFilesList}>
-          {selectedFiles.map((file, index) => (
-            <View
-              key={index}
-              style={[
-                styles.selectedFile,
-                {
-                  backgroundColor: theme.colors.background,
-                  borderRadius: theme.borderRadius.md,
-                },
-              ]}
-            >
-              <View style={styles.selectedFileInfo}>
-                <Text
-                  style={[
-                    styles.selectedFileName,
-                    { color: theme.colors.text },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {file.name}
-                </Text>
-                <Text
-                  style={[
-                    styles.selectedFileSize,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {formatSize(file.size)}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.removeFileButton}
-                onPress={() => handleRemoveFile(index)}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${file.name}`}
+          {selectedFiles.map((file) => {
+            const progress = uploadProgress[file.id];
+            const isUploaded = !!uploadedUrls[file.id];
+
+            return (
+              <View
+                key={file.id}
+                style={[
+                  styles.selectedFile,
+                  {
+                    backgroundColor: theme.colors.background,
+                    borderRadius: theme.borderRadius.md,
+                  },
+                ]}
               >
-                <Text style={[styles.removeFileIcon, { color: theme.colors.error }]}>
-                  {'\u2715'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+                {/* File Preview/Icon */}
+                {isImageFile(file) ? (
+                  <Image
+                    source={{ uri: file.uri }}
+                    style={styles.filePreviewImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.fileIconContainer, { backgroundColor: theme.colors.primaryLight }]}>
+                    <Text style={styles.fileIcon}>{getFileIcon(file)}</Text>
+                  </View>
+                )}
+
+                {/* File Info */}
+                <View style={styles.selectedFileInfo}>
+                  <Text
+                    style={[
+                      styles.selectedFileName,
+                      { color: theme.colors.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {file.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.selectedFileSize,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
+                    {formatFileSize(file.size)}
+                    {isUploaded && ' - Uploaded'}
+                  </Text>
+
+                  {/* Upload Progress */}
+                  {progress !== undefined && progress < 100 && !isUploaded && (
+                    <View style={styles.progressContainer}>
+                      <View
+                        style={[
+                          styles.progressBar,
+                          { backgroundColor: theme.colors.border },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.progressFill,
+                            {
+                              backgroundColor: theme.colors.primary,
+                              width: `${progress}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.progressText, { color: theme.colors.textSecondary }]}>
+                        {progress}%
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Remove Button */}
+                <TouchableOpacity
+                  style={styles.removeFileButton}
+                  onPress={() => handleRemoveFile(file.id)}
+                  disabled={isUploading}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${file.name}`}
+                >
+                  <Text style={[styles.removeFileIcon, { color: theme.colors.error }]}>
+                    {'\u2715'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
         </View>
       )}
 
+      {/* Submit Button */}
       <TouchableOpacity
         style={[
           styles.submitButton,
           {
             backgroundColor:
-              selectedFiles.length === 0
+              selectedFiles.length === 0 || isUploading
                 ? theme.colors.border
                 : theme.colors.primary,
             borderRadius: theme.borderRadius.md,
@@ -952,20 +1282,34 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
         accessibilityRole="button"
         accessibilityLabel="Upload files"
       >
-        <Text
-          style={[
-            styles.submitButtonText,
-            {
-              color:
-                selectedFiles.length === 0
-                  ? theme.colors.textDisabled
-                  : theme.colors.textInverse,
-              fontSize: theme.typography.fontSize.md,
-            },
-          ]}
-        >
-          {isUploading ? 'Uploading...' : 'Upload'}
-        </Text>
+        {isUploading ? (
+          <View style={styles.uploadingContainer}>
+            <ActivityIndicator size="small" color={theme.colors.textInverse} />
+            <Text
+              style={[
+                styles.submitButtonText,
+                { color: theme.colors.textInverse, marginLeft: 8 },
+              ]}
+            >
+              Uploading...
+            </Text>
+          </View>
+        ) : (
+          <Text
+            style={[
+              styles.submitButtonText,
+              {
+                color:
+                  selectedFiles.length === 0
+                    ? theme.colors.textDisabled
+                    : theme.colors.textInverse,
+                fontSize: theme.typography.fontSize.md,
+              },
+            ]}
+          >
+            Upload
+          </Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -1401,6 +1745,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
   },
+  uploadWarning: {
+    marginTop: 8,
+    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
+  },
   selectedFilesList: {
     marginTop: 16,
   },
@@ -1409,6 +1762,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     marginBottom: 8,
+  },
+  filePreviewImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  fileIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 4,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileIcon: {
+    fontSize: 24,
   },
   selectedFileInfo: {
     flex: 1,
@@ -1422,12 +1792,37 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
   },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  progressBar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressText: {
+    marginLeft: 8,
+    fontSize: 10,
+    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
+  },
   removeFileButton: {
     padding: 8,
   },
   removeFileIcon: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  uploadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Location styles
