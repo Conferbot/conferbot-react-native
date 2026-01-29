@@ -2,7 +2,6 @@
  * Jest Configuration for Conferbot React Native SDK
  */
 module.exports = {
-  preset: 'react-native',
   testEnvironment: 'node',
   roots: ['<rootDir>/src', '<rootDir>/__tests__'],
   testMatch: [
