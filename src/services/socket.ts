@@ -1,7 +1,15 @@
 import { io, Socket } from 'socket.io-client';
 import {
   SocketEvents,
+  type MessageReactionPayload,
+  type ReactionEmoji,
 } from '../types';
+import {
+  ReadReceiptSocketEvents,
+  type ReadReceiptData,
+  type DeliveryReceiptData,
+  type BatchReadReceiptPayload,
+} from '../types/messageStatus';
 import {
   DEFAULT_SOCKET_URL,
   SOCKET_TIMEOUT,
@@ -25,7 +33,7 @@ interface SocketOptions {
 
 // Socket event listeners map
 type SocketEventListener = (...args: any[]) => void;
-type EventListenersMap = Map<SocketEvents, Set<SocketEventListener>>;
+type EventListenersMap = Map<string, Set<SocketEventListener>>;
 
 // ********** Socket Client Class ********** //
 class ConferBotSocket {
@@ -74,6 +82,9 @@ class ConferBotSocket {
 
         // Set up message event handlers
         this.setupMessageHandlers();
+
+        // Set up read receipt event handlers
+        this.setupReadReceiptHandlers();
       } catch (error) {
         reject(error);
       }
@@ -95,6 +106,16 @@ class ConferBotSocket {
   // Check if socket is connected
   isConnected(): boolean {
     return this.socket?.connected || false;
+  }
+
+  // Get current user ID
+  getUserId(): string | undefined {
+    return this.userId;
+  }
+
+  // Set user ID
+  setUserId(userId: string): void {
+    this.userId = userId;
   }
 
   // ********** Event Handlers Setup ********** //
@@ -233,6 +254,44 @@ class ConferBotSocket {
         console.log('[ConferBot Socket] Destroy notification received');
       }
       this.emit(SocketEvents.DESTROY_NOTIFICATION);
+    });
+
+    // Message reaction update (server to client)
+    this.socket.on(SocketEvents.MESSAGE_REACTION_UPDATE, (data: any) => {
+      if (__DEV__) {
+        console.log('[ConferBot Socket] Reaction update received:', data);
+      }
+      this.emit(SocketEvents.MESSAGE_REACTION_UPDATE, data);
+    });
+  }
+
+  // ********** Read Receipt Event Handlers ********** //
+  // Set up read receipt event handlers
+  private setupReadReceiptHandlers(): void {
+    if (!this.socket) return;
+
+    // Message acknowledged by server (SENT status)
+    this.socket.on(ReadReceiptSocketEvents.MESSAGE_ACK, (data: { messageId: string | number }) => {
+      if (__DEV__) {
+        console.log('[ConferBot Socket] Message acknowledged:', data);
+      }
+      this.emit(ReadReceiptSocketEvents.MESSAGE_ACK, data);
+    });
+
+    // Message delivered to recipient
+    this.socket.on(ReadReceiptSocketEvents.MESSAGE_DELIVERED, (data: DeliveryReceiptData) => {
+      if (__DEV__) {
+        console.log('[ConferBot Socket] Message delivered:', data);
+      }
+      this.emit(ReadReceiptSocketEvents.MESSAGE_DELIVERED, data);
+    });
+
+    // Message read by recipient
+    this.socket.on(ReadReceiptSocketEvents.MESSAGE_READ, (data: ReadReceiptData) => {
+      if (__DEV__) {
+        console.log('[ConferBot Socket] Message read:', data);
+      }
+      this.emit(ReadReceiptSocketEvents.MESSAGE_READ, data);
     });
   }
 
@@ -392,9 +451,111 @@ class ConferBotSocket {
     }
   }
 
+  // ********** Reaction Methods ********** //
+  /**
+   * Send a message reaction to the server
+   * @param chatSessionId - The chat session ID
+   * @param messageId - The message ID to react to
+   * @param emoji - The emoji reaction
+   * @param action - 'add' to add reaction, 'remove' to remove
+   * @param userName - Optional user name for display
+   */
+  sendMessageReaction(
+    chatSessionId: string,
+    messageId: string,
+    emoji: ReactionEmoji,
+    action: 'add' | 'remove',
+    userName?: string
+  ): void {
+    if (!this.socket || !this.isConnected()) {
+      if (__DEV__) {
+        console.warn('[ConferBot Socket] Cannot send reaction: not connected');
+      }
+      return;
+    }
+
+    if (!this.userId) {
+      if (__DEV__) {
+        console.warn('[ConferBot Socket] Cannot send reaction: no user ID');
+      }
+      return;
+    }
+
+    const payload: MessageReactionPayload = {
+      chatSessionId,
+      messageId,
+      emoji,
+      action,
+      userId: this.userId,
+      userName,
+    };
+
+    this.socket.emit(SocketEvents.MESSAGE_REACTION, payload);
+
+    if (__DEV__) {
+      console.log('[ConferBot Socket] Reaction sent:', payload);
+    }
+  }
+
+  // ********** Read Receipt Methods ********** //
+
+  /**
+   * Mark a single message as read
+   * @param messageId - The ID of the message to mark as read
+   * @param chatSessionId - The chat session ID
+   */
+  markMessageAsRead(messageId: string | number, chatSessionId: string): void {
+    if (!this.socket || !this.isConnected()) {
+      if (__DEV__) {
+        console.warn('[ConferBot Socket] Cannot mark message as read: not connected');
+      }
+      return;
+    }
+
+    this.socket.emit(ReadReceiptSocketEvents.MARK_AS_READ, {
+      messageId,
+      chatSessionId,
+      readAt: new Date().toISOString(),
+    });
+
+    if (__DEV__) {
+      console.log('[ConferBot Socket] Message marked as read:', messageId);
+    }
+  }
+
+  /**
+   * Batch mark multiple messages as read
+   * @param messageIds - Array of message IDs to mark as read
+   * @param chatSessionId - The chat session ID
+   */
+  batchMarkMessagesAsRead(messageIds: (string | number)[], chatSessionId: string): void {
+    if (!this.socket || !this.isConnected()) {
+      if (__DEV__) {
+        console.warn('[ConferBot Socket] Cannot batch mark messages as read: not connected');
+      }
+      return;
+    }
+
+    if (messageIds.length === 0) {
+      return;
+    }
+
+    const payload: BatchReadReceiptPayload = {
+      messageIds,
+      chatSessionId,
+      viewedAt: new Date().toISOString(),
+    };
+
+    this.socket.emit(ReadReceiptSocketEvents.BATCH_MARK_AS_READ, payload);
+
+    if (__DEV__) {
+      console.log('[ConferBot Socket] Batch messages marked as read:', messageIds.length);
+    }
+  }
+
   // ********** Event Listener Methods ********** //
-  // Add event listener
-  on(event: SocketEvents, callback: SocketEventListener): () => void {
+  // Add event listener (supports both SocketEvents and read receipt events)
+  on(event: SocketEvents | string, callback: SocketEventListener): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
@@ -406,7 +567,7 @@ class ConferBotSocket {
   }
 
   // Remove event listener
-  off(event: SocketEvents, callback: SocketEventListener): void {
+  off(event: SocketEvents | string, callback: SocketEventListener): void {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
       eventListeners.delete(callback);
@@ -414,7 +575,7 @@ class ConferBotSocket {
   }
 
   // Emit event to all listeners
-  private emit(event: SocketEvents, ...args: any[]): void {
+  private emit(event: SocketEvents | string, ...args: any[]): void {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
       eventListeners.forEach((callback) => {
@@ -430,7 +591,7 @@ class ConferBotSocket {
   }
 
   // Remove all event listeners
-  removeAllListeners(event?: SocketEvents): void {
+  removeAllListeners(event?: SocketEvents | string): void {
     if (event) {
       this.listeners.delete(event);
     } else {
