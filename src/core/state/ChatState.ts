@@ -3,8 +3,16 @@
  *
  * Central state management for the Conferbot React Native SDK.
  * Manages conversation flow state including answer variables, user metadata,
- * transcript, and session records.
+ * transcript, session records, message status tracking, and message reactions.
  */
+
+import {
+  MessageStatus,
+  MessageStatusEntry,
+  isStatusMoreAdvanced,
+} from '../../types/messageStatus';
+
+import type { Reaction, ReactionEmoji } from '../../types';
 
 // ========================================
 // TYPES
@@ -43,6 +51,7 @@ export interface RecordEntry {
   type: string;
   time: Date | string;
   text?: string;
+  reactions?: Reaction[];
   [key: string]: any;
 }
 
@@ -52,7 +61,8 @@ export interface RecordEntry {
 
 /**
  * ChatState manages all conversation state for a chat session.
- * This includes answer variables, user metadata, transcript, and flow variables.
+ * This includes answer variables, user metadata, transcript, flow variables,
+ * message delivery status tracking, and message reactions.
  */
 export class ChatState {
   // Session identification
@@ -82,8 +92,22 @@ export class ChatState {
   private _isFlowComplete: boolean = false;
   private _flowCompletionReason?: string;
 
+  // Message status tracking (for read receipts)
+  private _messageStatuses: Map<string | number, MessageStatusEntry> = new Map();
+
+  // Message reactions (messageId -> reactions array)
+  private _reactions: Map<string, Reaction[]> = new Map();
+
   // Listeners for state changes
   private _listeners: Set<(state: ChatState) => void> = new Set();
+
+  // Message status change listeners
+  private _statusListeners: Set<
+    (messageId: string | number, status: MessageStatusEntry) => void
+  > = new Set();
+
+  // Reaction change listeners
+  private _reactionListeners: Set<(messageId: string, reactions: Reaction[]) => void> = new Set();
 
   constructor(sessionId: string, botId: string) {
     this._sessionId = sessionId;
@@ -125,6 +149,477 @@ export class ChatState {
 
   get userPhone(): string | undefined {
     return this._userMetadata.phone;
+  }
+
+  // ========================================
+  // MESSAGE STATUS TRACKING (READ RECEIPTS)
+  // ========================================
+
+  /**
+   * Gets the status for a specific message
+   */
+  getMessageStatus(messageId: string | number): MessageStatusEntry | undefined {
+    return this._messageStatuses.get(messageId);
+  }
+
+  /**
+   * Gets all message statuses as a Map
+   */
+  getAllMessageStatuses(): Map<string | number, MessageStatusEntry> {
+    return new Map(this._messageStatuses);
+  }
+
+  /**
+   * Sets the initial status for a queued offline message (PENDING)
+   */
+  setMessagePending(messageId: string | number, queuedMessageId?: string): void {
+    const now = new Date().toISOString();
+    const entry: MessageStatusEntry = {
+      status: MessageStatus.PENDING,
+      updatedAt: now,
+      queuedAt: now,
+      retryCount: 0,
+      queuedMessageId,
+    };
+    this._messageStatuses.set(messageId, entry);
+    this.notifyStatusListeners(messageId, entry);
+    this.notifyListeners();
+  }
+
+  /**
+   * Sets the status for a new message (SENDING)
+   */
+  setMessageSending(messageId: string | number): void {
+    const existing = this._messageStatuses.get(messageId);
+    const now = new Date().toISOString();
+    const entry: MessageStatusEntry = {
+      status: MessageStatus.SENDING,
+      updatedAt: now,
+      queuedAt: existing?.queuedAt,
+      sentAt: now,
+      retryCount: existing?.retryCount ?? 0,
+      queuedMessageId: existing?.queuedMessageId,
+    };
+    this._messageStatuses.set(messageId, entry);
+    this.notifyStatusListeners(messageId, entry);
+    this.notifyListeners();
+  }
+
+  /**
+   * Updates a message status to SENT (server acknowledged)
+   */
+  setMessageSent(messageId: string | number): void {
+    const existing = this._messageStatuses.get(messageId);
+    const now = new Date().toISOString();
+
+    // Only update if current status is PENDING or SENDING
+    if (
+      !existing ||
+      existing.status === MessageStatus.PENDING ||
+      existing.status === MessageStatus.SENDING
+    ) {
+      const entry: MessageStatusEntry = {
+        status: MessageStatus.SENT,
+        updatedAt: now,
+        queuedAt: existing?.queuedAt,
+        sentAt: existing?.sentAt || now,
+        retryCount: existing?.retryCount,
+        queuedMessageId: existing?.queuedMessageId,
+      };
+      this._messageStatuses.set(messageId, entry);
+      this.notifyStatusListeners(messageId, entry);
+      this.notifyListeners();
+    }
+  }
+
+  /**
+   * Updates a message status to DELIVERED
+   */
+  setMessageDelivered(messageId: string | number, deliveredAt?: string): void {
+    const existing = this._messageStatuses.get(messageId);
+    const now = deliveredAt || new Date().toISOString();
+
+    // Only update if current status is less advanced than DELIVERED
+    if (
+      !existing ||
+      !isStatusMoreAdvanced(existing.status, MessageStatus.DELIVERED)
+    ) {
+      const entry: MessageStatusEntry = {
+        status: MessageStatus.DELIVERED,
+        updatedAt: now,
+        queuedAt: existing?.queuedAt,
+        sentAt: existing?.sentAt,
+        deliveredAt: now,
+        retryCount: existing?.retryCount,
+        queuedMessageId: existing?.queuedMessageId,
+      };
+      this._messageStatuses.set(messageId, entry);
+      this.notifyStatusListeners(messageId, entry);
+      this.notifyListeners();
+    }
+  }
+
+  /**
+   * Updates a message status to READ
+   */
+  setMessageRead(
+    messageId: string | number,
+    readAt?: string,
+    readBy?: 'agent' | 'bot'
+  ): void {
+    const existing = this._messageStatuses.get(messageId);
+    const now = readAt || new Date().toISOString();
+
+    // Only update if current status is less advanced than READ
+    if (
+      !existing ||
+      !isStatusMoreAdvanced(existing.status, MessageStatus.READ)
+    ) {
+      const entry: MessageStatusEntry = {
+        status: MessageStatus.READ,
+        updatedAt: now,
+        queuedAt: existing?.queuedAt,
+        sentAt: existing?.sentAt,
+        deliveredAt: existing?.deliveredAt || now,
+        readAt: now,
+        readBy,
+        retryCount: existing?.retryCount,
+        queuedMessageId: existing?.queuedMessageId,
+      };
+      this._messageStatuses.set(messageId, entry);
+      this.notifyStatusListeners(messageId, entry);
+      this.notifyListeners();
+    }
+  }
+
+  /**
+   * Sets a message status to FAILED
+   */
+  setMessageFailed(messageId: string | number, error?: string): void {
+    const existing = this._messageStatuses.get(messageId);
+    const now = new Date().toISOString();
+
+    const entry: MessageStatusEntry = {
+      status: MessageStatus.FAILED,
+      updatedAt: now,
+      queuedAt: existing?.queuedAt,
+      sentAt: existing?.sentAt,
+      retryCount: (existing?.retryCount ?? 0) + 1,
+      error,
+      queuedMessageId: existing?.queuedMessageId,
+    };
+    this._messageStatuses.set(messageId, entry);
+    this.notifyStatusListeners(messageId, entry);
+    this.notifyListeners();
+  }
+
+  /**
+   * Updates message status with flexible parameters
+   */
+  updateMessageStatus(
+    messageId: string | number,
+    status: MessageStatus,
+    options?: {
+      timestamp?: string;
+      readBy?: 'agent' | 'bot';
+      error?: string;
+      queuedMessageId?: string;
+    }
+  ): void {
+    switch (status) {
+      case MessageStatus.PENDING:
+        this.setMessagePending(messageId, options?.queuedMessageId);
+        break;
+      case MessageStatus.SENDING:
+        this.setMessageSending(messageId);
+        break;
+      case MessageStatus.SENT:
+        this.setMessageSent(messageId);
+        break;
+      case MessageStatus.DELIVERED:
+        this.setMessageDelivered(messageId, options?.timestamp);
+        break;
+      case MessageStatus.READ:
+        this.setMessageRead(messageId, options?.timestamp, options?.readBy);
+        break;
+      case MessageStatus.FAILED:
+        this.setMessageFailed(messageId, options?.error);
+        break;
+    }
+  }
+
+  /**
+   * Batch update multiple messages to a status
+   */
+  batchUpdateMessageStatus(
+    messageIds: (string | number)[],
+    status: MessageStatus,
+    options?: {
+      timestamp?: string;
+      readBy?: 'agent' | 'bot';
+      error?: string;
+    }
+  ): void {
+    for (const messageId of messageIds) {
+      this.updateMessageStatus(messageId, status, options);
+    }
+  }
+
+  /**
+   * Gets all user message IDs that have a specific status or lower
+   */
+  getMessageIdsWithStatusOrLower(
+    maxStatus: MessageStatus
+  ): (string | number)[] {
+    const statusOrder: Record<MessageStatus, number> = {
+      [MessageStatus.FAILED]: -1,
+      [MessageStatus.PENDING]: 0,
+      [MessageStatus.SENDING]: 1,
+      [MessageStatus.SENT]: 2,
+      [MessageStatus.DELIVERED]: 3,
+      [MessageStatus.READ]: 4,
+    };
+    const maxOrder = statusOrder[maxStatus];
+
+    const result: (string | number)[] = [];
+    this._messageStatuses.forEach((entry, messageId) => {
+      if (statusOrder[entry.status] <= maxOrder) {
+        result.push(messageId);
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Gets unread message IDs (status is SENT or DELIVERED)
+   */
+  getUnreadMessageIds(): (string | number)[] {
+    const result: (string | number)[] = [];
+    this._messageStatuses.forEach((entry, messageId) => {
+      if (
+        entry.status === MessageStatus.SENT ||
+        entry.status === MessageStatus.DELIVERED
+      ) {
+        result.push(messageId);
+      }
+    });
+    return result;
+  }
+
+  /**
+   * Gets pending/failed message IDs (for offline queue retry)
+   */
+  getPendingMessageIds(): (string | number)[] {
+    const result: (string | number)[] = [];
+    this._messageStatuses.forEach((entry, messageId) => {
+      if (
+        entry.status === MessageStatus.PENDING ||
+        entry.status === MessageStatus.FAILED
+      ) {
+        result.push(messageId);
+      }
+    });
+    return result;
+  }
+
+  /**
+   * Gets failed message IDs
+   */
+  getFailedMessageIds(): (string | number)[] {
+    const result: (string | number)[] = [];
+    this._messageStatuses.forEach((entry, messageId) => {
+      if (entry.status === MessageStatus.FAILED) {
+        result.push(messageId);
+      }
+    });
+    return result;
+  }
+
+  /**
+   * Adds a listener for message status changes
+   */
+  addStatusListener(
+    listener: (messageId: string | number, status: MessageStatusEntry) => void
+  ): () => void {
+    this._statusListeners.add(listener);
+    return () => this._statusListeners.delete(listener);
+  }
+
+  /**
+   * Notifies all status listeners of a change
+   */
+  private notifyStatusListeners(
+    messageId: string | number,
+    status: MessageStatusEntry
+  ): void {
+    this._statusListeners.forEach((listener) => {
+      try {
+        listener(messageId, status);
+      } catch (error) {
+        console.error('[ChatState] Status listener error:', error);
+      }
+    });
+  }
+
+  // ========================================
+  // MESSAGE REACTIONS
+  // ========================================
+
+  /**
+   * Adds a reaction to a message
+   * @param messageId - The message ID to add reaction to
+   * @param emoji - The emoji reaction
+   * @param userId - The user ID adding the reaction
+   * @param userName - Optional user name
+   */
+  addReaction(
+    messageId: string,
+    emoji: ReactionEmoji,
+    userId: string,
+    userName?: string
+  ): void {
+    const reactions = this._reactions.get(messageId) || [];
+
+    // Check if user already reacted with this emoji
+    const existingIndex = reactions.findIndex(
+      (r) => r.userId === userId && r.emoji === emoji
+    );
+
+    if (existingIndex === -1) {
+      // Add new reaction
+      const newReaction: Reaction = {
+        emoji,
+        userId,
+        userName,
+        timestamp: new Date().toISOString(),
+      };
+      reactions.push(newReaction);
+      this._reactions.set(messageId, reactions);
+      this.notifyReactionListeners(messageId, reactions);
+      this.notifyListeners();
+    }
+  }
+
+  /**
+   * Removes a reaction from a message
+   * @param messageId - The message ID to remove reaction from
+   * @param emoji - The emoji reaction to remove
+   * @param userId - The user ID removing the reaction
+   */
+  removeReaction(messageId: string, emoji: ReactionEmoji, userId: string): void {
+    const reactions = this._reactions.get(messageId);
+    if (!reactions) return;
+
+    const filteredReactions = reactions.filter(
+      (r) => !(r.userId === userId && r.emoji === emoji)
+    );
+
+    if (filteredReactions.length === 0) {
+      this._reactions.delete(messageId);
+    } else {
+      this._reactions.set(messageId, filteredReactions);
+    }
+
+    this.notifyReactionListeners(messageId, filteredReactions);
+    this.notifyListeners();
+  }
+
+  /**
+   * Toggle a reaction (add if not present, remove if present)
+   * @param messageId - The message ID
+   * @param emoji - The emoji reaction
+   * @param userId - The user ID
+   * @param userName - Optional user name
+   * @returns 'added' | 'removed' indicating the action taken
+   */
+  toggleReaction(
+    messageId: string,
+    emoji: ReactionEmoji,
+    userId: string,
+    userName?: string
+  ): 'added' | 'removed' {
+    const reactions = this._reactions.get(messageId) || [];
+    const existingIndex = reactions.findIndex(
+      (r) => r.userId === userId && r.emoji === emoji
+    );
+
+    if (existingIndex === -1) {
+      this.addReaction(messageId, emoji, userId, userName);
+      return 'added';
+    } else {
+      this.removeReaction(messageId, emoji, userId);
+      return 'removed';
+    }
+  }
+
+  /**
+   * Gets all reactions for a message
+   * @param messageId - The message ID
+   * @returns Array of reactions
+   */
+  getReactions(messageId: string): Reaction[] {
+    return this._reactions.get(messageId) || [];
+  }
+
+  /**
+   * Gets all reactions as a Map
+   * @returns Map of messageId to reactions array
+   */
+  getAllReactions(): Map<string, Reaction[]> {
+    return new Map(this._reactions);
+  }
+
+  /**
+   * Sets all reactions for a message (used for sync from server)
+   * @param messageId - The message ID
+   * @param reactions - Array of reactions
+   */
+  setReactions(messageId: string, reactions: Reaction[]): void {
+    if (reactions.length === 0) {
+      this._reactions.delete(messageId);
+    } else {
+      this._reactions.set(messageId, reactions);
+    }
+    this.notifyReactionListeners(messageId, reactions);
+    this.notifyListeners();
+  }
+
+  /**
+   * Checks if a user has reacted to a message with a specific emoji
+   * @param messageId - The message ID
+   * @param emoji - The emoji to check
+   * @param userId - The user ID to check
+   * @returns true if user has reacted
+   */
+  hasUserReacted(messageId: string, emoji: ReactionEmoji, userId: string): boolean {
+    const reactions = this._reactions.get(messageId) || [];
+    return reactions.some((r) => r.userId === userId && r.emoji === emoji);
+  }
+
+  /**
+   * Add a reaction change listener
+   * @param listener - Callback function
+   * @returns Unsubscribe function
+   */
+  addReactionListener(
+    listener: (messageId: string, reactions: Reaction[]) => void
+  ): () => void {
+    this._reactionListeners.add(listener);
+    return () => this._reactionListeners.delete(listener);
+  }
+
+  /**
+   * Notify all reaction listeners
+   */
+  private notifyReactionListeners(messageId: string, reactions: Reaction[]): void {
+    this._reactionListeners.forEach((listener) => {
+      try {
+        listener(messageId, reactions);
+      } catch (error) {
+        console.error('[ChatState] Reaction listener error:', error);
+      }
+    });
   }
 
   // ========================================
@@ -423,6 +918,20 @@ export class ChatState {
       }
     }
 
+    // Count total reactions
+    let totalReactions = 0;
+    this._reactions.forEach((reactions) => {
+      totalReactions += reactions.length;
+    });
+
+    // Count message statuses
+    let pendingCount = 0;
+    let failedCount = 0;
+    this._messageStatuses.forEach((entry) => {
+      if (entry.status === MessageStatus.PENDING) pendingCount++;
+      if (entry.status === MessageStatus.FAILED) failedCount++;
+    });
+
     return {
       totalMessages: this._transcript.length,
       botMessages: botMessageCount,
@@ -430,6 +939,10 @@ export class ChatState {
       goalsReached,
       answersCollected: this._answerVariables.size,
       variablesSet: this._variables.size,
+      totalReactions,
+      messagesWithReactions: this._reactions.size,
+      pendingMessages: pendingCount,
+      failedMessages: failedCount,
     };
   }
 
@@ -503,6 +1016,18 @@ export class ChatState {
    * Serializes state to JSON-compatible object
    */
   toJSON(): Record<string, any> {
+    // Convert message statuses map to object
+    const messageStatuses: Record<string, MessageStatusEntry> = {};
+    this._messageStatuses.forEach((entry, key) => {
+      messageStatuses[String(key)] = entry;
+    });
+
+    // Convert reactions Map to array format for serialization
+    const reactionsArray: Array<{ messageId: string; reactions: Reaction[] }> = [];
+    this._reactions.forEach((reactions, messageId) => {
+      reactionsArray.push({ messageId, reactions });
+    });
+
     return {
       sessionId: this._sessionId,
       botId: this._botId,
@@ -515,6 +1040,8 @@ export class ChatState {
       visitedNodes: Array.from(this._visitedNodes),
       isFlowComplete: this._isFlowComplete,
       flowCompletionReason: this._flowCompletionReason,
+      messageStatuses,
+      reactions: reactionsArray,
     };
   }
 
@@ -567,6 +1094,20 @@ export class ChatState {
       state._flowCompletionReason = data.flowCompletionReason;
     }
 
+    // Restore message statuses
+    if (data.messageStatuses) {
+      for (const [key, value] of Object.entries(data.messageStatuses)) {
+        state._messageStatuses.set(key, value as MessageStatusEntry);
+      }
+    }
+
+    // Restore reactions
+    if (Array.isArray(data.reactions)) {
+      for (const { messageId, reactions } of data.reactions) {
+        state._reactions.set(messageId, reactions);
+      }
+    }
+
     return state;
   }
 
@@ -583,6 +1124,8 @@ export class ChatState {
     this._visitedNodes.clear();
     this._isFlowComplete = false;
     this._flowCompletionReason = undefined;
+    this._messageStatuses.clear();
+    this._reactions.clear();
     this.notifyListeners();
   }
 }
