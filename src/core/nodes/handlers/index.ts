@@ -2,7 +2,7 @@
  * Node Handlers Index
  *
  * Central export point for all node handlers in the Conferbot React Native SDK.
- * Provides unified registration and access to all 54 node type handlers.
+ * Provides unified registration and access to all 58 node type handlers.
  */
 
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
@@ -112,6 +112,7 @@ export {
   HumanHandoverHandler,
   DelayHandler,
   EmailHandler,
+  GmailHandler,
   SlackHandler,
   DiscordHandler,
   WhatsAppHandler,
@@ -121,11 +122,24 @@ export {
   GoogleAnalyticsHandler,
   HubSpotHandler,
   SalesforceHandler,
+  ZohoCRMHandler,
   MailchimpHandler,
   ZapierHandler,
   AirtableHandler,
+  NotionHandler,
+  StripeHandler,
   registerIntegrationHandlers,
 } from './IntegrationNodeHandlers';
+
+// ========================================
+// ENHANCED GPT HANDLER (Multi-provider, Streaming)
+// ========================================
+
+export {
+  EnhancedGPTHandler,
+  createEnhancedGPTHandler,
+  type EnhancedGPTUIState,
+} from './EnhancedGPTHandler';
 
 // ========================================
 // SPECIAL FLOW NODE HANDLERS
@@ -155,23 +169,29 @@ export type {
  */
 export interface HandlerRegistrationConfig {
   /** Socket client instance for real-time features like live chat and human handover */
-  socketClient?: any;
+  socketClient?: unknown;
   /** Base URL for API calls and integrations */
   apiBaseUrl?: string;
+  /** Global API key for AI providers (OpenAI, Anthropic, etc.) */
+  aiApiKey?: string;
+  /** Use enhanced GPT handler with streaming support */
+  useEnhancedGPT?: boolean;
 }
 
 /**
  * Registers ALL node handlers with the provided registry.
  * This is the primary entry point for initializing the complete handler system.
  *
- * Handler Categories (54 total):
+ * Handler Categories (58 total):
  * - Display: 7 handlers (message, image, video, audio, file, html, redirect)
  * - Ask: 9 handlers (name, email, phone, number, url, date, address, file, location)
  * - Choice: 7 handlers (buttons, cards, carousel, picturechoice, dropdown, rating, opinionscale)
  * - Advanced Input: 2 handlers (calendar, multiplequestions)
  * - Legacy: 3 handlers (user-input-node, user-range-node, quiz-node)
  * - Logic: 8 handlers (condition, boolean-condition, math, random-path, set-variable, jump, business-hours)
- * - Integration: 17 handlers (webhook, gpt, human-handover, delay, email, slack, discord, whatsapp, telegram, google-sheets, google-calendar, google-analytics, hubspot, salesforce, mailchimp, zapier, airtable)
+ * - Integration: 21 handlers (webhook, gpt, human-handover, delay, email, gmail, slack, discord,
+ *                              whatsapp, telegram, google-sheets, google-calendar, google-analytics,
+ *                              hubspot, salesforce, zoho-crm, mailchimp, zapier, airtable, notion, stripe)
  * - Special: 2 handlers (goal, end-conversation)
  *
  * @param registry - The NodeHandlerRegistry instance to register handlers with
@@ -182,7 +202,9 @@ export interface HandlerRegistrationConfig {
  * const registry = new NodeHandlerRegistry();
  * registerAllHandlers(registry, {
  *   socketClient: mySocketInstance,
- *   apiBaseUrl: 'https://api.conferbot.com'
+ *   apiBaseUrl: 'https://api.conferbot.com',
+ *   aiApiKey: 'sk-...',
+ *   useEnhancedGPT: true
  * });
  * ```
  */
@@ -208,11 +230,46 @@ export function registerAllHandlers(
   // Logic/Flow control handlers (8 handlers)
   registerLogicHandlers(registry);
 
-  // Integration handlers (17 handlers)
-  registerIntegrationHandlers(registry, config?.socketClient, config?.apiBaseUrl);
+  // Integration handlers (21 handlers)
+  // If useEnhancedGPT is true, we'll register the enhanced GPT handler
+  // instead of the basic one
+  if (config?.useEnhancedGPT) {
+    registerIntegrationHandlersWithEnhancedGPT(
+      registry,
+      config.socketClient,
+      config.apiBaseUrl,
+      config.aiApiKey
+    );
+  } else {
+    registerIntegrationHandlers(registry, config?.socketClient, config?.apiBaseUrl);
+  }
 
   // Special flow handlers (2 handlers)
   registerSpecialFlowHandlers(registry);
+}
+
+/**
+ * Registers integration handlers with enhanced GPT handler
+ */
+function registerIntegrationHandlersWithEnhancedGPT(
+  registry: NodeHandlerRegistry,
+  socketClient?: unknown,
+  apiBaseUrl?: string,
+  aiApiKey?: string
+): void {
+  // Register standard integration handlers first
+  registerIntegrationHandlers(registry, socketClient, apiBaseUrl);
+
+  // Override GPT handler with enhanced version
+  const enhancedGPT = createEnhancedGPTHandler(
+    undefined, // use default AIHandler
+    socketClient as any,
+    apiBaseUrl,
+    aiApiKey
+  );
+
+  // Register (will override the basic GPT handler)
+  registry.register(enhancedGPT);
 }
 
 /**
@@ -225,20 +282,20 @@ export function registerAllHandlers(
  * - Advanced Input: 2 (calendar, multiplequestions)
  * - Legacy: 3 (user-input-node, user-range-node, quiz-node)
  * - Logic: 8 (condition, boolean-condition, math, random-path, set-variable, jump, business-hours + subtype)
- * - Integration: 17 (webhook, gpt, human-handover, delay, email, slack, discord, whatsapp,
+ * - Integration: 21 (webhook, gpt, human-handover, delay, email, gmail, slack, discord, whatsapp,
  *                    telegram, google-sheets, google-calendar, google-analytics, hubspot,
- *                    salesforce, mailchimp, zapier, airtable)
+ *                    salesforce, zoho-crm, mailchimp, zapier, airtable, notion, stripe)
  * - Special: 2 (goal, end-conversation)
  *
- * Total: 54 handlers (with subtype variations counted)
+ * Total: 58 handlers (with subtype variations counted)
  */
-const TOTAL_HANDLER_COUNT = 54;
+const TOTAL_HANDLER_COUNT = 58;
 
 /**
  * Returns the total number of handlers registered by registerAllHandlers.
  * Useful for verification and debugging purposes.
  *
- * @returns The total count of registered handlers (54)
+ * @returns The total count of registered handlers (58)
  */
 export function getHandlerCount(): number {
   return TOTAL_HANDLER_COUNT;
@@ -274,7 +331,7 @@ export const HandlerCountByCategory: Record<HandlerCategory, number> = {
   [HandlerCategories.ADVANCED_INPUT]: 2,
   [HandlerCategories.LEGACY]: 3,
   [HandlerCategories.LOGIC]: 8,
-  [HandlerCategories.INTEGRATION]: 17,
+  [HandlerCategories.INTEGRATION]: 21,
   [HandlerCategories.SPECIAL]: 2,
 };
 
