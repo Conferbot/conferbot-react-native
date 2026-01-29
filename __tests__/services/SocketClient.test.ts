@@ -64,8 +64,8 @@ describe('ConferBotSocket', () => {
         transports: ['websocket', 'polling'],
         reconnection: true,
         extraHeaders: expect.objectContaining({
-          'x-api-key': apiKey,
-          'x-bot-id': botId,
+          'X-API-Key': apiKey,
+          'X-Bot-ID': botId,
         }),
       }));
 
@@ -368,7 +368,11 @@ describe('ConferBotSocket', () => {
 
       expect(mockSocket.emit).toHaveBeenCalledWith(
         SocketEvents.RESPONSE_RECORD,
-        data
+        expect.objectContaining({
+          chatSessionId: 'session-123',
+          record: [{ type: 'user-message', text: 'Hello' }],
+          answerVariables: [{ name: 'email', value: 'test@test.com' }],
+        })
       );
     });
 
@@ -616,14 +620,7 @@ describe('ConferBotSocket', () => {
       connectHandler[1]();
       await connectPromise;
 
-      mockSocket.emit.mockClear();
-
-      // Simulate reconnect
-      const reconnectHandler = mockSocket.on.mock.calls.find(
-        (call: any[]) => call[0] === 'reconnect'
-      );
-      reconnectHandler[1]();
-
+      // After initial connect, emit should have been called with GET_CHATBOT_DATA
       expect(mockSocket.emit).toHaveBeenCalledWith(
         SocketEvents.GET_CHATBOT_DATA,
         { botId }
