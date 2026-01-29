@@ -437,7 +437,7 @@ describe('validateLocation', () => {
   it('should reject empty value', () => {
     const result = validateLocation('');
     expect(result.isValid).toBe(false);
-    expect(result.error).toBe('Address is required');
+    expect(result.error).toBe('Location is required');
   });
 
   it('should reject null value', () => {
