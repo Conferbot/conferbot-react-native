@@ -172,8 +172,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return `${hour12}:${minuteStr} ${ampm}`;
   };
 
-  // Get agent info if available
-  const agent: Agent | undefined = (message as any).agent;
+  // Get agent info if available (embed-server sends agentDetails)
+  const agentDetails: AgentDetails | undefined = (message as any).agentDetails;
 
   // Get message text
   const messageText = 'text' in message ? message.text : undefined;
@@ -314,8 +314,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {!isUser && !isSystem && showAvatar && (
         <View style={styles.avatarContainer}>
           <Avatar
-            source={agent?.avatar}
-            name={agent?.name || 'Bot'}
+            source={undefined} // AgentDetails doesn't have avatar in embed-server
+            name={agentDetails?.name || 'Bot'}
             size={theme.layout.avatarSize}
           />
         </View>
@@ -323,20 +323,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
       <View style={styles.messageContainer}>
         {/* Message bubble */}
-        <View
-          ref={bubbleRef}
-          style={[styles.bubble, getBubbleStyle()]}
-        >
+        <View ref={bubbleRef} style={[styles.bubble, getBubbleStyle()]}>
           {/* Agent name for agent messages */}
           {isAgent && agent && (
-            <Text style={[styles.agentName, { color: textColor }]}>
-              {agent.name}
-            </Text>
+            <Text style={[styles.agentName, { color: textColor }]}>{agent.name}</Text>
           )}
 
           {/* Message text with links */}
-          {messageText && (
-            parsedText && parsedText.hasUrls ? (
+          {messageText &&
+            (parsedText && parsedText.hasUrls ? (
               renderTextWithLinks(parsedText.segments, textColor)
             ) : (
               <Text
@@ -347,8 +342,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               >
                 {messageText}
               </Text>
-            )
-          )}
+            ))}
 
           {/* Link Previews */}
           {renderLinkPreviews()}

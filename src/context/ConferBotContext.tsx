@@ -256,213 +256,217 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   }, []);
 
   // ********** Reaction Actions ********** //
-  const addReaction = useCallback((messageId: string, emoji: ReactionEmoji) => {
-    if (!chatSessionId || !user) {
-      console.warn('[ConferBot] Cannot add reaction: no active session or user');
-      return;
-    }
-
-    const newReaction: Reaction = {
-      emoji,
-      userId: user.id,
-      userName: user.name,
-      timestamp: new Date().toISOString(),
-    };
-
-    setReactions((prev) => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(messageId) || [];
-      // Check if user already reacted with this emoji
-      const alreadyReacted = existing.some(
-        (r) => r.userId === user.id && r.emoji === emoji
-      );
-      if (!alreadyReacted) {
-        newMap.set(messageId, [...existing, newReaction]);
+  const addReaction = useCallback(
+    (messageId: string, emoji: ReactionEmoji) => {
+      if (!chatSessionId || !user) {
+        console.warn('[ConferBot] Cannot add reaction: no active session or user');
+        return;
       }
-      return newMap;
-    });
 
-    // Send reaction via socket using the dedicated method
-    if (socketClient.current?.isConnected()) {
-      socketClient.current.sendMessageReaction(
-        chatSessionId,
-        messageId,
+      const newReaction: Reaction = {
         emoji,
-        'add',
-        user.name
-      );
-    }
-  }, [chatSessionId, user]);
-
-  const removeReaction = useCallback((messageId: string, emoji: ReactionEmoji) => {
-    if (!chatSessionId || !user) {
-      console.warn('[ConferBot] Cannot remove reaction: no active session or user');
-      return;
-    }
-
-    setReactions((prev) => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(messageId) || [];
-      const filtered = existing.filter(
-        (r) => !(r.userId === user.id && r.emoji === emoji)
-      );
-      if (filtered.length > 0) {
-        newMap.set(messageId, filtered);
-      } else {
-        newMap.delete(messageId);
-      }
-      return newMap;
-    });
-
-    // Send reaction removal via socket using the dedicated method
-    if (socketClient.current?.isConnected()) {
-      socketClient.current.sendMessageReaction(
-        chatSessionId,
-        messageId,
-        emoji,
-        'remove',
-        user.name
-      );
-    }
-  }, [chatSessionId, user]);
-
-  const getReactions = useCallback((messageId: string): Reaction[] => {
-    return reactions.get(messageId) || [];
-  }, [reactions]);
-
-  // ********** Node Flow Engine Initialization ********** //
-  const initializeFlowEngine = useCallback((
-    sessionId: string,
-    persistedState?: PersistedState | null
-  ) => {
-    if (!socketClient.current) {
-      console.warn('[ConferBot] Cannot initialize flow engine: socket not available');
-      return;
-    }
-
-    // Initialize handler registry
-    const registry = NodeHandlerRegistry.getInstance();
-    registerAllDisplayHandlers(registry);
-
-    // Create chat state - either restore from persisted or create new
-    if (persistedState?.session && persistedState.answerVariables) {
-      // Restore from persisted state
-      const restoredStateData = {
-        sessionId,
-        botId,
-        answerVariables: persistedState.answerVariables.variables,
-        variables: {},
-        userMetadata: persistedState.user ? storageService.current?.toUserMetadata(persistedState.user) : {},
-        transcript: [],
-        record: persistedState.messages,
-        currentNodeId: persistedState.session.currentNodeId,
-        visitedNodes: persistedState.session.visitedNodes || [],
-        isFlowComplete: persistedState.session.isFlowComplete || false,
-        flowCompletionReason: persistedState.session.flowCompletionReason,
+        userId: user.id,
+        userName: user.name,
+        timestamp: new Date().toISOString(),
       };
 
-      chatStateRef.current = ChatState.fromJSON(restoredStateData);
+      setReactions((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(messageId) || [];
+        // Check if user already reacted with this emoji
+        const alreadyReacted = existing.some((r) => r.userId === user.id && r.emoji === emoji);
+        if (!alreadyReacted) {
+          newMap.set(messageId, [...existing, newReaction]);
+        }
+        return newMap;
+      });
+
+      // Send reaction via socket using the dedicated method
+      if (socketClient.current?.isConnected()) {
+        socketClient.current.sendMessageReaction(chatSessionId, messageId, emoji, 'add', user.name);
+      }
+    },
+    [chatSessionId, user]
+  );
+
+  const removeReaction = useCallback(
+    (messageId: string, emoji: ReactionEmoji) => {
+      if (!chatSessionId || !user) {
+        console.warn('[ConferBot] Cannot remove reaction: no active session or user');
+        return;
+      }
+
+      setReactions((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(messageId) || [];
+        const filtered = existing.filter((r) => !(r.userId === user.id && r.emoji === emoji));
+        if (filtered.length > 0) {
+          newMap.set(messageId, filtered);
+        } else {
+          newMap.delete(messageId);
+        }
+        return newMap;
+      });
+
+      // Send reaction removal via socket using the dedicated method
+      if (socketClient.current?.isConnected()) {
+        socketClient.current.sendMessageReaction(
+          chatSessionId,
+          messageId,
+          emoji,
+          'remove',
+          user.name
+        );
+      }
+    },
+    [chatSessionId, user]
+  );
+
+  const getReactions = useCallback(
+    (messageId: string): Reaction[] => {
+      return reactions.get(messageId) || [];
+    },
+    [reactions]
+  );
+
+  // ********** Node Flow Engine Initialization ********** //
+  const initializeFlowEngine = useCallback(
+    (sessionId: string, persistedState?: PersistedState | null) => {
+      if (!socketClient.current) {
+        console.warn('[ConferBot] Cannot initialize flow engine: socket not available');
+        return;
+      }
+
+      // Initialize handler registry
+      const registry = NodeHandlerRegistry.getInstance();
+      registerAllDisplayHandlers(registry);
+
+      // Create chat state - either restore from persisted or create new
+      if (persistedState?.session && persistedState.answerVariables) {
+        // Restore from persisted state
+        const restoredStateData = {
+          sessionId,
+          botId,
+          answerVariables: persistedState.answerVariables.variables,
+          variables: {},
+          userMetadata: persistedState.user
+            ? storageService.current?.toUserMetadata(persistedState.user)
+            : {},
+          transcript: [],
+          record: persistedState.messages,
+          currentNodeId: persistedState.session.currentNodeId,
+          visitedNodes: persistedState.session.visitedNodes || [],
+          isFlowComplete: persistedState.session.isFlowComplete || false,
+          flowCompletionReason: persistedState.session.flowCompletionReason,
+        };
+
+        chatStateRef.current = ChatState.fromJSON(restoredStateData);
+
+        if (__DEV__) {
+          console.log('[ConferBot] Restored chat state from persistence');
+        }
+      } else {
+        // Create new chat state
+        chatStateRef.current = new ChatState(sessionId, botId);
+      }
+
+      // Add listener to persist state changes
+      chatStateRef.current.addListener(() => {
+        // Debounced persistence of answer variables and flow state
+        persistAnswerVariables();
+        persistFlowState();
+      });
+
+      // Create flow engine
+      flowEngine.current = new NodeFlowEngine(chatStateRef.current, registry, {
+        socketClient: socketClient.current,
+        onUIStateChange: (uiState) => {
+          setCurrentUIState(uiState);
+          setIsNodeProcessing(false);
+        },
+        onWaitingForInput: (_nodeId, _uiState) => {
+          setIsNodeProcessing(false);
+        },
+        onFlowComplete: (reason) => {
+          if (__DEV__) {
+            console.log('[ConferBot] Flow complete:', reason);
+          }
+          setIsNodeProcessing(false);
+          // Persist flow completion
+          persistFlowState();
+        },
+        onError: (error, nodeId) => {
+          console.error('[ConferBot] Flow engine error:', error.message, { nodeId });
+          setIsNodeProcessing(false);
+        },
+        debug: __DEV__,
+      });
 
       if (__DEV__) {
-        console.log('[ConferBot] Restored chat state from persistence');
+        console.log('[ConferBot] Flow engine initialized for session:', sessionId);
       }
-    } else {
-      // Create new chat state
-      chatStateRef.current = new ChatState(sessionId, botId);
-    }
-
-    // Add listener to persist state changes
-    chatStateRef.current.addListener(() => {
-      // Debounced persistence of answer variables and flow state
-      persistAnswerVariables();
-      persistFlowState();
-    });
-
-    // Create flow engine
-    flowEngine.current = new NodeFlowEngine(chatStateRef.current, registry, {
-      socketClient: socketClient.current,
-      onUIStateChange: (uiState) => {
-        setCurrentUIState(uiState);
-        setIsNodeProcessing(false);
-      },
-      onWaitingForInput: (_nodeId, _uiState) => {
-        setIsNodeProcessing(false);
-      },
-      onFlowComplete: (reason) => {
-        if (__DEV__) {
-          console.log('[ConferBot] Flow complete:', reason);
-        }
-        setIsNodeProcessing(false);
-        // Persist flow completion
-        persistFlowState();
-      },
-      onError: (error, nodeId) => {
-        console.error('[ConferBot] Flow engine error:', error.message, { nodeId });
-        setIsNodeProcessing(false);
-      },
-      debug: __DEV__,
-    });
-
-    if (__DEV__) {
-      console.log('[ConferBot] Flow engine initialized for session:', sessionId);
-    }
-  }, [botId, persistAnswerVariables, persistFlowState]);
+    },
+    [botId, persistAnswerVariables, persistFlowState]
+  );
 
   // ********** Restore Session ********** //
-  const restoreSession = useCallback(async (persistedState: PersistedState) => {
-    if (!persistedState.session || !apiClient.current) return false;
+  const restoreSession = useCallback(
+    async (persistedState: PersistedState) => {
+      if (!persistedState.session || !apiClient.current) return false;
 
-    try {
-      const sessionId = persistedState.session.chatSessionId;
-      const visitorId = persistedState.session.visitorId;
+      try {
+        const sessionId = persistedState.session.chatSessionId;
+        const visitorId = persistedState.session.visitorId;
 
-      // Verify session is still valid on the server
-      const historyResponse = await apiClient.current.getSessionHistory(sessionId);
+        // Verify session is still valid on the server
+        const historyResponse = await apiClient.current.getSessionHistory(sessionId);
 
-      if (!historyResponse.success) {
-        // Session no longer valid on server, clear persisted data
-        if (__DEV__) {
-          console.log('[ConferBot] Persisted session invalid on server, clearing');
+        if (!historyResponse.success) {
+          // Session no longer valid on server, clear persisted data
+          if (__DEV__) {
+            console.log('[ConferBot] Persisted session invalid on server, clearing');
+          }
+          await storageService.current?.clearAll();
+          setHasPersistedSession(false);
+          return false;
         }
-        await storageService.current?.clearAll();
-        setHasPersistedSession(false);
+
+        // Restore session state
+        setChatSessionId(sessionId);
+
+        // Merge persisted messages with server messages (server takes precedence)
+        const serverRecord = historyResponse.data?.record || [];
+        if (serverRecord.length > 0) {
+          setRecord(serverRecord);
+          // Update persisted messages with server data
+          await persistMessages(serverRecord);
+        } else if (persistedState.messages.length > 0) {
+          setRecord(persistedState.messages);
+        }
+
+        // Initialize flow engine with restored state
+        initializeFlowEngine(sessionId, persistedState);
+
+        // Join chat room via socket
+        if (socketClient.current && socketClient.current.isConnected()) {
+          socketClient.current.joinChatRoomVisitor(sessionId);
+        }
+
+        // Touch session to update lastAccessed timestamp
+        await storageService.current?.touchSession();
+
+        if (__DEV__) {
+          console.log('[ConferBot] Session restored successfully:', sessionId);
+        }
+
+        return true;
+      } catch (error) {
+        console.error('[ConferBot] Failed to restore session:', error);
         return false;
       }
-
-      // Restore session state
-      setChatSessionId(sessionId);
-
-      // Merge persisted messages with server messages (server takes precedence)
-      const serverRecord = historyResponse.data?.record || [];
-      if (serverRecord.length > 0) {
-        setRecord(serverRecord);
-        // Update persisted messages with server data
-        await persistMessages(serverRecord);
-      } else if (persistedState.messages.length > 0) {
-        setRecord(persistedState.messages);
-      }
-
-      // Initialize flow engine with restored state
-      initializeFlowEngine(sessionId, persistedState);
-
-      // Join chat room via socket
-      if (socketClient.current && socketClient.current.isConnected()) {
-        socketClient.current.joinChatRoomVisitor(sessionId);
-      }
-
-      // Touch session to update lastAccessed timestamp
-      await storageService.current?.touchSession();
-
-      if (__DEV__) {
-        console.log('[ConferBot] Session restored successfully:', sessionId);
-      }
-
-      return true;
-    } catch (error) {
-      console.error('[ConferBot] Failed to restore session:', error);
-      return false;
-    }
-  }, [initializeFlowEngine, persistMessages]);
+    },
+    [initializeFlowEngine, persistMessages]
+  );
 
   // ********** Initialization ********** //
   // Initialize SDK on mount
@@ -483,13 +487,12 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
           autoConnect: config?.autoConnect !== false,
         });
 
-        // Fetch chatbot configuration
-        const configResponse = await apiClient.current.getChatbotConfig();
-        if (configResponse.success && configResponse.data) {
-          setChatbotConfig(configResponse.data);
-        }
+        // Set up socket event listeners BEFORE connecting
+        // This ensures we catch the fetched-chatbot-data event
+        setupSocketListeners();
 
         // Connect socket if autoConnect is enabled
+        // Socket connection automatically fetches chatbot data via 'get-chatbot-data' event
         if (config?.autoConnect !== false) {
           await socketClient.current.connect(user?.id || persistedState?.user?.userId);
           setIsConnected(true);
@@ -577,10 +580,15 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       }
     });
 
-    // Agent accepted handover
+    // Agent accepted handover (embed-server sends agentDetails)
     socketClient.current.on(SocketEvents.AGENT_ACCEPTED, (data: any) => {
-      if (data.agent) {
-        setCurrentAgent(data.agent);
+      if (data.agentDetails) {
+        // Map agentDetails to Agent interface
+        setCurrentAgent({
+          id: data.agentDetails._id,
+          name: data.agentDetails.name,
+          email: data.agentDetails.email,
+        });
       }
     });
 
@@ -763,25 +771,22 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   }, []);
 
   // Register push token
-  const registerPushToken = useCallback(
-    async (token: string): Promise<void> => {
-      if (!apiClient.current) return;
+  const registerPushToken = useCallback(async (token: string): Promise<void> => {
+    if (!apiClient.current) return;
 
-      try {
-        // Detect platform
-        const platform = Platform.OS as 'ios' | 'android';
+    try {
+      // Detect platform
+      const platform = Platform.OS as 'ios' | 'android';
 
-        await apiClient.current.registerPushToken(token, platform);
+      await apiClient.current.registerPushToken(token, platform);
 
-        if (__DEV__) {
-          console.log('[ConferBot] Push token registered:', token);
-        }
-      } catch (error) {
-        console.error('[ConferBot] Failed to register push token:', error);
+      if (__DEV__) {
+        console.log('[ConferBot] Push token registered:', token);
       }
-    },
-    []
-  );
+    } catch (error) {
+      console.error('[ConferBot] Failed to register push token:', error);
+    }
+  }, []);
 
   // Add event listener
   const on = useCallback(

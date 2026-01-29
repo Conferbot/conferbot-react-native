@@ -601,7 +601,9 @@ export interface ConferBotContextActions {
   clearPersistedData: () => Promise<void>;
   resetConversation: () => Promise<void>;
   // Read receipt actions
-  getMessageStatus: (messageId: string | number) => import('./messageStatus').MessageStatus | undefined;
+  getMessageStatus: (
+    messageId: string | number
+  ) => import('./messageStatus').MessageStatus | undefined;
   markMessageAsRead: (messageId: string | number) => void;
   markVisibleMessagesAsRead: (messageIds: (string | number)[]) => void;
   // Offline queue actions
