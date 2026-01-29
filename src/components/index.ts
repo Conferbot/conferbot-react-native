@@ -32,3 +32,39 @@ export type { MessageListProps } from './MessageList';
 // Main Chat Widget
 export { ChatWidget } from './ChatWidget';
 export type { ChatWidgetProps } from './ChatWidget';
+
+// Node Components - UI components for all node types
+export {
+  NodeRenderer,
+  // Message components
+  MessageBubble as NodeMessageBubble,
+  ImageDisplay,
+  VideoPlayer,
+  AudioPlayer,
+  FileDownload,
+  HTMLView,
+  // Input components
+  TextInputField,
+  TextInputComponent,
+  // Selection components
+  ButtonGroup,
+  CardGrid,
+  CarouselView,
+  PictureChoiceGrid,
+  DropdownPicker,
+  // Rating components
+  StarRating,
+  OpinionScaleSelector,
+  SliderInput,
+  // Advanced components
+  CalendarPicker,
+  MultiFieldForm,
+  FileUploadButton,
+  LocationInput,
+  // Special components
+  HumanHandoverView,
+  GPTResponseView,
+  LoadingIndicator,
+  QuizQuestion,
+} from './NodeComponents';
+export type { NodeRendererProps } from './NodeComponents';
