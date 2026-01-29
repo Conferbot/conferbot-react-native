@@ -2,44 +2,119 @@
  * IntegrationNodeHandlers.ts
  *
  * Integration node handlers for the Conferbot React Native SDK.
- * Implements all 17 integration node types for external service communication.
+ * Implements all integration node types for external service communication.
+ *
+ * Includes handlers for:
+ * - Webhook: HTTP requests to external APIs
+ * - GPT: AI-powered responses
+ * - Human Handover: Live agent handover
+ * - Delay: Flow pausing
+ * - Email/Gmail: Email sending
+ * - Slack/Discord: Messaging platforms
+ * - WhatsApp/Telegram: Communication channels
+ * - Google Sheets/Calendar/Analytics: Google integrations
+ * - HubSpot/Salesforce/Mailchimp/ZohoCRM: CRM integrations
+ * - Zapier/Airtable/Notion: Automation and database integrations
+ * - Stripe: Payment processing
  */
 
 import { BaseNodeHandler, NodeResult, NodeUIState } from '../NodeHandler';
 import { ChatState } from '../../state/ChatState';
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
+import type {
+  HandoverStage,
+  PreChatFormConfig,
+  PostChatSurveyConfig,
+  AgentInfo,
+  QueueInfo,
+} from '../../../components/Handover/types';
+
+import {
+  WebhookHandler as WebhookHandlerService,
+  WebhookRequest,
+  createWebhookHandler,
+} from '../../../services/WebhookHandler';
+
+import {
+  HttpMethod,
+  AuthenticationConfig,
+  AuthenticationType,
+  ResponseExtractConfig,
+} from '../../../utils/WebhookUtils';
+
+import {
+  validateEmailList,
+  validateEmailConfig,
+  formatEmailBody,
+  formatSlackMessage,
+  createSlackBlock,
+  createSlackAttachment,
+  formatDiscordMessage,
+  createDiscordEmbed,
+  formatHubSpotContact,
+  formatZohoCRMRecord,
+  formatSalesforceRecord,
+  formatAirtableFields,
+  formatNotionProperties,
+  createNotionBlock,
+  formatStripeAmount,
+  formatStripeMetadata,
+  extractContactData,
+  removeEmptyValues,
+  deepResolveVariables,
+  validateWebhookUrl,
+} from '../../utils/IntegrationUtils';
+
+import type {
+  SocketClient,
+  EmailConfig,
+  EmailPayload,
+  SlackConfig,
+  DiscordConfig,
+  GoogleSheetsConfig,
+  GoogleSheetsPayload,
+  GoogleCalendarConfig,
+  GmailConfig,
+  GoogleAnalyticsConfig,
+  ZohoCRMConfig,
+  ZohoCRMPayload,
+  ZapierConfig,
+  AirtableConfig,
+  AirtablePayload,
+  NotionConfig,
+  NotionPayload,
+  StripeConfig,
+  StripePayload,
+  ContactData,
+} from '../../utils/IntegrationTypes';
+
+import { IntegrationSocketEvents } from '../../utils/IntegrationTypes';
 
 // ========================================
-// TYPES AND INTERFACES
+// ADDITIONAL TYPES
 // ========================================
-
-/** HTTP method types */
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-
-/** Socket client interface for event emission */
-interface SocketClient {
-  emit(event: string, payload: any): void;
-  on?(event: string, callback: (data: any) => void): void;
-  off?(event: string, callback?: (data: any) => void): void;
-}
 
 /** API call response */
-interface ApiResponse {
+interface ApiResponse<T = unknown> {
   success: boolean;
-  data?: any;
+  data?: T;
   error?: string;
   statusCode?: number;
 }
 
-/** Webhook configuration */
+/** Extended Webhook configuration with all authentication options */
 interface WebhookConfig {
   url: string;
   method: HttpMethod;
   headers?: Record<string, string>;
-  body?: any;
+  body?: unknown;
   variableName?: string;
   timeout?: number;
   retryCount?: number;
+  authentication?: AuthenticationConfig;
+  responseExtract?: ResponseExtractConfig;
+  includeAnswerVariables?: boolean;
+  proceedOnError?: boolean;
 }
 
 /** GPT configuration */
@@ -63,24 +138,50 @@ interface HumanHandoverConfig {
     label: string;
     type: 'text' | 'email' | 'phone' | 'select';
     required?: boolean;
-    options?: Array<{ label: string; value: any }>;
+    options?: Array<{ label: string; value: unknown }>;
+  }>;
+  customQuestions?: Array<{
+    id: string;
+    question: string;
+    type: 'text' | 'email' | 'phone' | 'select';
+    required?: boolean;
+    options?: Array<{ label: string; value: string }>;
+  }>;
+  departments?: Array<{
+    id: string;
+    name: string;
+    description?: string;
   }>;
   waitMessage?: string;
   connectedMessage?: string;
   noAgentsMessage?: string;
   timeoutMessage?: string;
   timeoutSeconds?: number;
+  showPostChatSurvey?: boolean;
+  surveyConfig?: PostChatSurveyConfig;
 }
 
-/** Email configuration */
-interface EmailConfig {
-  to: string;
-  subject: string;
-  body: string;
-  cc?: string;
-  bcc?: string;
-  replyTo?: string;
-  attachments?: Array<{ name: string; url: string }>;
+/** Extended HumanHandover UI state with full flow support */
+interface ExtendedHumanHandoverUIState extends NodeUIState.HumanHandover {
+  extendedStage?: HandoverStage;
+  queueInfo?: QueueInfo;
+  agent?: AgentInfo;
+  isAgentTyping?: boolean;
+  preChatConfig?: PreChatFormConfig;
+  surveyConfig?: PostChatSurveyConfig;
+  customQuestions?: Array<{
+    id: string;
+    question: string;
+    type: 'text' | 'email' | 'phone' | 'select';
+    required?: boolean;
+    options?: Array<{ label: string; value: string }>;
+  }>;
+  departments?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
+  errorMessage?: string;
 }
 
 /** Communication platform message config */
@@ -88,70 +189,18 @@ interface CommunicationConfig {
   message: string;
   channel?: string;
   webhookUrl?: string;
-  additionalData?: Record<string, any>;
-}
-
-/** Google Sheets configuration */
-interface GoogleSheetsConfig {
-  spreadsheetId: string;
-  sheetName?: string;
-  action: 'addRow' | 'updateRow' | 'getRow';
-  data?: Record<string, any>;
-  rowId?: string | number;
-  variableName?: string;
-}
-
-/** Google Calendar configuration */
-interface GoogleCalendarConfig {
-  calendarId?: string;
-  action: 'createEvent' | 'checkAvailability' | 'getEvents';
-  event?: {
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-    attendees?: string[];
-    location?: string;
-  };
-  startDate?: string;
-  endDate?: string;
-  variableName?: string;
-}
-
-/** Google Analytics configuration */
-interface GoogleAnalyticsConfig {
-  trackingId?: string;
-  eventCategory: string;
-  eventAction: string;
-  eventLabel?: string;
-  eventValue?: number;
+  additionalData?: Record<string, unknown>;
 }
 
 /** CRM configuration (HubSpot, Salesforce, Mailchimp) */
 interface CRMConfig {
-  action: 'createContact' | 'updateContact' | 'createDeal' | 'addToList';
-  contactData?: Record<string, any>;
+  action: 'createContact' | 'updateContact' | 'createDeal' | 'addToList' | 'createLead' | 'subscribe';
+  contactData?: Record<string, unknown>;
   listId?: string;
-  dealData?: Record<string, any>;
+  dealData?: Record<string, unknown>;
   webhookUrl?: string;
   variableName?: string;
-}
-
-/** Zapier configuration */
-interface ZapierConfig {
-  webhookUrl: string;
-  data?: Record<string, any>;
-  variableName?: string;
-}
-
-/** Airtable configuration */
-interface AirtableConfig {
-  baseId: string;
-  tableName: string;
-  action: 'createRecord' | 'updateRecord' | 'getRecord';
-  recordId?: string;
-  fields?: Record<string, any>;
-  variableName?: string;
+  proceedOnError?: boolean;
 }
 
 // ========================================
@@ -159,7 +208,8 @@ interface AirtableConfig {
 // ========================================
 
 /**
- * Base class for integration node handlers with shared utilities
+ * Base class for integration node handlers with shared utilities.
+ * Provides common functionality for API calls, socket events, and variable resolution.
  */
 abstract class BaseIntegrationHandler extends BaseNodeHandler {
   protected socketClient: SocketClient | null = null;
@@ -168,28 +218,36 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
 
   /**
    * Sets the socket client for real-time communication
+   * @param client - Socket client instance
    */
   setSocketClient(client: SocketClient): void {
     this.socketClient = client;
   }
 
   /**
-   * Sets the API base URL
+   * Sets the API base URL for fallback HTTP requests
+   * @param url - Base URL for API calls
    */
   setApiBaseUrl(url: string): void {
     this.apiBaseUrl = url;
   }
 
   /**
-   * Makes an HTTP API call
+   * Makes an HTTP API call with timeout and error handling
+   * @param url - Request URL
+   * @param method - HTTP method
+   * @param data - Request body data
+   * @param headers - Request headers
+   * @param timeout - Request timeout in milliseconds
+   * @returns API response object
    */
-  protected async makeApiCall(
+  protected async makeApiCall<T = unknown>(
     url: string,
     method: HttpMethod,
-    data?: any,
+    data?: unknown,
     headers?: Record<string, string>,
     timeout?: number
-  ): Promise<ApiResponse> {
+  ): Promise<ApiResponse<T>> {
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
@@ -215,13 +273,13 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
       const response = await fetch(url, fetchOptions);
       clearTimeout(timeoutId);
 
-      let responseData: any;
+      let responseData: T | undefined;
       const contentType = response.headers.get('content-type');
 
       if (contentType?.includes('application/json')) {
         responseData = await response.json();
       } else {
-        responseData = await response.text();
+        responseData = (await response.text()) as unknown as T;
       }
 
       if (!response.ok) {
@@ -262,57 +320,43 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
   }
 
   /**
-   * Emits a socket event
+   * Emits a socket event to the server
+   * @param event - Event name
+   * @param payload - Event payload
+   * @returns True if event was emitted successfully
    */
-  protected emitSocketEvent(event: string, payload: any): boolean {
+  protected emitSocketEvent(event: string, payload: unknown): boolean {
     if (!this.socketClient) {
-      console.warn(`[${this.nodeType}] Socket client not available`);
       return false;
     }
 
     try {
       this.socketClient.emit(event, payload);
       return true;
-    } catch (error) {
-      console.error(`[${this.nodeType}] Socket emit error:`, error);
+    } catch {
       return false;
     }
   }
 
   /**
-   * Resolves all variables in an object
+   * Resolves all variables in an object recursively
+   * @param obj - Object with variable placeholders
+   * @param state - Chat state for variable resolution
+   * @returns Object with resolved variables
    */
   protected resolveObjectVariables(
-    obj: Record<string, any>,
+    obj: Record<string, unknown>,
     state: ChatState
-  ): Record<string, any> {
-    const resolved: Record<string, any> = {};
-
-    for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'string') {
-        resolved[key] = state.resolveVariables(value);
-      } else if (typeof value === 'object' && value !== null) {
-        resolved[key] = Array.isArray(value)
-          ? value.map((item) =>
-              typeof item === 'string'
-                ? state.resolveVariables(item)
-                : typeof item === 'object'
-                ? this.resolveObjectVariables(item, state)
-                : item
-            )
-          : this.resolveObjectVariables(value, state);
-      } else {
-        resolved[key] = value;
-      }
-    }
-
-    return resolved;
+  ): Record<string, unknown> {
+    return deepResolveVariables(obj, (text) => state.resolveVariables(text));
   }
 
   /**
-   * Builds common payload with state data
+   * Builds common payload with session data
+   * @param state - Chat state
+   * @returns Common payload fields
    */
-  protected buildCommonPayload(state: ChatState): Record<string, any> {
+  protected buildCommonPayload(state: ChatState): Record<string, unknown> {
     return {
       sessionId: state.sessionId,
       botId: state.botId,
@@ -321,114 +365,264 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
       answers: state.getAllAnswers(),
     };
   }
+
+  /**
+   * Stores the integration result in state and emits tracking event
+   * @param state - Chat state
+   * @param prefix - Variable name prefix
+   * @param success - Whether operation succeeded
+   * @param data - Response data
+   * @param error - Error message if failed
+   */
+  protected storeIntegrationResult(
+    state: ChatState,
+    prefix: string,
+    success: boolean,
+    data?: unknown,
+    error?: string
+  ): void {
+    state.setVariable(`_${prefix}Success`, success);
+    if (success && data) {
+      state.setVariable(`_${prefix}Response`, data);
+    }
+    if (!success && error) {
+      state.setVariable(`_${prefix}Error`, error);
+    }
+  }
 }
 
 // ========================================
-// 1. WEBHOOK HANDLER
+// 1. WEBHOOK HANDLER (Enhanced)
 // ========================================
 
 /**
- * Handles webhook node - makes HTTP requests to configured URLs
+ * Handles webhook node - makes HTTP requests to configured URLs.
+ *
+ * Features:
+ * - Support all HTTP methods (GET, POST, PUT, DELETE, PATCH)
+ * - Custom headers support
+ * - Request body with variable interpolation
+ * - Authentication (Bearer, Basic, API Key, OAuth2, Custom)
+ * - Timeout configuration
+ * - Retry logic with exponential backoff
+ * - Response extraction into variables
+ * - URL validation and security checks
  */
 export class WebhookHandler extends BaseIntegrationHandler {
   readonly nodeType = 'webhook';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  private webhookService: WebhookHandlerService;
+
+  constructor() {
+    super();
+    this.webhookService = createWebhookHandler({
+      defaultTimeoutMs: 30000,
+      defaultMaxRetries: 3,
+      allowLocalhost: __DEV__ ?? false,
+      debug: __DEV__ ?? false,
+    });
+  }
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Webhook node missing data');
     }
 
-    const config: WebhookConfig = {
-      url: this.getString(data, 'url') || this.getString(data, 'webhookUrl'),
-      method: (this.getString(data, 'method', 'POST').toUpperCase() as HttpMethod),
-      headers: data.headers as Record<string, string>,
-      body: data.body || data.payload,
-      variableName: this.getString(data, 'variableName'),
-      timeout: this.getNumber(data, 'timeout', 30000),
-      retryCount: this.getNumber(data, 'retryCount', 0),
-    };
+    const config = this.parseWebhookConfig(data);
 
     if (!config.url) {
       return this.createError('Webhook URL is required');
     }
 
-    // Resolve variables in URL and body
-    const resolvedUrl = state.resolveVariables(config.url);
-    let resolvedBody = config.body;
+    const urlValidation = validateWebhookUrl(config.url);
+    if (!urlValidation.isValid) {
+      return this.createError(urlValidation.error || 'Invalid webhook URL');
+    }
 
-    if (typeof resolvedBody === 'object' && resolvedBody !== null) {
-      resolvedBody = this.resolveObjectVariables(resolvedBody, state);
-    } else if (typeof resolvedBody === 'string') {
-      resolvedBody = state.resolveVariables(resolvedBody);
-      // Try to parse as JSON
-      try {
-        resolvedBody = JSON.parse(resolvedBody);
-      } catch {
-        // Keep as string if not valid JSON
+    const variables = this.buildVariableContext(state);
+    const authentication = this.parseAuthentication(data);
+    const responseExtract = this.parseResponseExtract(data);
+
+    const request: WebhookRequest = {
+      url: urlValidation.sanitizedUrl || config.url,
+      method: config.method,
+      headers: config.headers,
+      body: config.body,
+      authentication,
+      timeoutMs: config.timeout,
+      maxRetries: config.retryCount,
+      responseExtract,
+      variables,
+      includeAnswerVariables: config.includeAnswerVariables,
+      answerVariables: state.getAllAnswers(),
+      proceedOnError: config.proceedOnError,
+      allowLocalhost: __DEV__ ?? false,
+    };
+
+    const result = await this.webhookService.execute(request);
+
+    for (const [key, value] of Object.entries(result.extractedVariables)) {
+      state.setVariable(key, value);
+    }
+
+    if (config.variableName && result.response?.data) {
+      state.setVariable(config.variableName, result.response.data);
+    }
+
+    this.emitSocketEvent('webhook:executed', {
+      sessionId: state.sessionId,
+      nodeId: this.getNodeId(node),
+      success: result.success,
+      statusCode: result.response?.statusCode,
+      duration: result.extractedVariables._webhookDuration,
+    });
+
+    if (result.success) {
+      return this.proceed(node, {
+        webhookResponse: result.response?.data,
+        webhookSuccess: true,
+      });
+    } else {
+      this.storeIntegrationResult(state, 'webhook', false, undefined, result.error);
+
+      if (result.shouldProceed) {
+        return this.proceed(node, {
+          webhookError: result.error,
+          webhookSuccess: false,
+        });
+      }
+
+      return this.createError(`Webhook request failed: ${result.error}`, true);
+    }
+  }
+
+  private parseWebhookConfig(data: Record<string, unknown>): WebhookConfig {
+    return {
+      url: this.getString(data, 'url') || this.getString(data, 'webhookUrl'),
+      method: (this.getString(data, 'method', 'POST').toUpperCase() as HttpMethod),
+      headers: data.headers as Record<string, string>,
+      body: data.body || data.payload,
+      variableName: this.getString(data, 'variableName') || this.getString(data, 'answerVariable'),
+      timeout: this.getNumber(data, 'timeout', 30000),
+      retryCount: this.getNumber(data, 'retryCount') || this.getNumber(data, 'maxRetries', 3),
+      includeAnswerVariables: this.getBoolean(data, 'includeAnswerVariables', false),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
+    };
+  }
+
+  private parseAuthentication(data: Record<string, unknown>): AuthenticationConfig | undefined {
+    const auth = data.authentication as Record<string, unknown> | undefined;
+    if (!auth) return undefined;
+
+    const authType = this.detectAuthType(auth);
+    if (authType === 'none') return undefined;
+
+    const config: AuthenticationConfig = { type: authType };
+
+    switch (authType) {
+      case 'bearer':
+        config.token = auth.token as string || auth.bearerToken as string;
+        break;
+      case 'basic':
+        config.username = auth.username as string;
+        config.password = auth.password as string;
+        break;
+      case 'apiKey':
+        config.apiKeyName = auth.key as string || auth.headerName as string || 'X-API-Key';
+        config.apiKeyValue = auth.value as string || auth.apiKey as string;
+        config.apiKeyLocation = auth.location === 'query' ? 'query' : 'header';
+        break;
+      case 'oauth2':
+        config.tokenUrl = auth.tokenUrl as string;
+        config.clientId = auth.clientId as string;
+        config.clientSecret = auth.clientSecret as string;
+        config.scope = auth.scope as string;
+        config.grantType = auth.grantType as string || 'client_credentials';
+        break;
+      case 'custom':
+        config.tokenUrl = auth.tokenUrl as string;
+        config.username = auth.username as string;
+        config.password = auth.password as string;
+        config.tokenPath = auth.tokenPath as string || 'access_token';
+        config.expiresInPath = auth.expiresInPath as string || 'expires_in';
+        break;
+    }
+
+    return config;
+  }
+
+  private detectAuthType(auth: Record<string, unknown>): AuthenticationType {
+    if (auth.type) {
+      const type = (auth.type as string).toLowerCase();
+      switch (type) {
+        case 'bearer': return 'bearer';
+        case 'basic': return 'basic';
+        case 'apikey':
+        case 'api_key':
+        case 'api-key': return 'apiKey';
+        case 'oauth2':
+        case 'oauth': return 'oauth2';
+        case 'custom':
+        case 'token': return 'custom';
+        case 'none': return 'none';
       }
     }
 
-    // Add common payload data if body is object
-    if (typeof resolvedBody === 'object' && resolvedBody !== null) {
-      resolvedBody = {
-        ...this.buildCommonPayload(state),
-        ...resolvedBody,
-      };
-    }
+    if (auth.token && !auth.tokenUrl) return 'bearer';
+    if (auth.apiKey || auth.headerName) return 'apiKey';
+    if (auth.clientId && auth.clientSecret) return 'oauth2';
+    if (auth.tokenUrl && auth.username) return 'custom';
+    if (auth.username && auth.password && !auth.tokenUrl) return 'basic';
 
-    // Resolve headers
-    const resolvedHeaders = config.headers
-      ? this.resolveObjectVariables(config.headers, state) as Record<string, string>
-      : undefined;
+    return 'none';
+  }
 
-    // Make the API call with retry support
-    let lastError: string = '';
-    const maxAttempts = (config.retryCount || 0) + 1;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const response = await this.makeApiCall(
-        resolvedUrl,
-        config.method,
-        resolvedBody,
-        resolvedHeaders,
-        config.timeout
-      );
-
-      if (response.success) {
-        // Store response in variable if configured
-        if (config.variableName) {
-          state.setVariable(config.variableName, response.data);
-        }
-
-        // Also store in standard webhook response variable
-        state.setVariable('_webhookResponse', response.data);
-        state.setVariable('_webhookStatusCode', response.statusCode);
-
-        return this.proceed(node, { webhookResponse: response.data });
+  private parseResponseExtract(data: Record<string, unknown>): ResponseExtractConfig | undefined {
+    const extract = data.responseExtract as Record<string, unknown> || data.extract as Record<string, unknown>;
+    if (!extract) {
+      const variableName = this.getString(data, 'variableName') || this.getString(data, 'answerVariable');
+      if (variableName) {
+        return {
+          storeFullResponse: true,
+          fullResponseVariableName: variableName,
+        };
       }
-
-      lastError = response.error || 'Unknown error';
-
-      if (attempt < maxAttempts) {
-        // Wait before retry with exponential backoff
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.pow(2, attempt) * 1000)
-        );
-      }
+      return undefined;
     }
 
-    // All attempts failed
-    console.error(`[WebhookHandler] Request failed: ${lastError}`);
-    state.setVariable('_webhookError', lastError);
+    const config: ResponseExtractConfig = {};
 
-    // Check if we should proceed on error
-    const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
-    if (proceedOnError) {
-      return this.proceed(node, { webhookError: lastError });
+    if (extract.path) {
+      config.path = extract.path as string;
+      config.variableName = extract.variableName as string || this.getString(data, 'variableName');
     }
 
-    return this.createError(`Webhook request failed: ${lastError}`, true);
+    if (Array.isArray(extract.extractions)) {
+      config.extractions = (extract.extractions as Array<Record<string, unknown>>).map((e) => ({
+        path: e.path as string,
+        variableName: e.variableName as string,
+        defaultValue: e.defaultValue,
+      }));
+    }
+
+    if (extract.storeFullResponse !== false) {
+      config.storeFullResponse = true;
+      config.fullResponseVariableName = extract.fullResponseVariableName as string || '_webhookResponse';
+    }
+
+    return config;
+  }
+
+  private buildVariableContext(state: ChatState): Record<string, unknown> {
+    return {
+      ...state.getAllVariables(),
+      ...state.getAllAnswers(),
+      ...state.getUserMetadata(),
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
@@ -437,12 +631,18 @@ export class WebhookHandler extends BaseIntegrationHandler {
 // ========================================
 
 /**
- * Handles GPT node - sends prompts to GPT via socket/API for AI responses
+ * Handles GPT node - sends prompts to GPT via socket/API for AI responses.
+ *
+ * Features:
+ * - Variable interpolation in prompts
+ * - Conversation history context
+ * - Streaming response support
+ * - Configurable model, temperature, and token limits
  */
 export class GPTHandler extends BaseIntegrationHandler {
   readonly nodeType = 'gpt';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('GPT node missing data');
@@ -464,23 +664,20 @@ export class GPTHandler extends BaseIntegrationHandler {
       return this.createError('GPT prompt is required');
     }
 
-    // Resolve variables in prompts
     const resolvedPrompt = state.resolveVariables(config.prompt);
     const resolvedSystemPrompt = config.systemPrompt
       ? state.resolveVariables(config.systemPrompt)
       : undefined;
 
-    // Build conversation context from transcript
     const transcript = state.getTranscript();
     const conversationHistory = transcript
       .filter((entry) => entry.type === 'bot' || entry.type === 'user')
-      .slice(-10) // Last 10 messages for context
+      .slice(-10)
       .map((entry) => ({
         role: entry.type === 'user' ? 'user' : 'assistant',
         content: entry.text || '',
       }));
 
-    // Emit GPT request via socket
     const gptPayload = {
       ...this.buildCommonPayload(state),
       nodeId,
@@ -496,14 +693,13 @@ export class GPTHandler extends BaseIntegrationHandler {
     const socketEmitted = this.emitSocketEvent('gpt:request', gptPayload);
 
     if (!socketEmitted) {
-      // Fallback to API call if socket not available
       const apiResponse = await this.makeGPTApiCall(config, resolvedPrompt, resolvedSystemPrompt, state);
 
       if (apiResponse.success && apiResponse.data) {
-        const responseText = apiResponse.data.response || apiResponse.data.text || '';
+        const responseData = apiResponse.data as { response?: string; text?: string };
+        const responseText = responseData.response || responseData.text || '';
         state.setVariable(config.variableName || 'gptResponse', responseText);
 
-        // Return complete response UI state
         const uiState: NodeUIState.GPTResponse = {
           type: 'gptResponse',
           nodeId,
@@ -518,7 +714,6 @@ export class GPTHandler extends BaseIntegrationHandler {
       return this.createError(`GPT request failed: ${apiResponse.error}`, true);
     }
 
-    // Return streaming response UI state
     const uiState: NodeUIState.GPTResponse = {
       type: 'gptResponse',
       nodeId,
@@ -534,8 +729,8 @@ export class GPTHandler extends BaseIntegrationHandler {
    * Handles GPT response from socket/callback
    */
   handleResponse(
-    response: any,
-    node: Record<string, any>,
+    response: { error?: string; text?: string; response?: string },
+    node: Record<string, unknown>,
     state: ChatState
   ): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -551,9 +746,6 @@ export class GPTHandler extends BaseIntegrationHandler {
     return Promise.resolve(this.proceed(node, { gptResponse: responseText }));
   }
 
-  /**
-   * Makes GPT API call as fallback
-   */
   private async makeGPTApiCall(
     config: GPTConfig,
     prompt: string,
@@ -583,11 +775,12 @@ export class GPTHandler extends BaseIntegrationHandler {
 
 /**
  * Handles human handover node - initiates live agent handover
+ * with full pre-chat form, queue management, and post-chat survey support.
  */
 export class HumanHandoverHandler extends BaseIntegrationHandler {
   readonly nodeType = 'human-handover';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Human handover node missing data');
@@ -599,178 +792,304 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
       department: this.getString(data, 'department'),
       priority: this.getString(data, 'priority', 'normal'),
       showPreChatForm: this.getBoolean(data, 'showPreChatForm', false),
-      preChatFields: this.getArray(data, 'preChatFields'),
+      preChatFields: this.getArray(data, 'preChatFields') as HumanHandoverConfig['preChatFields'],
+      customQuestions: this.getArray(data, 'customQuestions') as HumanHandoverConfig['customQuestions'],
+      departments: this.getArray(data, 'departments') as HumanHandoverConfig['departments'],
       waitMessage: this.getString(data, 'waitMessage', 'Please wait while we connect you with an agent...'),
-      connectedMessage: this.getString(data, 'connectedMessage', 'You are now connected with an agent.'),
+      connectedMessage: this.getString(data, 'connectedMessage', 'You are now connected with'),
       noAgentsMessage: this.getString(data, 'noAgentsMessage', 'Sorry, no agents are available at the moment.'),
       timeoutMessage: this.getString(data, 'timeoutMessage', 'Connection timed out. Please try again later.'),
       timeoutSeconds: this.getNumber(data, 'timeoutSeconds', 300),
+      showPostChatSurvey: this.getBoolean(data, 'showPostChatSurvey', true),
+      surveyConfig: data.surveyConfig as PostChatSurveyConfig,
     };
 
-    // Resolve variable strings
     const resolvedWaitMessage = state.resolveVariables(config.waitMessage || '');
     const resolvedConnectedMessage = state.resolveVariables(config.connectedMessage || '');
     const resolvedNoAgentsMessage = state.resolveVariables(config.noAgentsMessage || '');
     const resolvedTimeoutMessage = state.resolveVariables(config.timeoutMessage || '');
 
-    // Check if pre-chat form is needed and not yet filled
+    const preChatConfig: PreChatFormConfig = {
+      title: this.getString(data, 'preChatTitle', 'Before we connect you'),
+      subtitle: this.getString(data, 'preChatSubtitle', 'Please provide the following information'),
+      fields: [
+        ...(config.preChatFields || []).map((field) => ({
+          id: field.id,
+          label: field.label,
+          type: field.type as 'text' | 'email' | 'phone' | 'select',
+          required: field.required,
+          options: field.options?.map((opt) => ({
+            label: opt.label,
+            value: String(opt.value),
+          })),
+        })),
+        ...(config.customQuestions || []).map((q) => ({
+          id: q.id,
+          label: q.question,
+          type: q.type as 'text' | 'email' | 'phone' | 'select',
+          required: q.required,
+          options: q.options,
+        })),
+      ],
+      departments: config.departments,
+      showDepartmentSelector: !!config.departments && config.departments.length > 0,
+      submitButtonText: this.getString(data, 'preChatSubmitText', 'Start Chat'),
+    };
+
+    const surveyConfig: PostChatSurveyConfig = config.surveyConfig || {
+      enabled: config.showPostChatSurvey !== false,
+      title: this.getString(data, 'surveyTitle', 'How was your experience?'),
+      ratingQuestion: this.getString(data, 'surveyRatingQuestion', 'Please rate your conversation'),
+      ratingStyle: (this.getString(data, 'surveyRatingStyle', 'stars') as 'stars' | 'thumbs' | 'numbers' | 'emojis'),
+      maxRating: this.getNumber(data, 'surveyMaxRating', 5),
+      feedbackQuestion: this.getString(data, 'surveyFeedbackQuestion', 'Any additional feedback? (optional)'),
+      submitButtonText: this.getString(data, 'surveySubmitText', 'Submit'),
+      skipButtonText: this.getString(data, 'surveySkipText', 'Skip'),
+      thankYouMessage: this.getString(data, 'surveyThankYouMessage', 'Thank you for your feedback!'),
+    };
+
     const preChatCompleted = state.getVariable('_preChatFormCompleted');
-    if (config.showPreChatForm && !preChatCompleted && config.preChatFields?.length) {
-      const uiState: NodeUIState.HumanHandover = {
+    const hasPreChatFields = preChatConfig.fields.length > 0 || (preChatConfig.departments && preChatConfig.departments.length > 0);
+
+    if (config.showPreChatForm && !preChatCompleted && hasPreChatFields) {
+      const uiState: ExtendedHumanHandoverUIState = {
         type: 'humanHandover',
         nodeId,
         stage: 'waiting',
+        extendedStage: 'pre_chat',
         showPreChatForm: true,
         preChatFields: config.preChatFields,
+        preChatConfig,
+        customQuestions: config.customQuestions,
+        departments: config.departments,
+        surveyConfig,
         waitMessage: resolvedWaitMessage,
+        connectedMessage: resolvedConnectedMessage,
+        noAgentsMessage: resolvedNoAgentsMessage,
+        timeoutMessage: resolvedTimeoutMessage,
       };
 
-      return NodeResult.displayUI(uiState);
+      return NodeResult.displayUI(uiState as NodeUIState.HumanHandover);
     }
 
-    // Build handover request payload
     const handoverPayload = {
       ...this.buildCommonPayload(state),
       nodeId,
-      department: config.department,
+      department: state.getVariable('_selectedDepartment') || config.department,
       priority: config.priority,
       transcript: state.getTranscript(),
       preChatData: state.getVariable('_preChatFormData'),
     };
 
-    // Emit handover request via socket
     const socketEmitted = this.emitSocketEvent('handover:request', handoverPayload);
 
     if (!socketEmitted) {
-      // No socket - return no agents UI state
-      const uiState: NodeUIState.HumanHandover = {
+      const uiState: ExtendedHumanHandoverUIState = {
         type: 'humanHandover',
         nodeId,
         stage: 'noAgents',
+        extendedStage: 'no_agents',
         noAgentsMessage: resolvedNoAgentsMessage,
+        surveyConfig,
       };
 
-      return NodeResult.displayUI(uiState);
+      return NodeResult.displayUI(uiState as NodeUIState.HumanHandover);
     }
 
-    // Mark handover as initiated
     state.setVariable('_handoverInitiated', true);
     state.setVariable('_handoverStartTime', new Date().toISOString());
 
-    // Return waiting UI state
-    const uiState: NodeUIState.HumanHandover = {
+    const uiState: ExtendedHumanHandoverUIState = {
       type: 'humanHandover',
       nodeId,
       stage: 'waiting',
+      extendedStage: 'waiting',
       waitMessage: resolvedWaitMessage,
       connectedMessage: resolvedConnectedMessage,
       noAgentsMessage: resolvedNoAgentsMessage,
       timeoutMessage: resolvedTimeoutMessage,
+      surveyConfig,
     };
 
-    return NodeResult.displayUI(uiState);
+    return NodeResult.displayUI(uiState as NodeUIState.HumanHandover);
   }
 
   /**
-   * Handles handover status updates
+   * Handles handover status updates and UI actions
    */
   handleResponse(
-    response: any,
-    node: Record<string, any>,
+    response: Record<string, unknown>,
+    node: Record<string, unknown>,
     state: ChatState
   ): Promise<NodeResult> {
     const data = this.getNodeData(node);
     const nodeId = this.getNodeId(node);
 
+    const surveyConfig: PostChatSurveyConfig = data?.surveyConfig as PostChatSurveyConfig || {
+      enabled: this.getBoolean(data || {}, 'showPostChatSurvey', true),
+      title: this.getString(data || {}, 'surveyTitle', 'How was your experience?'),
+      ratingQuestion: this.getString(data || {}, 'surveyRatingQuestion', 'Please rate your conversation'),
+      ratingStyle: 'stars' as const,
+      maxRating: 5,
+    };
+
     // Handle pre-chat form submission
-    if (response.preChatFormData) {
-      state.setVariable('_preChatFormData', response.preChatFormData);
+    if (response.action === 'preChatSubmit' && response.formData) {
+      state.setVariable('_preChatFormData', response.formData);
       state.setVariable('_preChatFormCompleted', true);
 
-      // Store individual fields in user metadata
-      const metadata: Record<string, any> = {};
-      for (const [key, value] of Object.entries(response.preChatFormData)) {
+      if (response.department) {
+        state.setVariable('_selectedDepartment', response.department);
+      }
+
+      const metadata: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(response.formData as Record<string, unknown>)) {
         metadata[key] = value;
       }
-      state.setUserMetadata(metadata);
+      state.setUserMetadata(metadata as Record<string, string | undefined>);
 
-      // Re-handle to initiate actual handover
       return this.handle(node, state);
     }
 
-    // Handle status updates from socket
-    if (response.status === 'connected') {
-      state.setVariable('_handoverConnected', true);
-      state.setVariable('_agentName', response.agentName);
+    // Handle various actions
+    switch (response.action) {
+      case 'cancel':
+        state.setVariable('_handoverCancelled', true);
+        return Promise.resolve(this.proceed(node, { handoverCancelled: true }));
 
-      const uiState: NodeUIState.HumanHandover = {
-        type: 'humanHandover',
-        nodeId,
-        stage: 'connected',
-        agentName: response.agentName,
-        agentAvatar: response.agentAvatar,
-        connectedMessage: state.resolveVariables(
-          this.getString(data || {}, 'connectedMessage', 'You are now connected with {{agentName}}.')
-        ),
-      };
+      case 'retry':
+        state.setVariable('_preChatFormCompleted', false);
+        return this.handle(node, state);
 
-      return Promise.resolve(NodeResult.displayUI(uiState));
+      case 'endChat':
+        state.setVariable('_handoverEnded', true);
+        state.setVariable('_handoverEndTime', new Date().toISOString());
+        this.emitSocketEvent('handover:end', {
+          sessionId: state.sessionId,
+          conversationId: state.getVariable('_handoverConversationId'),
+          reason: 'user_ended',
+        });
+
+        if (surveyConfig.enabled) {
+          const uiState: ExtendedHumanHandoverUIState = {
+            type: 'humanHandover',
+            nodeId,
+            stage: 'ended',
+            extendedStage: 'post_chat',
+            surveyConfig,
+            agent: state.getVariable('_handoverAgent') as AgentInfo,
+          };
+          return Promise.resolve(NodeResult.displayUI(uiState as NodeUIState.HumanHandover));
+        }
+        return Promise.resolve(this.proceed(node, { handoverEnded: true }));
+
+      case 'surveySubmit':
+        if (response.surveyResponse) {
+          state.setVariable('_surveyResponse', response.surveyResponse);
+          state.setVariable('_surveySubmitted', true);
+          this.emitSocketEvent('handover:survey', {
+            sessionId: state.sessionId,
+            conversationId: state.getVariable('_handoverConversationId'),
+            response: response.surveyResponse,
+          });
+        }
+        return Promise.resolve(this.proceed(node, { handoverEnded: true, surveySubmitted: true }));
+
+      case 'surveySkip':
+        state.setVariable('_surveySkipped', true);
+        return Promise.resolve(this.proceed(node, { handoverEnded: true, surveySkipped: true }));
+
+      case 'continue':
+        return Promise.resolve(this.proceed(node, { handoverEnded: true }));
     }
 
-    if (response.status === 'ended') {
-      state.setVariable('_handoverEnded', true);
+    // Handle socket status updates
+    return this.handleStatusUpdate(response, node, state, nodeId, surveyConfig);
+  }
 
-      // Proceed to next node when handover ends
-      return Promise.resolve(this.proceed(node, { handoverEnded: true }));
-    }
+  private handleStatusUpdate(
+    response: Record<string, unknown>,
+    node: Record<string, unknown>,
+    state: ChatState,
+    nodeId: string,
+    surveyConfig: PostChatSurveyConfig
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
 
-    if (response.status === 'noAgents') {
-      const uiState: NodeUIState.HumanHandover = {
-        type: 'humanHandover',
-        nodeId,
-        stage: 'noAgents',
-        noAgentsMessage: state.resolveVariables(
-          this.getString(data || {}, 'noAgentsMessage', 'No agents available.')
-        ),
-      };
+    switch (response.status) {
+      case 'queued':
+        state.setVariable('_handoverConversationId', response.conversationId);
+        return Promise.resolve(NodeResult.displayUI({
+          type: 'humanHandover',
+          nodeId,
+          stage: 'waiting',
+          queueInfo: response.queueInfo,
+          waitMessage: state.resolveVariables(this.getString(data || {}, 'waitMessage', 'Please wait...')),
+        } as NodeUIState.HumanHandover));
 
-      // Check if should proceed on no agents
-      const proceedOnNoAgents = this.getBoolean(data || {}, 'proceedOnNoAgents', false);
-      if (proceedOnNoAgents) {
-        return Promise.resolve(this.proceed(node, { noAgents: true }));
+      case 'connected':
+        state.setVariable('_handoverConnected', true);
+        state.setVariable('_handoverAgent', response.agent);
+        state.setVariable('_handoverConnectedTime', new Date().toISOString());
+        return Promise.resolve(NodeResult.displayUI({
+          type: 'humanHandover',
+          nodeId,
+          stage: 'connected',
+          agent: response.agent as AgentInfo,
+          agentName: (response.agent as AgentInfo)?.name || response.agentName as string,
+          agentAvatar: (response.agent as AgentInfo)?.avatar || response.agentAvatar as string,
+          connectedMessage: state.resolveVariables(this.getString(data || {}, 'connectedMessage', 'You are now connected.')),
+        } as NodeUIState.HumanHandover));
+
+      case 'ended':
+        state.setVariable('_handoverEnded', true);
+        state.setVariable('_handoverEndTime', new Date().toISOString());
+        if (surveyConfig.enabled) {
+          return Promise.resolve(NodeResult.displayUI({
+            type: 'humanHandover',
+            nodeId,
+            stage: 'ended',
+            surveyConfig,
+            agent: state.getVariable('_handoverAgent') as AgentInfo,
+          } as NodeUIState.HumanHandover));
+        }
+        return Promise.resolve(this.proceed(node, { handoverEnded: true }));
+
+      case 'noAgents':
+      case 'no_agents': {
+        const proceedOnNoAgents = this.getBoolean(data || {}, 'proceedOnNoAgents', false);
+        if (proceedOnNoAgents) {
+          return Promise.resolve(this.proceed(node, { noAgents: true }));
+        }
+        return Promise.resolve(NodeResult.displayUI({
+          type: 'humanHandover',
+          nodeId,
+          stage: 'noAgents',
+          noAgentsMessage: response.message as string || state.resolveVariables(this.getString(data || {}, 'noAgentsMessage', 'No agents available.')),
+        } as NodeUIState.HumanHandover));
       }
 
-      return Promise.resolve(NodeResult.displayUI(uiState));
-    }
-
-    if (response.status === 'timeout') {
-      state.setVariable('_handoverTimeout', true);
-
-      const uiState: NodeUIState.HumanHandover = {
-        type: 'humanHandover',
-        nodeId,
-        stage: 'timeout',
-        timeoutMessage: state.resolveVariables(
-          this.getString(data || {}, 'timeoutMessage', 'Connection timed out.')
-        ),
-      };
-
-      const proceedOnTimeout = this.getBoolean(data || {}, 'proceedOnTimeout', false);
-      if (proceedOnTimeout) {
-        return Promise.resolve(this.proceed(node, { timeout: true }));
+      case 'timeout': {
+        state.setVariable('_handoverTimeout', true);
+        const proceedOnTimeout = this.getBoolean(data || {}, 'proceedOnTimeout', false);
+        if (proceedOnTimeout) {
+          return Promise.resolve(this.proceed(node, { timeout: true }));
+        }
+        return Promise.resolve(NodeResult.displayUI({
+          type: 'humanHandover',
+          nodeId,
+          stage: 'timeout',
+          timeoutMessage: response.message as string || state.resolveVariables(this.getString(data || {}, 'timeoutMessage', 'Connection timed out.')),
+        } as NodeUIState.HumanHandover));
       }
 
-      return Promise.resolve(NodeResult.displayUI(uiState));
+      default:
+        return Promise.resolve(NodeResult.displayUI({
+          type: 'humanHandover',
+          nodeId,
+          stage: 'waiting',
+        } as NodeUIState.HumanHandover));
     }
-
-    // Default: return waiting state
-    const uiState: NodeUIState.HumanHandover = {
-      type: 'humanHandover',
-      nodeId,
-      stage: 'waiting',
-    };
-
-    return Promise.resolve(NodeResult.displayUI(uiState));
   }
 }
 
@@ -779,12 +1098,13 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
 // ========================================
 
 /**
- * Handles delay node - pauses flow for configured duration
+ * Handles delay node - pauses flow for configured duration.
+ * Supports milliseconds, seconds, minutes, and hours.
  */
 export class DelayHandler extends BaseIntegrationHandler {
   readonly nodeType = 'delay';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Delay node missing data');
@@ -819,7 +1139,6 @@ export class DelayHandler extends BaseIntegrationHandler {
     const maxDelay = 10 * 60 * 1000;
     delayMs = Math.min(delayMs, maxDelay);
 
-    // Store delay info in state
     state.setVariable('_lastDelay', delayMs);
     state.setVariable('_delayStartTime', new Date().toISOString());
 
@@ -835,12 +1154,19 @@ export class DelayHandler extends BaseIntegrationHandler {
 // ========================================
 
 /**
- * Handles email node - triggers email send via socket/API
+ * Handles email node - triggers email send via socket/API.
+ *
+ * Features:
+ * - Email validation for recipients
+ * - CC/BCC support
+ * - HTML and plain text formatting
+ * - Attachment support
+ * - Variable interpolation in all fields
  */
 export class EmailHandler extends BaseIntegrationHandler {
   readonly nodeType = 'email';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Email node missing data');
@@ -853,12 +1179,10 @@ export class EmailHandler extends BaseIntegrationHandler {
       cc: this.getString(data, 'cc'),
       bcc: this.getString(data, 'bcc'),
       replyTo: this.getString(data, 'replyTo'),
-      attachments: this.getArray(data, 'attachments'),
+      attachments: this.getArray(data, 'attachments') as EmailConfig['attachments'],
+      format: (this.getString(data, 'format', 'text') as 'text' | 'html'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
     };
-
-    if (!config.to) {
-      return this.createError('Email recipient is required');
-    }
 
     // Resolve variables in all fields
     const resolvedConfig: EmailConfig = {
@@ -869,17 +1193,49 @@ export class EmailHandler extends BaseIntegrationHandler {
       bcc: config.bcc ? state.resolveVariables(config.bcc) : undefined,
       replyTo: config.replyTo ? state.resolveVariables(config.replyTo) : undefined,
       attachments: config.attachments,
+      format: config.format,
     };
 
+    // Validate email configuration
+    const validation = validateEmailConfig(resolvedConfig);
+    if (!validation.isValid) {
+      const errorMsg = validation.errors.join('; ');
+      if (!config.proceedOnError) {
+        return this.createError(errorMsg);
+      }
+      this.storeIntegrationResult(state, 'email', false, undefined, errorMsg);
+      return this.proceed(node, { emailSent: false, emailError: errorMsg });
+    }
+
+    // Format email body based on format type
+    resolvedConfig.body = formatEmailBody(resolvedConfig.body, resolvedConfig.format);
+
+    // Validate and format email addresses
+    const toResult = validateEmailList(resolvedConfig.to);
+    resolvedConfig.to = toResult.formatted;
+
+    if (resolvedConfig.cc) {
+      const ccResult = validateEmailList(resolvedConfig.cc);
+      resolvedConfig.cc = ccResult.formatted || undefined;
+    }
+
+    if (resolvedConfig.bcc) {
+      const bccResult = validateEmailList(resolvedConfig.bcc);
+      resolvedConfig.bcc = bccResult.formatted || undefined;
+    }
+
     // Build email payload
-    const emailPayload = {
-      ...this.buildCommonPayload(state),
-      nodeId: this.getNodeId(node),
+    const emailPayload: EmailPayload = {
       ...resolvedConfig,
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
+      nodeId: this.getNodeId(node),
+      userMetadata: state.getUserMetadata(),
     };
 
     // Try socket first
-    const socketEmitted = this.emitSocketEvent('email:send', emailPayload);
+    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.EMAIL_SEND, emailPayload);
 
     if (!socketEmitted) {
       // Fallback to API
@@ -890,38 +1246,135 @@ export class EmailHandler extends BaseIntegrationHandler {
       const response = await this.makeApiCall(apiUrl, 'POST', emailPayload);
 
       if (!response.success) {
-        console.error(`[EmailHandler] Send failed: ${response.error}`);
-        state.setVariable('_emailError', response.error);
+        this.storeIntegrationResult(state, 'email', false, undefined, response.error);
 
-        const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
-        if (!proceedOnError) {
+        if (!config.proceedOnError) {
           return this.createError(`Email send failed: ${response.error}`, true);
         }
-      } else {
-        state.setVariable('_emailSent', true);
-        state.setVariable('_emailMessageId', response.data?.messageId);
+        return this.proceed(node, { emailSent: false, emailError: response.error });
       }
-    } else {
-      state.setVariable('_emailSent', true);
+
+      const responseData = response.data as { messageId?: string } | undefined;
+      state.setVariable('_emailMessageId', responseData?.messageId);
     }
 
+    this.storeIntegrationResult(state, 'email', true);
     return this.proceed(node, { emailSent: true });
   }
 }
 
 // ========================================
-// 6-9. COMMUNICATION HANDLERS
+// 6. GMAIL HANDLER
 // ========================================
 
 /**
- * Base handler for communication platforms (Slack, Discord, WhatsApp, Telegram)
+ * Handles Gmail node - sends emails via Gmail API.
+ * Extends EmailHandler with Gmail-specific features.
+ */
+export class GmailHandler extends BaseIntegrationHandler {
+  readonly nodeType = 'gmail';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Gmail node missing data');
+    }
+
+    const config: GmailConfig = {
+      to: this.getString(data, 'to') || this.getString(data, 'recipient'),
+      subject: this.getString(data, 'subject'),
+      body: this.getString(data, 'body') || this.getString(data, 'message') || this.getString(data, 'content'),
+      cc: this.getString(data, 'cc'),
+      bcc: this.getString(data, 'bcc'),
+      replyTo: this.getString(data, 'replyTo'),
+      attachments: this.getArray(data, 'attachments') as EmailConfig['attachments'],
+      format: (this.getString(data, 'format', 'text') as 'text' | 'html'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
+      saveAsDraft: this.getBoolean(data, 'saveAsDraft', false),
+      labels: this.getArray(data, 'labels') as string[],
+    };
+
+    // Resolve variables
+    const resolvedConfig: GmailConfig = {
+      ...config,
+      to: state.resolveVariables(config.to),
+      subject: state.resolveVariables(config.subject),
+      body: state.resolveVariables(config.body),
+      cc: config.cc ? state.resolveVariables(config.cc) : undefined,
+      bcc: config.bcc ? state.resolveVariables(config.bcc) : undefined,
+      replyTo: config.replyTo ? state.resolveVariables(config.replyTo) : undefined,
+    };
+
+    // Validate
+    const validation = validateEmailConfig(resolvedConfig);
+    if (!validation.isValid) {
+      const errorMsg = validation.errors.join('; ');
+      if (!config.proceedOnError) {
+        return this.createError(errorMsg);
+      }
+      this.storeIntegrationResult(state, 'gmail', false, undefined, errorMsg);
+      return this.proceed(node, { gmailSent: false, gmailError: errorMsg });
+    }
+
+    // Format body
+    resolvedConfig.body = formatEmailBody(resolvedConfig.body, resolvedConfig.format);
+
+    // Validate email addresses
+    const toResult = validateEmailList(resolvedConfig.to);
+    resolvedConfig.to = toResult.formatted;
+
+    const gmailPayload = {
+      ...resolvedConfig,
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
+      nodeId: this.getNodeId(node),
+      userMetadata: state.getUserMetadata(),
+      answers: state.getAllAnswers(),
+    };
+
+    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.GMAIL_SEND, gmailPayload);
+
+    if (!socketEmitted) {
+      const apiUrl = this.apiBaseUrl
+        ? `${this.apiBaseUrl}/api/integrations/gmail/send`
+        : '/api/integrations/gmail/send';
+
+      const response = await this.makeApiCall(apiUrl, 'POST', gmailPayload);
+
+      if (!response.success) {
+        this.storeIntegrationResult(state, 'gmail', false, undefined, response.error);
+
+        if (!config.proceedOnError) {
+          return this.createError(`Gmail send failed: ${response.error}`, true);
+        }
+        return this.proceed(node, { gmailSent: false, gmailError: response.error });
+      }
+
+      const responseData = response.data as { messageId?: string; threadId?: string } | undefined;
+      state.setVariable('_gmailMessageId', responseData?.messageId);
+      state.setVariable('_gmailThreadId', responseData?.threadId);
+    }
+
+    this.storeIntegrationResult(state, 'gmail', true);
+    return this.proceed(node, { gmailSent: true });
+  }
+}
+
+// ========================================
+// 7-10. COMMUNICATION HANDLERS
+// ========================================
+
+/**
+ * Base handler for communication platforms (Slack, Discord, WhatsApp, Telegram).
+ * Provides common structure with platform-specific message formatting.
  */
 abstract class BaseCommunicationHandler extends BaseIntegrationHandler {
   protected abstract readonly platformName: string;
   protected abstract readonly socketEvent: string;
   protected abstract readonly apiEndpoint: string;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError(`${this.platformName} node missing data`);
@@ -931,19 +1384,17 @@ abstract class BaseCommunicationHandler extends BaseIntegrationHandler {
       message: this.getString(data, 'message') || this.getString(data, 'text'),
       channel: this.getString(data, 'channel') || this.getString(data, 'channelId'),
       webhookUrl: this.getString(data, 'webhookUrl') || this.getString(data, 'webhook'),
-      additionalData: data.additionalData || data.extra,
+      additionalData: data.additionalData as Record<string, unknown> || data.extra as Record<string, unknown>,
     };
 
     if (!config.message) {
       return this.createError(`${this.platformName} message is required`);
     }
 
-    // Resolve variables
     const resolvedMessage = state.resolveVariables(config.message);
     const resolvedChannel = config.channel ? state.resolveVariables(config.channel) : undefined;
     const resolvedWebhook = config.webhookUrl ? state.resolveVariables(config.webhookUrl) : undefined;
 
-    // Build payload
     const payload = {
       ...this.buildCommonPayload(state),
       nodeId: this.getNodeId(node),
@@ -956,11 +1407,9 @@ abstract class BaseCommunicationHandler extends BaseIntegrationHandler {
         : undefined,
     };
 
-    // Try socket first
     const socketEmitted = this.emitSocketEvent(this.socketEvent, payload);
 
     if (!socketEmitted && resolvedWebhook) {
-      // Direct webhook call
       const response = await this.makeApiCall(resolvedWebhook, 'POST', {
         text: resolvedMessage,
         channel: resolvedChannel,
@@ -968,8 +1417,7 @@ abstract class BaseCommunicationHandler extends BaseIntegrationHandler {
       });
 
       if (!response.success) {
-        console.error(`[${this.platformName}Handler] Send failed: ${response.error}`);
-        state.setVariable(`_${this.platformName.toLowerCase()}Error`, response.error);
+        this.storeIntegrationResult(state, this.platformName.toLowerCase(), false, undefined, response.error);
 
         const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
         if (!proceedOnError) {
@@ -977,41 +1425,193 @@ abstract class BaseCommunicationHandler extends BaseIntegrationHandler {
         }
       }
     } else if (!socketEmitted) {
-      // Try API endpoint
       const apiUrl = this.apiBaseUrl
         ? `${this.apiBaseUrl}${this.apiEndpoint}`
         : this.apiEndpoint;
 
-      const response = await this.makeApiCall(apiUrl, 'POST', payload);
-
-      if (!response.success) {
-        console.error(`[${this.platformName}Handler] API call failed: ${response.error}`);
-      }
+      await this.makeApiCall(apiUrl, 'POST', payload);
     }
 
-    state.setVariable(`_${this.platformName.toLowerCase()}Sent`, true);
+    this.storeIntegrationResult(state, this.platformName.toLowerCase(), true);
     return this.proceed(node, { [`${this.platformName.toLowerCase()}Sent`]: true });
   }
 }
 
 /**
- * Slack node handler
+ * Slack node handler with rich message formatting support.
  */
 export class SlackHandler extends BaseCommunicationHandler {
   readonly nodeType = 'slack-node';
   protected readonly platformName = 'Slack';
-  protected readonly socketEvent = 'slack:send';
+  protected readonly socketEvent = IntegrationSocketEvents.SLACK_SEND;
   protected readonly apiEndpoint = '/api/integrations/slack/send';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Slack node missing data');
+    }
+
+    const config: SlackConfig = {
+      message: this.getString(data, 'message') || this.getString(data, 'text'),
+      channel: this.getString(data, 'channel') || this.getString(data, 'channelId'),
+      webhookUrl: this.getString(data, 'webhookUrl') || this.getString(data, 'webhook'),
+      username: this.getString(data, 'username'),
+      icon: this.getString(data, 'icon') || this.getString(data, 'iconEmoji'),
+      blocks: this.getArray(data, 'blocks') as SlackConfig['blocks'],
+      attachments: this.getArray(data, 'attachments') as SlackConfig['attachments'],
+      threadTs: this.getString(data, 'threadTs') || this.getString(data, 'thread_ts'),
+    };
+
+    if (!config.message && !config.blocks?.length) {
+      return this.createError('Slack message or blocks required');
+    }
+
+    const resolvedMessage = config.message ? state.resolveVariables(config.message) : '';
+    const resolvedChannel = config.channel ? state.resolveVariables(config.channel) : undefined;
+    const resolvedWebhook = config.webhookUrl ? state.resolveVariables(config.webhookUrl) : undefined;
+
+    // Format message with Slack markdown
+    const formattedMessage = formatSlackMessage(resolvedMessage);
+
+    // Build blocks if not provided
+    let blocks = config.blocks;
+    if (!blocks && resolvedMessage) {
+      blocks = [createSlackBlock(formattedMessage)];
+    }
+
+    // Build attachments with collected data
+    let attachments = config.attachments;
+    if (!attachments && this.getBoolean(data, 'includeAnswers', false)) {
+      attachments = [createSlackAttachment(state.getAllAnswers())];
+    }
+
+    const payload = {
+      ...this.buildCommonPayload(state),
+      nodeId: this.getNodeId(node),
+      platform: 'slack',
+      text: formattedMessage,
+      channel: resolvedChannel,
+      webhookUrl: resolvedWebhook,
+      username: config.username,
+      icon_emoji: config.icon,
+      blocks,
+      attachments,
+      thread_ts: config.threadTs,
+    };
+
+    const socketEmitted = this.emitSocketEvent(this.socketEvent, payload);
+
+    if (!socketEmitted && resolvedWebhook) {
+      const webhookPayload = {
+        text: formattedMessage,
+        channel: resolvedChannel,
+        username: config.username,
+        icon_emoji: config.icon,
+        blocks,
+        attachments,
+        thread_ts: config.threadTs,
+      };
+
+      const response = await this.makeApiCall(resolvedWebhook, 'POST', webhookPayload);
+
+      if (!response.success) {
+        this.storeIntegrationResult(state, 'slack', false, undefined, response.error);
+
+        const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
+        if (!proceedOnError) {
+          return this.createError(`Slack send failed: ${response.error}`, true);
+        }
+      }
+    }
+
+    this.storeIntegrationResult(state, 'slack', true);
+    return this.proceed(node, { slackSent: true });
+  }
 }
 
 /**
- * Discord node handler
+ * Discord node handler with embed support.
  */
 export class DiscordHandler extends BaseCommunicationHandler {
   readonly nodeType = 'discord-node';
   protected readonly platformName = 'Discord';
-  protected readonly socketEvent = 'discord:send';
+  protected readonly socketEvent = IntegrationSocketEvents.DISCORD_SEND;
   protected readonly apiEndpoint = '/api/integrations/discord/send';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Discord node missing data');
+    }
+
+    const config: DiscordConfig = {
+      message: this.getString(data, 'message') || this.getString(data, 'content'),
+      channel: this.getString(data, 'channel') || this.getString(data, 'channelId'),
+      webhookUrl: this.getString(data, 'webhookUrl') || this.getString(data, 'webhook'),
+      username: this.getString(data, 'username'),
+      avatarUrl: this.getString(data, 'avatarUrl') || this.getString(data, 'avatar_url'),
+      embeds: this.getArray(data, 'embeds') as DiscordConfig['embeds'],
+      tts: this.getBoolean(data, 'tts', false),
+    };
+
+    if (!config.message && !config.embeds?.length) {
+      return this.createError('Discord message or embeds required');
+    }
+
+    const resolvedMessage = config.message ? state.resolveVariables(config.message) : '';
+    const resolvedChannel = config.channel ? state.resolveVariables(config.channel) : undefined;
+    const resolvedWebhook = config.webhookUrl ? state.resolveVariables(config.webhookUrl) : undefined;
+
+    // Format message
+    const formattedMessage = formatDiscordMessage(resolvedMessage);
+
+    // Build embeds if not provided and includeAnswers is true
+    let embeds = config.embeds;
+    if (!embeds && this.getBoolean(data, 'includeAnswers', false)) {
+      const embedTitle = this.getString(data, 'embedTitle', 'New Submission');
+      embeds = [createDiscordEmbed(embedTitle, undefined, state.getAllAnswers())];
+    }
+
+    const payload = {
+      ...this.buildCommonPayload(state),
+      nodeId: this.getNodeId(node),
+      platform: 'discord',
+      content: formattedMessage,
+      channel: resolvedChannel,
+      webhookUrl: resolvedWebhook,
+      username: config.username,
+      avatar_url: config.avatarUrl,
+      embeds,
+      tts: config.tts,
+    };
+
+    const socketEmitted = this.emitSocketEvent(this.socketEvent, payload);
+
+    if (!socketEmitted && resolvedWebhook) {
+      const webhookPayload = {
+        content: formattedMessage,
+        username: config.username,
+        avatar_url: config.avatarUrl,
+        embeds,
+        tts: config.tts,
+      };
+
+      const response = await this.makeApiCall(resolvedWebhook, 'POST', webhookPayload);
+
+      if (!response.success) {
+        this.storeIntegrationResult(state, 'discord', false, undefined, response.error);
+
+        const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
+        if (!proceedOnError) {
+          return this.createError(`Discord send failed: ${response.error}`, true);
+        }
+      }
+    }
+
+    this.storeIntegrationResult(state, 'discord', true);
+    return this.proceed(node, { discordSent: true });
+  }
 }
 
 /**
@@ -1023,16 +1623,15 @@ export class WhatsAppHandler extends BaseCommunicationHandler {
   protected readonly socketEvent = 'whatsapp:send';
   protected readonly apiEndpoint = '/api/integrations/whatsapp/send';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('WhatsApp node missing data');
     }
 
-    // WhatsApp may have phone number instead of channel
     const phoneNumber = this.getString(data, 'phoneNumber') || this.getString(data, 'phone') || this.getString(data, 'to');
     if (phoneNumber) {
-      data.channel = phoneNumber;
+      (data as Record<string, unknown>).channel = phoneNumber;
     }
 
     return super.handle(node, state);
@@ -1048,16 +1647,15 @@ export class TelegramHandler extends BaseCommunicationHandler {
   protected readonly socketEvent = 'telegram:send';
   protected readonly apiEndpoint = '/api/integrations/telegram/send';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Telegram node missing data');
     }
 
-    // Telegram uses chatId instead of channel
     const chatId = this.getString(data, 'chatId') || this.getString(data, 'chat_id');
     if (chatId) {
-      data.channel = chatId;
+      (data as Record<string, unknown>).channel = chatId;
     }
 
     return super.handle(node, state);
@@ -1065,16 +1663,16 @@ export class TelegramHandler extends BaseCommunicationHandler {
 }
 
 // ========================================
-// 10-12. GOOGLE HANDLERS
+// 11-13. GOOGLE HANDLERS
 // ========================================
 
 /**
- * Google Sheets node handler
+ * Google Sheets node handler with proper data formatting.
  */
 export class GoogleSheetsHandler extends BaseIntegrationHandler {
   readonly nodeType = 'google-sheets';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Google Sheets node missing data');
@@ -1084,9 +1682,11 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
       spreadsheetId: this.getString(data, 'spreadsheetId') || this.getString(data, 'sheetId'),
       sheetName: this.getString(data, 'sheetName') || this.getString(data, 'sheet'),
       action: (this.getString(data, 'action', 'addRow') as GoogleSheetsConfig['action']),
-      data: data.data || data.rowData || data.values,
-      rowId: data.rowId,
+      data: data.data as Record<string, unknown> || data.rowData as Record<string, unknown> || data.values as Record<string, unknown>,
+      columnMappings: this.getArray(data, 'columnMappings') as GoogleSheetsConfig['columnMappings'],
+      rowId: data.rowId as string | number,
       variableName: this.getString(data, 'variableName'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
     };
 
     if (!config.spreadsheetId) {
@@ -1096,8 +1696,11 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
     // Build row data from answers if not provided
     let rowData = config.data;
     if (!rowData || Object.keys(rowData).length === 0) {
-      rowData = state.getAllAnswers();
-    } else if (typeof rowData === 'object') {
+      rowData = {
+        ...state.getAllAnswers(),
+        ...state.getUserMetadata(),
+      };
+    } else {
       rowData = this.resolveObjectVariables(rowData, state);
     }
 
@@ -1106,25 +1709,25 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
       ...rowData,
       _sessionId: state.sessionId,
       _timestamp: new Date().toISOString(),
-      ...state.getUserMetadata(),
     };
 
-    // Build payload
-    const payload = {
-      ...this.buildCommonPayload(state),
-      nodeId: this.getNodeId(node),
+
+    const payload: GoogleSheetsPayload = {
       spreadsheetId: config.spreadsheetId,
       sheetName: config.sheetName,
       action: config.action,
       data: enrichedRowData,
+      columnMappings: config.columnMappings,
       rowId: config.rowId,
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
+      nodeId: this.getNodeId(node),
     };
 
-    // Try socket first
-    const socketEmitted = this.emitSocketEvent('googleSheets:execute', payload);
+    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.GOOGLE_SHEETS_EXECUTE, payload);
 
     if (!socketEmitted) {
-      // Fallback to API
       const apiUrl = this.apiBaseUrl
         ? `${this.apiBaseUrl}/api/integrations/google-sheets/${config.action}`
         : `/api/integrations/google-sheets/${config.action}`;
@@ -1132,24 +1735,21 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
       const response = await this.makeApiCall(apiUrl, 'POST', payload);
 
       if (!response.success) {
-        console.error(`[GoogleSheetsHandler] Operation failed: ${response.error}`);
-        state.setVariable('_googleSheetsError', response.error);
+        this.storeIntegrationResult(state, 'googleSheets', false, undefined, response.error);
 
-        const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
-        if (!proceedOnError) {
+        if (!config.proceedOnError) {
           return this.createError(`Google Sheets operation failed: ${response.error}`, true);
         }
-      } else {
-        if (config.variableName && response.data) {
-          state.setVariable(config.variableName, response.data);
-        }
-        state.setVariable('_googleSheetsSuccess', true);
-        state.setVariable('_googleSheetsResponse', response.data);
+        return this.proceed(node, { googleSheetsSuccess: false, googleSheetsError: response.error });
       }
-    } else {
-      state.setVariable('_googleSheetsSuccess', true);
+
+      if (config.variableName && response.data) {
+        state.setVariable(config.variableName, response.data);
+      }
+      state.setVariable('_googleSheetsResponse', response.data);
     }
 
+    this.storeIntegrationResult(state, 'googleSheets', true);
     return this.proceed(node, { googleSheetsSuccess: true });
   }
 }
@@ -1160,7 +1760,7 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
 export class GoogleCalendarHandler extends BaseIntegrationHandler {
   readonly nodeType = 'google-calendar';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Google Calendar node missing data');
@@ -1169,10 +1769,12 @@ export class GoogleCalendarHandler extends BaseIntegrationHandler {
     const config: GoogleCalendarConfig = {
       calendarId: this.getString(data, 'calendarId') || this.getString(data, 'calendar'),
       action: (this.getString(data, 'action', 'createEvent') as GoogleCalendarConfig['action']),
-      event: data.event,
+      event: data.event as GoogleCalendarConfig['event'],
       startDate: this.getString(data, 'startDate'),
       endDate: this.getString(data, 'endDate'),
+      timezone: this.getString(data, 'timezone'),
       variableName: this.getString(data, 'variableName'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
     };
 
     // Resolve event data variables
@@ -1185,10 +1787,10 @@ export class GoogleCalendarHandler extends BaseIntegrationHandler {
         endTime: state.resolveVariables(resolvedEvent.endTime || ''),
         attendees: resolvedEvent.attendees?.map((a: string) => state.resolveVariables(a)),
         location: resolvedEvent.location ? state.resolveVariables(resolvedEvent.location) : undefined,
+        timezone: config.timezone,
       };
     }
 
-    // Build payload
     const payload = {
       ...this.buildCommonPayload(state),
       nodeId: this.getNodeId(node),
@@ -1197,13 +1799,12 @@ export class GoogleCalendarHandler extends BaseIntegrationHandler {
       event: resolvedEvent,
       startDate: config.startDate ? state.resolveVariables(config.startDate) : undefined,
       endDate: config.endDate ? state.resolveVariables(config.endDate) : undefined,
+      timezone: config.timezone,
     };
 
-    // Try socket first
-    const socketEmitted = this.emitSocketEvent('googleCalendar:execute', payload);
+    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.GOOGLE_CALENDAR_EXECUTE, payload);
 
     if (!socketEmitted) {
-      // Fallback to API
       const apiUrl = this.apiBaseUrl
         ? `${this.apiBaseUrl}/api/integrations/google-calendar/${config.action}`
         : `/api/integrations/google-calendar/${config.action}`;
@@ -1211,29 +1812,28 @@ export class GoogleCalendarHandler extends BaseIntegrationHandler {
       const response = await this.makeApiCall(apiUrl, 'POST', payload);
 
       if (!response.success) {
-        console.error(`[GoogleCalendarHandler] Operation failed: ${response.error}`);
-        state.setVariable('_googleCalendarError', response.error);
+        this.storeIntegrationResult(state, 'googleCalendar', false, undefined, response.error);
 
-        const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
-        if (!proceedOnError) {
+        if (!config.proceedOnError) {
           return this.createError(`Google Calendar operation failed: ${response.error}`, true);
         }
-      } else {
-        if (config.variableName && response.data) {
-          state.setVariable(config.variableName, response.data);
-        }
-        state.setVariable('_googleCalendarSuccess', true);
-        state.setVariable('_googleCalendarResponse', response.data);
-
-        // Store event ID for reference
-        if (response.data?.eventId) {
-          state.setVariable('_calendarEventId', response.data.eventId);
-        }
+        return this.proceed(node, { googleCalendarSuccess: false, googleCalendarError: response.error });
       }
-    } else {
-      state.setVariable('_googleCalendarSuccess', true);
+
+      if (config.variableName && response.data) {
+        state.setVariable(config.variableName, response.data);
+      }
+
+      const responseData = response.data as { eventId?: string; meetingLink?: string } | undefined;
+      if (responseData?.eventId) {
+        state.setVariable('_calendarEventId', responseData.eventId);
+      }
+      if (responseData?.meetingLink) {
+        state.setVariable('_calendarMeetingLink', responseData.meetingLink);
+      }
     }
 
+    this.storeIntegrationResult(state, 'googleCalendar', true);
     return this.proceed(node, { googleCalendarSuccess: true });
   }
 }
@@ -1244,7 +1844,7 @@ export class GoogleCalendarHandler extends BaseIntegrationHandler {
 export class GoogleAnalyticsHandler extends BaseIntegrationHandler {
   readonly nodeType = 'google-analytics';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Google Analytics node missing data');
@@ -1256,45 +1856,31 @@ export class GoogleAnalyticsHandler extends BaseIntegrationHandler {
       eventAction: this.getString(data, 'eventAction') || this.getString(data, 'action'),
       eventLabel: this.getString(data, 'eventLabel') || this.getString(data, 'label'),
       eventValue: this.getNumber(data, 'eventValue') || this.getNumber(data, 'value'),
+      customDimensions: data.customDimensions as Record<string, string>,
+      customMetrics: data.customMetrics as Record<string, number>,
     };
 
     if (!config.eventAction) {
       return this.createError('Google Analytics event action is required');
     }
 
-    // Resolve variables
     const resolvedConfig: GoogleAnalyticsConfig = {
       trackingId: config.trackingId ? state.resolveVariables(config.trackingId) : undefined,
       eventCategory: state.resolveVariables(config.eventCategory),
       eventAction: state.resolveVariables(config.eventAction),
       eventLabel: config.eventLabel ? state.resolveVariables(config.eventLabel) : undefined,
       eventValue: config.eventValue,
+      customDimensions: config.customDimensions,
+      customMetrics: config.customMetrics,
     };
 
-    // Build payload
     const payload = {
       ...this.buildCommonPayload(state),
       nodeId: this.getNodeId(node),
       ...resolvedConfig,
-      userMetadata: state.getUserMetadata(),
     };
 
-    // Emit socket event for GA tracking (handled client-side or server-side)
-    const socketEmitted = this.emitSocketEvent('analytics:track', payload);
-
-    if (!socketEmitted) {
-      // Fallback to API
-      const apiUrl = this.apiBaseUrl
-        ? `${this.apiBaseUrl}/api/integrations/google-analytics/track`
-        : '/api/integrations/google-analytics/track';
-
-      const response = await this.makeApiCall(apiUrl, 'POST', payload);
-
-      if (!response.success) {
-        console.warn(`[GoogleAnalyticsHandler] Track failed: ${response.error}`);
-        // Analytics failures should not block flow
-      }
-    }
+    this.emitSocketEvent(IntegrationSocketEvents.ANALYTICS_TRACK, payload);
 
     state.setVariable('_analyticsTracked', true);
     return this.proceed(node, { analyticsTracked: true });
@@ -1302,18 +1888,18 @@ export class GoogleAnalyticsHandler extends BaseIntegrationHandler {
 }
 
 // ========================================
-// 13-15. CRM HANDLERS
+// 14-17. CRM HANDLERS
 // ========================================
 
 /**
- * Base handler for CRM integrations (HubSpot, Salesforce, Mailchimp)
+ * Base handler for CRM integrations with proper data formatting.
  */
 abstract class BaseCRMHandler extends BaseIntegrationHandler {
   protected abstract readonly crmName: string;
   protected abstract readonly socketEvent: string;
   protected abstract readonly apiEndpoint: string;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError(`${this.crmName} node missing data`);
@@ -1321,50 +1907,39 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
 
     const config: CRMConfig = {
       action: (this.getString(data, 'action', 'createContact') as CRMConfig['action']),
-      contactData: data.contactData || data.contact || data.data,
+      contactData: data.contactData as Record<string, unknown> || data.contact as Record<string, unknown> || data.data as Record<string, unknown>,
       listId: this.getString(data, 'listId') || this.getString(data, 'list'),
-      dealData: data.dealData || data.deal,
+      dealData: data.dealData as Record<string, unknown> || data.deal as Record<string, unknown>,
       webhookUrl: this.getString(data, 'webhookUrl'),
       variableName: this.getString(data, 'variableName'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
     };
 
-    // Build contact data from answers and metadata if not provided
+    // Extract contact data from answers and metadata
     let contactData = config.contactData;
     if (!contactData || Object.keys(contactData).length === 0) {
-      const userMeta = state.getUserMetadata();
-      const answers = state.getAllAnswers();
-      contactData = {
-        email: userMeta.email || answers.email,
-        firstName: userMeta.name?.split(' ')[0] || answers.name?.split(' ')[0],
-        lastName: userMeta.name?.split(' ').slice(1).join(' ') || answers.name?.split(' ').slice(1).join(' '),
-        phone: userMeta.phone || answers.phone,
-        ...answers,
-      };
+      contactData = extractContactData(state.getAllAnswers(), state.getUserMetadata());
     } else {
       contactData = this.resolveObjectVariables(contactData, state);
     }
 
-    // Remove empty values
-    contactData = Object.fromEntries(
-      Object.entries(contactData).filter(([_, v]) => v !== undefined && v !== null && v !== '')
-    );
+    // Format contact data for the specific CRM
+    const formattedData = this.formatContactData(contactData as ContactData, config.action);
 
-    // Build payload
     const payload = {
       ...this.buildCommonPayload(state),
       nodeId: this.getNodeId(node),
       crm: this.crmName.toLowerCase(),
       action: config.action,
-      contactData,
+      properties: formattedData,
+      contactData: formattedData,
       listId: config.listId,
       dealData: config.dealData ? this.resolveObjectVariables(config.dealData, state) : undefined,
     };
 
-    // Try socket first
     const socketEmitted = this.emitSocketEvent(this.socketEvent, payload);
 
     if (!socketEmitted) {
-      // Try webhook if configured
       if (config.webhookUrl) {
         const response = await this.makeApiCall(
           state.resolveVariables(config.webhookUrl),
@@ -1373,13 +1948,15 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
         );
 
         if (!response.success) {
-          console.error(`[${this.crmName}Handler] Webhook failed: ${response.error}`);
-          state.setVariable(`_${this.crmName.toLowerCase()}Error`, response.error);
+          this.storeIntegrationResult(state, this.crmName.toLowerCase(), false, undefined, response.error);
+
+          if (!config.proceedOnError) {
+            return this.createError(`${this.crmName} operation failed: ${response.error}`, true);
+          }
         } else {
           this.storeResponse(state, config.variableName, response.data);
         }
       } else {
-        // Fallback to API
         const apiUrl = this.apiBaseUrl
           ? `${this.apiBaseUrl}${this.apiEndpoint}/${config.action}`
           : `${this.apiEndpoint}/${config.action}`;
@@ -1387,11 +1964,9 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
         const response = await this.makeApiCall(apiUrl, 'POST', payload);
 
         if (!response.success) {
-          console.error(`[${this.crmName}Handler] API call failed: ${response.error}`);
-          state.setVariable(`_${this.crmName.toLowerCase()}Error`, response.error);
+          this.storeIntegrationResult(state, this.crmName.toLowerCase(), false, undefined, response.error);
 
-          const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
-          if (!proceedOnError) {
+          if (!config.proceedOnError) {
             return this.createError(`${this.crmName} operation failed: ${response.error}`, true);
           }
         } else {
@@ -1399,18 +1974,20 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
         }
       }
     } else {
-      state.setVariable(`_${this.crmName.toLowerCase()}Success`, true);
+      this.storeIntegrationResult(state, this.crmName.toLowerCase(), true);
     }
 
     return this.proceed(node, { [`${this.crmName.toLowerCase()}Success`]: true });
   }
 
-  protected storeResponse(state: ChatState, variableName: string | undefined, data: any): void {
-    state.setVariable(`_${this.crmName.toLowerCase()}Success`, true);
-    state.setVariable(`_${this.crmName.toLowerCase()}Response`, data);
+  protected abstract formatContactData(contact: ContactData, action: string): Record<string, unknown>;
 
-    if (data?.id || data?.contactId || data?.recordId) {
-      state.setVariable(`_${this.crmName.toLowerCase()}Id`, data.id || data.contactId || data.recordId);
+  protected storeResponse(state: ChatState, variableName: string | undefined, data: unknown): void {
+    this.storeIntegrationResult(state, this.crmName.toLowerCase(), true, data);
+
+    const responseData = data as { id?: string; contactId?: string; recordId?: string } | undefined;
+    if (responseData?.id || responseData?.contactId || responseData?.recordId) {
+      state.setVariable(`_${this.crmName.toLowerCase()}Id`, responseData.id || responseData.contactId || responseData.recordId);
     }
 
     if (variableName) {
@@ -1420,13 +1997,17 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
 }
 
 /**
- * HubSpot node handler
+ * HubSpot node handler with proper contact/deal formatting.
  */
 export class HubSpotHandler extends BaseCRMHandler {
   readonly nodeType = 'hubspot';
   protected readonly crmName = 'HubSpot';
-  protected readonly socketEvent = 'hubspot:execute';
+  protected readonly socketEvent = IntegrationSocketEvents.HUBSPOT_EXECUTE;
   protected readonly apiEndpoint = '/api/integrations/hubspot';
+
+  protected formatContactData(contact: ContactData, _action: string): Record<string, unknown> {
+    return formatHubSpotContact(contact);
+  }
 }
 
 /**
@@ -1435,8 +2016,88 @@ export class HubSpotHandler extends BaseCRMHandler {
 export class SalesforceHandler extends BaseCRMHandler {
   readonly nodeType = 'salesforce';
   protected readonly crmName = 'Salesforce';
-  protected readonly socketEvent = 'salesforce:execute';
+  protected readonly socketEvent = IntegrationSocketEvents.SALESFORCE_EXECUTE;
   protected readonly apiEndpoint = '/api/integrations/salesforce';
+
+  protected formatContactData(contact: ContactData, action: string): Record<string, unknown> {
+    const objectType = action === 'createLead' ? 'Lead' : 'Contact';
+    return formatSalesforceRecord(contact, objectType);
+  }
+}
+
+/**
+ * Zoho CRM node handler with proper lead/contact formatting.
+ */
+export class ZohoCRMHandler extends BaseIntegrationHandler {
+  readonly nodeType = 'zoho-crm';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Zoho CRM node missing data');
+    }
+
+    const config: ZohoCRMConfig = {
+      module: (this.getString(data, 'module', 'Contacts') as ZohoCRMConfig['module']),
+      action: (this.getString(data, 'action', 'create') as ZohoCRMConfig['action']),
+      data: data.data as Record<string, unknown> || data.recordData as Record<string, unknown>,
+      recordId: this.getString(data, 'recordId'),
+      searchCriteria: this.getString(data, 'searchCriteria'),
+      variableName: this.getString(data, 'variableName'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
+    };
+
+    // Extract and format contact data
+    let recordData = config.data;
+    if (!recordData || Object.keys(recordData).length === 0) {
+      const contactData = extractContactData(state.getAllAnswers(), state.getUserMetadata());
+      recordData = formatZohoCRMRecord(contactData, config.module);
+    } else {
+      recordData = this.resolveObjectVariables(recordData, state);
+    }
+
+    const payload: ZohoCRMPayload = {
+      module: config.module,
+      action: config.action,
+      data: [recordData],
+      recordId: config.recordId,
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
+      nodeId: this.getNodeId(node),
+    };
+
+    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.ZOHO_CRM_EXECUTE, payload);
+
+    if (!socketEmitted) {
+      const apiUrl = this.apiBaseUrl
+        ? `${this.apiBaseUrl}/api/integrations/zoho-crm/${config.action}`
+        : `/api/integrations/zoho-crm/${config.action}`;
+
+      const response = await this.makeApiCall(apiUrl, 'POST', payload);
+
+      if (!response.success) {
+        this.storeIntegrationResult(state, 'zohoCRM', false, undefined, response.error);
+
+        if (!config.proceedOnError) {
+          return this.createError(`Zoho CRM operation failed: ${response.error}`, true);
+        }
+        return this.proceed(node, { zohoCRMSuccess: false, zohoCRMError: response.error });
+      }
+
+      if (config.variableName && response.data) {
+        state.setVariable(config.variableName, response.data);
+      }
+
+      const responseData = response.data as { data?: Array<{ details?: { id?: string } }> } | undefined;
+      if (responseData?.data?.[0]?.details?.id) {
+        state.setVariable('_zohoCRMRecordId', responseData.data[0].details.id);
+      }
+    }
+
+    this.storeIntegrationResult(state, 'zohoCRM', true);
+    return this.proceed(node, { zohoCRMSuccess: true });
+  }
 }
 
 /**
@@ -1445,16 +2106,27 @@ export class SalesforceHandler extends BaseCRMHandler {
 export class MailchimpHandler extends BaseCRMHandler {
   readonly nodeType = 'mailchimp';
   protected readonly crmName = 'Mailchimp';
-  protected readonly socketEvent = 'mailchimp:execute';
+  protected readonly socketEvent = IntegrationSocketEvents.MAILCHIMP_EXECUTE;
   protected readonly apiEndpoint = '/api/integrations/mailchimp';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  protected formatContactData(contact: ContactData, _action: string): Record<string, unknown> {
+    return {
+      email_address: contact.email,
+      status: 'subscribed',
+      merge_fields: {
+        FNAME: contact.firstName || '',
+        LNAME: contact.lastName || '',
+        PHONE: contact.phone || '',
+      },
+    };
+  }
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Mailchimp node missing data');
     }
 
-    // Mailchimp-specific: require list ID for subscribe action
     const action = this.getString(data, 'action', 'addToList');
     const listId = this.getString(data, 'listId') || this.getString(data, 'audienceId');
 
@@ -1462,9 +2134,8 @@ export class MailchimpHandler extends BaseCRMHandler {
       return this.createError('Mailchimp list/audience ID is required for subscription');
     }
 
-    // Ensure listId is in data for parent handler
     if (listId) {
-      data.listId = listId;
+      (data as Record<string, unknown>).listId = listId;
     }
 
     return super.handle(node, state);
@@ -1472,16 +2143,16 @@ export class MailchimpHandler extends BaseCRMHandler {
 }
 
 // ========================================
-// 16-17. AUTOMATION HANDLERS
+// 18-20. AUTOMATION & DATABASE HANDLERS
 // ========================================
 
 /**
- * Zapier node handler
+ * Zapier node handler with proper webhook triggering.
  */
 export class ZapierHandler extends BaseIntegrationHandler {
   readonly nodeType = 'zapier';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Zapier node missing data');
@@ -1489,33 +2160,45 @@ export class ZapierHandler extends BaseIntegrationHandler {
 
     const config: ZapierConfig = {
       webhookUrl: this.getString(data, 'webhookUrl') || this.getString(data, 'webhook') || this.getString(data, 'zapUrl'),
-      data: data.data || data.payload,
+      data: data.data as Record<string, unknown> || data.payload as Record<string, unknown>,
+      includeAllAnswers: this.getBoolean(data, 'includeAllAnswers', true),
       variableName: this.getString(data, 'variableName'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
     };
 
     if (!config.webhookUrl) {
       return this.createError('Zapier webhook URL is required');
     }
 
-    // Resolve webhook URL
-    const resolvedWebhookUrl = state.resolveVariables(config.webhookUrl);
+    // Validate webhook URL
+    const urlValidation = validateWebhookUrl(config.webhookUrl);
+    if (!urlValidation.isValid) {
+      return this.createError(urlValidation.error || 'Invalid Zapier webhook URL');
+    }
 
-    // Build payload - include all answers and metadata
-    let payload: Record<string, any> = {
-      ...this.buildCommonPayload(state),
+    const resolvedWebhookUrl = state.resolveVariables(urlValidation.sanitizedUrl || config.webhookUrl);
+
+    // Build payload
+    let payload: Record<string, unknown> = {
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
       nodeId: this.getNodeId(node),
     };
 
-    // Add custom data if provided, otherwise use all answers
+    // Add custom data or all answers
     if (config.data && Object.keys(config.data).length > 0) {
       payload = {
         ...payload,
         ...this.resolveObjectVariables(config.data, state),
       };
-    } else {
+    }
+
+    if (config.includeAllAnswers) {
       payload = {
         ...payload,
-        ...state.getAllAnswers(),
+        answers: state.getAllAnswers(),
+        userMetadata: state.getUserMetadata(),
       };
     }
 
@@ -1523,40 +2206,38 @@ export class ZapierHandler extends BaseIntegrationHandler {
     const response = await this.makeApiCall(resolvedWebhookUrl, 'POST', payload);
 
     if (!response.success) {
-      console.error(`[ZapierHandler] Webhook call failed: ${response.error}`);
-      state.setVariable('_zapierError', response.error);
+      this.storeIntegrationResult(state, 'zapier', false, undefined, response.error);
 
-      const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
-      if (!proceedOnError) {
+      if (!config.proceedOnError) {
         return this.createError(`Zapier webhook failed: ${response.error}`, true);
       }
-    } else {
-      state.setVariable('_zapierSuccess', true);
-      state.setVariable('_zapierResponse', response.data);
-
-      if (config.variableName && response.data) {
-        state.setVariable(config.variableName, response.data);
-      }
+      return this.proceed(node, { zapierTriggered: false, zapierError: response.error });
     }
 
-    // Also emit socket event for tracking
-    this.emitSocketEvent('zapier:triggered', {
+    if (config.variableName && response.data) {
+      state.setVariable(config.variableName, response.data);
+    }
+
+    this.storeIntegrationResult(state, 'zapier', true, response.data);
+
+    // Emit tracking event
+    this.emitSocketEvent(IntegrationSocketEvents.ZAPIER_TRIGGER, {
       sessionId: state.sessionId,
       nodeId: this.getNodeId(node),
-      success: response.success,
+      success: true,
     });
 
-    return this.proceed(node, { zapierTriggered: response.success });
+    return this.proceed(node, { zapierTriggered: true });
   }
 }
 
 /**
- * Airtable node handler
+ * Airtable node handler with proper record structure.
  */
 export class AirtableHandler extends BaseIntegrationHandler {
   readonly nodeType = 'airtable';
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     if (!data) {
       return this.createError('Airtable node missing data');
@@ -1567,8 +2248,12 @@ export class AirtableHandler extends BaseIntegrationHandler {
       tableName: this.getString(data, 'tableName') || this.getString(data, 'table'),
       action: (this.getString(data, 'action', 'createRecord') as AirtableConfig['action']),
       recordId: this.getString(data, 'recordId'),
-      fields: data.fields || data.data,
+      fields: data.fields as Record<string, unknown> || data.data as Record<string, unknown>,
+      filterFormula: this.getString(data, 'filterFormula'),
+      maxRecords: this.getNumber(data, 'maxRecords'),
+      sort: this.getArray(data, 'sort') as AirtableConfig['sort'],
       variableName: this.getString(data, 'variableName'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
     };
 
     if (!config.baseId) {
@@ -1579,7 +2264,7 @@ export class AirtableHandler extends BaseIntegrationHandler {
       return this.createError('Airtable table name is required');
     }
 
-    // Build fields data from answers if not provided
+    // Build fields data
     let fields = config.fields;
     if (!fields || Object.keys(fields).length === 0) {
       const answers = state.getAllAnswers();
@@ -1596,27 +2281,27 @@ export class AirtableHandler extends BaseIntegrationHandler {
       fields = this.resolveObjectVariables(fields, state);
     }
 
-    // Remove undefined/null values
-    fields = Object.fromEntries(
-      Object.entries(fields).filter(([_, v]) => v !== undefined && v !== null)
-    );
+    // Format fields for Airtable
+    const formattedFields = formatAirtableFields(removeEmptyValues(fields) as Record<string, unknown>);
 
-    // Build payload
-    const payload = {
-      ...this.buildCommonPayload(state),
-      nodeId: this.getNodeId(node),
+    const payload: AirtablePayload = {
       baseId: config.baseId,
       tableName: config.tableName,
       action: config.action,
       recordId: config.recordId,
-      fields,
+      fields: formattedFields,
+      filterFormula: config.filterFormula,
+      maxRecords: config.maxRecords,
+      sort: config.sort,
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
+      nodeId: this.getNodeId(node),
     };
 
-    // Try socket first
-    const socketEmitted = this.emitSocketEvent('airtable:execute', payload);
+    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.AIRTABLE_EXECUTE, payload);
 
     if (!socketEmitted) {
-      // Fallback to API
       const apiUrl = this.apiBaseUrl
         ? `${this.apiBaseUrl}/api/integrations/airtable/${config.action}`
         : `/api/integrations/airtable/${config.action}`;
@@ -1624,31 +2309,272 @@ export class AirtableHandler extends BaseIntegrationHandler {
       const response = await this.makeApiCall(apiUrl, 'POST', payload);
 
       if (!response.success) {
-        console.error(`[AirtableHandler] Operation failed: ${response.error}`);
-        state.setVariable('_airtableError', response.error);
+        this.storeIntegrationResult(state, 'airtable', false, undefined, response.error);
 
-        const proceedOnError = this.getBoolean(data, 'proceedOnError', true);
-        if (!proceedOnError) {
+        if (!config.proceedOnError) {
           return this.createError(`Airtable operation failed: ${response.error}`, true);
         }
-      } else {
-        state.setVariable('_airtableSuccess', true);
-        state.setVariable('_airtableResponse', response.data);
-
-        // Store record ID for reference
-        if (response.data?.id) {
-          state.setVariable('_airtableRecordId', response.data.id);
-        }
-
-        if (config.variableName && response.data) {
-          state.setVariable(config.variableName, response.data);
-        }
+        return this.proceed(node, { airtableSuccess: false, airtableError: response.error });
       }
-    } else {
-      state.setVariable('_airtableSuccess', true);
+
+      if (config.variableName && response.data) {
+        state.setVariable(config.variableName, response.data);
+      }
+
+      const responseData = response.data as { id?: string } | undefined;
+      if (responseData?.id) {
+        state.setVariable('_airtableRecordId', responseData.id);
+      }
     }
 
+    this.storeIntegrationResult(state, 'airtable', true);
     return this.proceed(node, { airtableSuccess: true });
+  }
+}
+
+/**
+ * Notion node handler with proper page/database formatting.
+ */
+export class NotionHandler extends BaseIntegrationHandler {
+  readonly nodeType = 'notion';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Notion node missing data');
+    }
+
+    const config: NotionConfig = {
+      databaseId: this.getString(data, 'databaseId') || this.getString(data, 'database'),
+      parentPageId: this.getString(data, 'parentPageId') || this.getString(data, 'parentPage'),
+      action: (this.getString(data, 'action', 'addToDatabase') as NotionConfig['action']),
+      properties: data.properties as Record<string, unknown>,
+      content: this.getArray(data, 'content') as NotionConfig['content'],
+      filter: data.filter as Record<string, unknown>,
+      sorts: this.getArray(data, 'sorts') as NotionConfig['sorts'],
+      variableName: this.getString(data, 'variableName'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
+    };
+
+    // Validate required fields based on action
+    if ((config.action === 'addToDatabase' || config.action === 'queryDatabase') && !config.databaseId) {
+      return this.createError('Notion database ID is required for database operations');
+    }
+
+    if (config.action === 'createPage' && !config.parentPageId && !config.databaseId) {
+      return this.createError('Notion parent page ID or database ID is required for page creation');
+    }
+
+    // Build properties from answers if not provided
+    let properties = config.properties;
+    if (!properties || Object.keys(properties).length === 0) {
+      const answers = state.getAllAnswers();
+      const userMeta = state.getUserMetadata();
+      const combined = { ...answers, ...userMeta };
+      properties = formatNotionProperties(combined);
+    } else {
+      properties = this.resolveObjectVariables(properties, state);
+    }
+
+    // Build content blocks
+    let children: Record<string, unknown>[] | undefined;
+    if (config.content && config.content.length > 0) {
+      children = config.content.map((block) =>
+        createNotionBlock(block.type, block.text, block.checked)
+      );
+    }
+
+    const payload: NotionPayload = {
+      action: config.action,
+      databaseId: config.databaseId,
+      parentPageId: config.parentPageId,
+      properties,
+      children: children as unknown as NotionPayload['children'],
+      filter: config.filter,
+      sorts: config.sorts,
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
+      nodeId: this.getNodeId(node),
+    };
+
+    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.NOTION_EXECUTE, payload);
+
+    if (!socketEmitted) {
+      const apiUrl = this.apiBaseUrl
+        ? `${this.apiBaseUrl}/api/integrations/notion/${config.action}`
+        : `/api/integrations/notion/${config.action}`;
+
+      const response = await this.makeApiCall(apiUrl, 'POST', payload);
+
+      if (!response.success) {
+        this.storeIntegrationResult(state, 'notion', false, undefined, response.error);
+
+        if (!config.proceedOnError) {
+          return this.createError(`Notion operation failed: ${response.error}`, true);
+        }
+        return this.proceed(node, { notionSuccess: false, notionError: response.error });
+      }
+
+      if (config.variableName && response.data) {
+        state.setVariable(config.variableName, response.data);
+      }
+
+      const responseData = response.data as { id?: string; url?: string } | undefined;
+      if (responseData?.id) {
+        state.setVariable('_notionPageId', responseData.id);
+      }
+      if (responseData?.url) {
+        state.setVariable('_notionPageUrl', responseData.url);
+      }
+    }
+
+    this.storeIntegrationResult(state, 'notion', true);
+    return this.proceed(node, { notionSuccess: true });
+  }
+}
+
+// ========================================
+// 21. STRIPE HANDLER
+// ========================================
+
+/**
+ * Stripe node handler for payment session handling.
+ *
+ * Features:
+ * - Payment link creation
+ * - Checkout session creation
+ * - Customer creation
+ * - Subscription creation
+ * - Proper amount formatting
+ * - Metadata handling
+ */
+export class StripeHandler extends BaseIntegrationHandler {
+  readonly nodeType = 'stripe';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Stripe node missing data');
+    }
+
+    const config: StripeConfig = {
+      action: (this.getString(data, 'action', 'createCheckoutSession') as StripeConfig['action']),
+      amount: this.getNumber(data, 'amount'),
+      currency: this.getString(data, 'currency', 'USD').toUpperCase(),
+      description: this.getString(data, 'description'),
+      productName: this.getString(data, 'productName') || this.getString(data, 'product'),
+      customerEmail: this.getString(data, 'customerEmail') || this.getString(data, 'email'),
+      successUrl: this.getString(data, 'successUrl'),
+      cancelUrl: this.getString(data, 'cancelUrl'),
+      priceId: this.getString(data, 'priceId'),
+      metadata: data.metadata as Record<string, string>,
+      variableName: this.getString(data, 'variableName'),
+      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
+    };
+
+    // Validate based on action
+    if (config.action === 'createCheckoutSession' || config.action === 'createPaymentLink') {
+      if (!config.amount && !config.priceId) {
+        return this.createError('Stripe amount or price ID is required');
+      }
+    }
+
+    // Get customer email from user metadata if not provided
+    if (!config.customerEmail) {
+      const userMeta = state.getUserMetadata();
+      config.customerEmail = userMeta.email;
+    }
+
+    // Resolve variables
+    const resolvedConfig: StripeConfig = {
+      ...config,
+      description: config.description ? state.resolveVariables(config.description) : undefined,
+      productName: config.productName ? state.resolveVariables(config.productName) : undefined,
+      customerEmail: config.customerEmail ? state.resolveVariables(config.customerEmail) : undefined,
+      successUrl: config.successUrl ? state.resolveVariables(config.successUrl) : undefined,
+      cancelUrl: config.cancelUrl ? state.resolveVariables(config.cancelUrl) : undefined,
+    };
+
+    // Format amount for Stripe (convert to cents)
+    const formattedAmount = config.amount
+      ? formatStripeAmount(config.amount, config.currency)
+      : undefined;
+
+    // Format metadata
+    const formattedMetadata = formatStripeMetadata({
+      ...state.getAllAnswers(),
+      sessionId: state.sessionId,
+      ...(config.metadata || {}),
+    });
+
+    const payload: StripePayload = {
+      action: config.action,
+      amount: formattedAmount,
+      currency: config.currency || 'USD',
+      description: resolvedConfig.description,
+      productName: resolvedConfig.productName,
+      customerEmail: resolvedConfig.customerEmail,
+      successUrl: resolvedConfig.successUrl,
+      cancelUrl: resolvedConfig.cancelUrl,
+      priceId: config.priceId,
+      metadata: formattedMetadata,
+      sessionId: state.sessionId,
+      botId: state.botId,
+      timestamp: new Date().toISOString(),
+      nodeId: this.getNodeId(node),
+      answers: state.getAllAnswers(),
+    };
+
+    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.STRIPE_EXECUTE, payload);
+
+    if (!socketEmitted) {
+      const apiUrl = this.apiBaseUrl
+        ? `${this.apiBaseUrl}/api/integrations/stripe/${config.action}`
+        : `/api/integrations/stripe/${config.action}`;
+
+      const response = await this.makeApiCall(apiUrl, 'POST', payload);
+
+      if (!response.success) {
+        this.storeIntegrationResult(state, 'stripe', false, undefined, response.error);
+
+        if (!config.proceedOnError) {
+          return this.createError(`Stripe operation failed: ${response.error}`, true);
+        }
+        return this.proceed(node, { stripeSuccess: false, stripeError: response.error });
+      }
+
+      if (config.variableName && response.data) {
+        state.setVariable(config.variableName, response.data);
+      }
+
+      const responseData = response.data as {
+        id?: string;
+        url?: string;
+        paymentIntentId?: string;
+        customerId?: string;
+        subscriptionId?: string;
+      } | undefined;
+
+      if (responseData?.id) {
+        state.setVariable('_stripeSessionId', responseData.id);
+      }
+      if (responseData?.url) {
+        state.setVariable('_stripeCheckoutUrl', responseData.url);
+      }
+      if (responseData?.paymentIntentId) {
+        state.setVariable('_stripePaymentIntentId', responseData.paymentIntentId);
+      }
+      if (responseData?.customerId) {
+        state.setVariable('_stripeCustomerId', responseData.customerId);
+      }
+      if (responseData?.subscriptionId) {
+        state.setVariable('_stripeSubscriptionId', responseData.subscriptionId);
+      }
+    }
+
+    this.storeIntegrationResult(state, 'stripe', true);
+    return this.proceed(node, { stripeSuccess: true });
   }
 }
 
@@ -1665,6 +2591,7 @@ export const IntegrationHandlers = {
   HumanHandoverHandler,
   DelayHandler,
   EmailHandler,
+  GmailHandler,
   SlackHandler,
   DiscordHandler,
   WhatsAppHandler,
@@ -1674,13 +2601,19 @@ export const IntegrationHandlers = {
   GoogleAnalyticsHandler,
   HubSpotHandler,
   SalesforceHandler,
+  ZohoCRMHandler,
   MailchimpHandler,
   ZapierHandler,
   AirtableHandler,
+  NotionHandler,
+  StripeHandler,
 };
 
 /**
- * Creates instances of all integration handlers
+ * Creates instances of all integration handlers with optional socket client and API base URL.
+ * @param socketClient - Optional socket client for real-time communication
+ * @param apiBaseUrl - Optional base URL for API fallback calls
+ * @returns Array of configured integration handlers
  */
 export function createIntegrationHandlers(
   socketClient?: SocketClient,
@@ -1692,6 +2625,7 @@ export function createIntegrationHandlers(
     new HumanHandoverHandler(),
     new DelayHandler(),
     new EmailHandler(),
+    new GmailHandler(),
     new SlackHandler(),
     new DiscordHandler(),
     new WhatsAppHandler(),
@@ -1701,12 +2635,14 @@ export function createIntegrationHandlers(
     new GoogleAnalyticsHandler(),
     new HubSpotHandler(),
     new SalesforceHandler(),
+    new ZohoCRMHandler(),
     new MailchimpHandler(),
     new ZapierHandler(),
     new AirtableHandler(),
+    new NotionHandler(),
+    new StripeHandler(),
   ];
 
-  // Configure all handlers with socket client and API base URL
   for (const handler of handlers) {
     if (socketClient) {
       handler.setSocketClient(socketClient);
@@ -1720,7 +2656,10 @@ export function createIntegrationHandlers(
 }
 
 /**
- * Registers all integration handlers with the registry
+ * Registers all integration handlers with the provided registry.
+ * @param registry - Node handler registry
+ * @param socketClient - Optional socket client for real-time communication
+ * @param apiBaseUrl - Optional base URL for API fallback calls
  */
 export function registerIntegrationHandlers(
   registry: NodeHandlerRegistry,
