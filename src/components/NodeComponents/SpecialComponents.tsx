@@ -22,28 +22,99 @@ import {
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import {
+  HandoverView,
+  PreChatForm,
+  HandoverWaiting,
+  HandoverConnected,
+  HandoverError,
+  PostChatSurvey,
+  AgentTyping,
+} from '../Handover';
+import type {
+  HandoverStage,
+  PreChatFormConfig,
+  PostChatSurveyConfig,
+  AgentInfo,
+  QueueInfo,
+  PreChatFormData,
+  SurveyResponse,
+} from '../Handover/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_WIDTH = SCREEN_WIDTH - 24;
 const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.75;
 
 // ========================================
+// EXTENDED HUMAN HANDOVER UI STATE
+// ========================================
+
+/**
+ * Extended HumanHandover UI state with full handover flow support.
+ * This extends the base NodeUIState.HumanHandover with additional fields.
+ */
+export interface ExtendedHumanHandoverState extends NodeUIState.HumanHandover {
+  /** Extended stage for full handover flow */
+  extendedStage?: HandoverStage;
+
+  /** Queue information */
+  queueInfo?: QueueInfo;
+
+  /** Agent info when connected */
+  agent?: AgentInfo;
+
+  /** Whether agent is currently typing */
+  isAgentTyping?: boolean;
+
+  /** Pre-chat form configuration */
+  preChatConfig?: PreChatFormConfig;
+
+  /** Post-chat survey configuration */
+  surveyConfig?: PostChatSurveyConfig;
+
+  /** Custom questions from nodeData */
+  customQuestions?: Array<{
+    id: string;
+    question: string;
+    type: 'text' | 'email' | 'phone' | 'select';
+    required?: boolean;
+    options?: Array<{ label: string; value: string }>;
+  }>;
+
+  /** Department selection options */
+  departments?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
+
+  /** Error message for error states */
+  errorMessage?: string;
+}
+
+// ========================================
 // HUMAN HANDOVER VIEW
 // ========================================
 
-interface HumanHandoverViewProps extends NodeUIState.HumanHandover {
+interface HumanHandoverViewProps extends ExtendedHumanHandoverState {
   onSubmit: (response: any, portName?: string) => void;
 }
 
 /**
  * HumanHandoverView component
  *
- * Displays the human handover status and interface.
- * Supports pre-chat forms, waiting, connected, ended, and error states.
+ * Complete human handover UI with full flow support:
+ * - Pre-chat form with validation
+ * - Queue position and estimated wait time
+ * - Agent connection status
+ * - Agent typing indicator
+ * - Post-chat survey
+ * - Error handling (no agents, timeout, errors)
  */
 export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
   nodeId,
   stage,
+  extendedStage,
   agentName,
   agentAvatar,
   waitMessage = 'Please wait while we connect you with an agent...',
@@ -51,455 +122,310 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
   endedMessage = 'The conversation has ended. Thank you for chatting with us!',
   noAgentsMessage = 'Sorry, no agents are available at the moment. Please try again later.',
   timeoutMessage = 'We apologize, but we were unable to connect you with an agent. Please try again later.',
+  errorMessage,
   showPreChatForm = false,
   preChatFields,
+  preChatConfig,
+  surveyConfig,
+  customQuestions,
+  departments,
+  queueInfo,
+  agent,
+  isAgentTyping = false,
   onSubmit,
 }) => {
   const theme = useTheme();
-  const [formValues, setFormValues] = useState<Record<string, any>>({});
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [currentStage, setCurrentStage] = useState<HandoverStage>(
+    extendedStage || mapLegacyStage(stage)
+  );
+  const [isPreChatSubmitting, setIsPreChatSubmitting] = useState(false);
+  const [isSurveySubmitting, setIsSurveySubmitting] = useState(false);
 
-  // Pulse animation for waiting state
+  // Update stage when props change
   useEffect(() => {
-    if (stage === 'waiting') {
-      const animation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.2,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      animation.start();
-      return () => animation.stop();
+    if (extendedStage) {
+      setCurrentStage(extendedStage);
+    } else {
+      setCurrentStage(mapLegacyStage(stage));
     }
-  }, [stage, pulseAnim]);
+  }, [stage, extendedStage]);
 
-  const handleFormValueChange = useCallback((fieldId: string, value: any) => {
-    setFormValues(prev => ({ ...prev, [fieldId]: value }));
-    if (formErrors[fieldId]) {
-      setFormErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[fieldId];
-        return newErrors;
+  // Map legacy stage to extended stage
+  function mapLegacyStage(legacyStage: string): HandoverStage {
+    switch (legacyStage) {
+      case 'waiting':
+        return showPreChatForm && !preChatFields ? 'pre_chat' : 'waiting';
+      case 'connected':
+        return 'connected';
+      case 'ended':
+        return surveyConfig?.enabled ? 'post_chat' : 'ended';
+      case 'noAgents':
+        return 'no_agents';
+      case 'timeout':
+        return 'timeout';
+      default:
+        return 'pre_chat';
+    }
+  }
+
+  // Build pre-chat config from legacy fields or new config
+  const effectivePreChatConfig: PreChatFormConfig = preChatConfig || {
+    title: 'Before we connect you',
+    subtitle: 'Please provide the following information',
+    fields: [
+      ...(preChatFields || []).map((field) => ({
+        id: field.id,
+        label: field.label,
+        type: field.type as 'text' | 'email' | 'phone' | 'select',
+        required: field.required,
+        options: field.options?.map((opt) => ({
+          label: opt.label,
+          value: String(opt.value),
+        })),
+      })),
+      ...(customQuestions || []).map((q) => ({
+        id: q.id,
+        label: q.question,
+        type: q.type as 'text' | 'email' | 'phone' | 'select',
+        required: q.required,
+        options: q.options,
+      })),
+    ],
+    departments: departments,
+    showDepartmentSelector: !!departments && departments.length > 0,
+    submitButtonText: 'Start Chat',
+  };
+
+  // Build agent info from legacy fields or new agent object
+  const effectiveAgent: AgentInfo = agent || {
+    id: '',
+    name: agentName || 'Agent',
+    avatar: agentAvatar,
+  };
+
+  // Default survey config
+  const effectiveSurveyConfig: PostChatSurveyConfig = surveyConfig || {
+    enabled: true,
+    title: 'How was your experience?',
+    ratingQuestion: 'Please rate your conversation',
+    ratingStyle: 'stars',
+    maxRating: 5,
+    feedbackQuestion: 'Any additional feedback? (optional)',
+    submitButtonText: 'Submit',
+    skipButtonText: 'Skip',
+    thankYouMessage: 'Thank you for your feedback!',
+  };
+
+  // Handle pre-chat form submission
+  const handlePreChatSubmit = useCallback(
+    (data: PreChatFormData, department?: string) => {
+      setIsPreChatSubmitting(true);
+      onSubmit({
+        action: 'preChatSubmit',
+        formData: data,
+        department,
       });
-    }
-  }, [formErrors]);
+      // Move to waiting state after submit
+      setTimeout(() => {
+        setCurrentStage('waiting');
+        setIsPreChatSubmitting(false);
+      }, 500);
+    },
+    [onSubmit]
+  );
 
-  const validateForm = useCallback((): boolean => {
-    if (!preChatFields) return true;
-
-    const newErrors: Record<string, string> = {};
-
-    preChatFields.forEach(field => {
-      const value = formValues[field.id];
-
-      if (field.required && (!value || (typeof value === 'string' && !value.trim()))) {
-        newErrors[field.id] = 'This field is required';
-        return;
-      }
-
-      if (value && field.type === 'email') {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(value)) {
-          newErrors[field.id] = 'Please enter a valid email';
-        }
-      }
-
-      if (value && field.type === 'phone') {
-        const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/;
-        if (!phoneRegex.test(value)) {
-          newErrors[field.id] = 'Please enter a valid phone number';
-        }
-      }
-    });
-
-    setFormErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [preChatFields, formValues]);
-
-  const handlePreChatSubmit = useCallback(() => {
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
+  // Handle cancel
+  const handleCancel = useCallback(() => {
     onSubmit({
-      action: 'preChatSubmit',
-      formData: formValues,
-    });
-  }, [validateForm, formValues, onSubmit]);
-
-  const handleEndChat = useCallback(() => {
-    onSubmit({
-      action: 'endChat',
+      action: 'cancel',
     });
   }, [onSubmit]);
 
+  // Handle retry
   const handleRetry = useCallback(() => {
+    setCurrentStage('pre_chat');
     onSubmit({
       action: 'retry',
     });
   }, [onSubmit]);
 
-  const renderPreChatForm = () => {
-    if (!showPreChatForm || !preChatFields) return null;
+  // Handle end chat
+  const handleEndChat = useCallback(() => {
+    setCurrentStage(effectiveSurveyConfig.enabled ? 'post_chat' : 'ended');
+    onSubmit({
+      action: 'endChat',
+    });
+  }, [effectiveSurveyConfig.enabled, onSubmit]);
 
-    return (
-      <View style={styles.preChatForm}>
-        <Text
-          style={[
-            styles.preChatTitle,
-            {
-              color: theme.colors.text,
-              fontSize: theme.typography.fontSize.lg,
-            },
-          ]}
-        >
-          Before we connect you
-        </Text>
-        <Text
-          style={[
-            styles.preChatSubtitle,
-            {
-              color: theme.colors.textSecondary,
-              fontSize: theme.typography.fontSize.sm,
-            },
-          ]}
-        >
-          Please provide the following information
-        </Text>
-
-        {preChatFields.map(field => (
-          <View key={field.id} style={styles.formField}>
-            <Text
-              style={[
-                styles.fieldLabel,
-                { color: theme.colors.text },
-              ]}
-            >
-              {field.label}
-              {field.required && (
-                <Text style={{ color: theme.colors.error }}> *</Text>
-              )}
-            </Text>
-
-            {field.type === 'select' && field.options ? (
-              <View style={styles.selectOptions}>
-                {field.options.map(option => {
-                  const isSelected = formValues[field.id] === option.value;
-                  return (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[
-                        styles.selectOption,
-                        {
-                          backgroundColor: isSelected
-                            ? theme.colors.primary
-                            : theme.colors.surface,
-                          borderColor: isSelected
-                            ? theme.colors.primary
-                            : theme.colors.border,
-                          borderRadius: theme.borderRadius.sm,
-                        },
-                      ]}
-                      onPress={() => handleFormValueChange(field.id, option.value)}
-                    >
-                      <Text
-                        style={{
-                          color: isSelected
-                            ? theme.colors.textInverse
-                            : theme.colors.text,
-                        }}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ) : (
-              <TextInput
-                style={[
-                  styles.fieldInput,
-                  {
-                    backgroundColor: theme.colors.surface,
-                    borderColor: formErrors[field.id]
-                      ? theme.colors.error
-                      : theme.colors.border,
-                    borderRadius: theme.borderRadius.md,
-                    color: theme.colors.text,
-                  },
-                ]}
-                value={formValues[field.id] || ''}
-                onChangeText={(text) => handleFormValueChange(field.id, text)}
-                placeholder={`Enter ${field.label.toLowerCase()}`}
-                placeholderTextColor={theme.colors.textDisabled}
-                keyboardType={
-                  field.type === 'email' ? 'email-address' :
-                  field.type === 'phone' ? 'phone-pad' :
-                  'default'
-                }
-                autoCapitalize={field.type === 'email' ? 'none' : 'sentences'}
-              />
-            )}
-
-            {formErrors[field.id] && (
-              <Text
-                style={[
-                  styles.fieldError,
-                  { color: theme.colors.error },
-                ]}
-              >
-                {formErrors[field.id]}
-              </Text>
-            )}
-          </View>
-        ))}
-
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            {
-              backgroundColor: theme.colors.primary,
-              borderRadius: theme.borderRadius.md,
-            },
-          ]}
-          onPress={handlePreChatSubmit}
-          disabled={isSubmitting}
-          accessibilityRole="button"
-          accessibilityLabel="Start chat"
-        >
-          <Text
-            style={[
-              styles.submitButtonText,
-              {
-                color: theme.colors.textInverse,
-                fontSize: theme.typography.fontSize.md,
-              },
-            ]}
-          >
-            {isSubmitting ? 'Starting...' : 'Start Chat'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderWaitingState = () => (
-    <View style={styles.waitingContainer}>
-      <Animated.View
-        style={[
-          styles.waitingIconContainer,
-          {
-            backgroundColor: theme.colors.primaryLight,
-            transform: [{ scale: pulseAnim }],
-          },
-        ]}
-      >
-        <Text style={styles.waitingIcon}>{'\uD83D\uDE4B'}</Text>
-      </Animated.View>
-      <Text
-        style={[
-          styles.waitingTitle,
-          {
-            color: theme.colors.text,
-            fontSize: theme.typography.fontSize.lg,
-          },
-        ]}
-      >
-        Connecting you with an agent
-      </Text>
-      <Text
-        style={[
-          styles.waitingMessage,
-          {
-            color: theme.colors.textSecondary,
-            fontSize: theme.typography.fontSize.sm,
-          },
-        ]}
-      >
-        {waitMessage}
-      </Text>
-      <ActivityIndicator
-        size="small"
-        color={theme.colors.primary}
-        style={styles.waitingIndicator}
-      />
-    </View>
+  // Handle survey submission
+  const handleSurveySubmit = useCallback(
+    (response: SurveyResponse) => {
+      setIsSurveySubmitting(true);
+      onSubmit({
+        action: 'surveySubmit',
+        surveyResponse: response,
+      });
+      setTimeout(() => {
+        setIsSurveySubmitting(false);
+      }, 500);
+    },
+    [onSubmit]
   );
 
-  const renderConnectedState = () => (
-    <View style={styles.connectedContainer}>
-      {agentAvatar ? (
-        <Image
-          source={{ uri: agentAvatar }}
-          style={[
-            styles.agentAvatar,
-            { borderColor: theme.colors.success },
-          ]}
-        />
-      ) : (
-        <View
-          style={[
-            styles.agentAvatarPlaceholder,
-            {
-              backgroundColor: theme.colors.success,
-            },
-          ]}
-        >
-          <Text style={styles.agentAvatarText}>
-            {agentName ? agentName.charAt(0).toUpperCase() : 'A'}
-          </Text>
-        </View>
-      )}
-      <View style={styles.connectedInfo}>
-        <View style={styles.connectedHeader}>
+  // Handle survey skip
+  const handleSurveySkip = useCallback(() => {
+    setCurrentStage('ended');
+    onSubmit({
+      action: 'surveySkip',
+    });
+  }, [onSubmit]);
+
+  // Handle continue (back to bot)
+  const handleContinue = useCallback(() => {
+    onSubmit({
+      action: 'continue',
+    });
+  }, [onSubmit]);
+
+  // Render based on current stage
+  const renderContent = () => {
+    switch (currentStage) {
+      case 'pre_chat':
+        // Show pre-chat form if configured
+        if (effectivePreChatConfig.fields.length > 0) {
+          return (
+            <PreChatForm
+              config={effectivePreChatConfig}
+              onSubmit={handlePreChatSubmit}
+              onCancel={handleCancel}
+              isSubmitting={isPreChatSubmitting}
+            />
+          );
+        }
+        // If no fields, go directly to waiting
+        return (
+          <HandoverWaiting
+            message={waitMessage}
+            queueInfo={queueInfo}
+            onCancel={handleCancel}
+          />
+        );
+
+      case 'waiting':
+      case 'connecting':
+        return (
+          <HandoverWaiting
+            message={waitMessage}
+            queueInfo={queueInfo}
+            onCancel={handleCancel}
+            showQueuePosition={!!queueInfo?.position}
+            showEstimatedTime={!!queueInfo?.estimatedWaitTime}
+          />
+        );
+
+      case 'connected':
+      case 'agent_typing':
+        return (
+          <View>
+            <HandoverConnected
+              agent={effectiveAgent}
+              message={`${connectedMessage} ${effectiveAgent.name}`}
+              onEndChat={handleEndChat}
+            />
+            <AgentTyping
+              agent={effectiveAgent}
+              visible={isAgentTyping || currentStage === 'agent_typing'}
+            />
+          </View>
+        );
+
+      case 'post_chat':
+        return (
+          <PostChatSurvey
+            config={effectiveSurveyConfig}
+            agent={effectiveAgent}
+            onSubmit={handleSurveySubmit}
+            onSkip={handleSurveySkip}
+            isSubmitting={isSurveySubmitting}
+          />
+        );
+
+      case 'ended':
+        return (
           <View
             style={[
-              styles.onlineIndicator,
-              { backgroundColor: theme.colors.success },
-            ]}
-          />
-          <Text
-            style={[
-              styles.connectedText,
-              { color: theme.colors.success },
+              styles.endedContainer,
+              {
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.lg,
+              },
+              theme.shadows.sm,
             ]}
           >
-            Connected
-          </Text>
-        </View>
-        <Text
-          style={[
-            styles.agentName,
-            {
-              color: theme.colors.text,
-              fontSize: theme.typography.fontSize.lg,
-            },
-          ]}
-        >
-          {connectedMessage} {agentName || 'an agent'}
-        </Text>
-      </View>
-    </View>
-  );
+            <Text style={styles.endedIcon}>{'\u2705'}</Text>
+            <Text
+              style={[
+                styles.endedMessage,
+                {
+                  color: theme.colors.text,
+                  fontSize: theme.typography.fontSize.md,
+                },
+              ]}
+            >
+              {endedMessage}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.continueButton,
+                {
+                  borderColor: theme.colors.border,
+                  borderRadius: theme.borderRadius.md,
+                },
+              ]}
+              onPress={handleContinue}
+            >
+              <Text
+                style={[
+                  styles.continueButtonText,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
+                Continue
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
 
-  const renderEndedState = () => (
-    <View style={styles.endedContainer}>
-      <Text style={styles.endedIcon}>{'\u2705'}</Text>
-      <Text
-        style={[
-          styles.endedMessage,
-          {
-            color: theme.colors.text,
-            fontSize: theme.typography.fontSize.md,
-          },
-        ]}
-      >
-        {endedMessage}
-      </Text>
-    </View>
-  );
+      case 'no_agents':
+        return (
+          <HandoverError
+            errorType="no_agents"
+            message={noAgentsMessage}
+            onRetry={handleRetry}
+            onContinue={handleContinue}
+          />
+        );
 
-  const renderNoAgentsState = () => (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorIcon}>{'\uD83D\uDE14'}</Text>
-      <Text
-        style={[
-          styles.errorMessage,
-          {
-            color: theme.colors.text,
-            fontSize: theme.typography.fontSize.md,
-          },
-        ]}
-      >
-        {noAgentsMessage}
-      </Text>
-      <TouchableOpacity
-        style={[
-          styles.retryButton,
-          {
-            backgroundColor: theme.colors.primary,
-            borderRadius: theme.borderRadius.md,
-          },
-        ]}
-        onPress={handleRetry}
-        accessibilityRole="button"
-        accessibilityLabel="Try again"
-      >
-        <Text
-          style={[
-            styles.retryButtonText,
-            { color: theme.colors.textInverse },
-          ]}
-        >
-          Try Again
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderTimeoutState = () => (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorIcon}>{'\u23F0'}</Text>
-      <Text
-        style={[
-          styles.errorMessage,
-          {
-            color: theme.colors.text,
-            fontSize: theme.typography.fontSize.md,
-          },
-        ]}
-      >
-        {timeoutMessage}
-      </Text>
-      <TouchableOpacity
-        style={[
-          styles.retryButton,
-          {
-            backgroundColor: theme.colors.primary,
-            borderRadius: theme.borderRadius.md,
-          },
-        ]}
-        onPress={handleRetry}
-        accessibilityRole="button"
-        accessibilityLabel="Try again"
-      >
-        <Text
-          style={[
-            styles.retryButtonText,
-            { color: theme.colors.textInverse },
-          ]}
-        >
-          Try Again
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderContent = () => {
-    if (showPreChatForm && stage === 'waiting') {
-      return renderPreChatForm();
-    }
-
-    switch (stage) {
-      case 'waiting':
-        return renderWaitingState();
-      case 'connected':
-        return renderConnectedState();
-      case 'ended':
-        return renderEndedState();
-      case 'noAgents':
-        return renderNoAgentsState();
       case 'timeout':
-        return renderTimeoutState();
+        return (
+          <HandoverError
+            errorType="timeout"
+            message={timeoutMessage}
+            onRetry={handleRetry}
+            onContinue={handleContinue}
+          />
+        );
+
+      case 'error':
+        return (
+          <HandoverError
+            errorType="error"
+            message={errorMessage || 'An error occurred. Please try again.'}
+            onRetry={handleRetry}
+            onContinue={handleContinue}
+          />
+        );
+
       default:
         return null;
     }
@@ -507,16 +433,9 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
 
   return (
     <View
-      style={[
-        styles.handoverContainer,
-        {
-          backgroundColor: theme.colors.surface,
-          borderRadius: theme.borderRadius.lg,
-        },
-        theme.shadows.sm,
-      ]}
+      style={styles.handoverContainer}
       accessibilityRole="alert"
-      accessibilityLabel={`Human handover: ${stage}`}
+      accessibilityLabel={`Human handover: ${currentStage}`}
     >
       {renderContent()}
     </View>
@@ -1050,131 +969,14 @@ const styles = StyleSheet.create({
 
   // Human Handover styles
   handoverContainer: {
-    marginVertical: 8,
-    marginHorizontal: 12,
-    padding: 20,
-    maxWidth: MAX_WIDTH,
-  },
-  preChatForm: {
     width: '100%',
   },
-  preChatTitle: {
-    fontWeight: '600',
-    marginBottom: 4,
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  preChatSubtitle: {
-    marginBottom: 20,
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  formField: {
-    marginBottom: 16,
-  },
-  fieldLabel: {
-    marginBottom: 8,
-    fontWeight: '500',
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  fieldInput: {
-    height: 48,
-    paddingHorizontal: 16,
-    borderWidth: 1.5,
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  fieldError: {
-    marginTop: 4,
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  selectOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  selectOption: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-  waitingContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  waitingIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  waitingIcon: {
-    fontSize: 40,
-  },
-  waitingTitle: {
-    fontWeight: '600',
-    marginBottom: 8,
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  waitingMessage: {
-    textAlign: 'center',
-    marginBottom: 16,
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  waitingIndicator: {
-    marginTop: 8,
-  },
-  connectedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  agentAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 3,
-  },
-  agentAvatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  agentAvatarText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  connectedInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  connectedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  onlineIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  connectedText: {
-    fontSize: 12,
-    fontWeight: '600',
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  agentName: {
-    fontWeight: '500',
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
   endedContainer: {
+    marginVertical: 8,
+    marginHorizontal: 12,
+    padding: 24,
     alignItems: 'center',
-    paddingVertical: 20,
+    maxWidth: MAX_WIDTH,
   },
   endedIcon: {
     fontSize: 48,
@@ -1182,28 +984,15 @@ const styles = StyleSheet.create({
   },
   endedMessage: {
     textAlign: 'center',
-    fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
-  },
-  errorContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  errorMessage: {
-    textAlign: 'center',
     marginBottom: 20,
     fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
   },
-  retryButton: {
+  continueButton: {
     paddingVertical: 12,
     paddingHorizontal: 32,
+    borderWidth: 1,
   },
-  retryButtonText: {
-    fontWeight: '600',
-    fontSize: 16,
+  continueButtonText: {
     fontFamily: Platform.select({ ios: 'System', android: 'Roboto' }),
   },
 
