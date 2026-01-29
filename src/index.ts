@@ -20,6 +20,17 @@ export type {
   RecordItem,
 } from './types';
 
+// ========== Core (Node Handling) ========== //
+export * from './core';
+export { ChatState, NodeFlowEngine, NodeHandlerRegistry } from './core';
+export type { NodeResult, NodeUIState, NodeHandler, EngineState } from './core';
+
+// Node Types
+export { NodeTypes, DisplayNodes, LogicNodes, IntegrationNodes, FlowNodes } from './core/nodes/NodeTypes';
+
+// Handler registration
+export { registerAllHandlers } from './core/nodes/handlers';
+
 // ========== Theme System ========== //
 export { ThemeProvider, useTheme, defaultTheme, darkTheme } from './theme';
 export type { ConferBotTheme, ConferBotThemeOverride } from './theme';
@@ -55,6 +66,9 @@ export type { ChatHeaderProps, MessageListProps } from './components';
 // Main Chat Widget
 export { ChatWidget } from './components';
 export type { ChatWidgetProps } from './components';
+
+// Node UI Components
+export { NodeRenderer } from './components/NodeComponents';
 
 // Default export
 export { ConferBotProvider as default } from './context/ConferBotContext';
