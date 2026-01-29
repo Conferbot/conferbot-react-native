@@ -6,6 +6,114 @@ export interface ConferBotConfig {
   autoConnect?: boolean;
   reconnectionAttempts?: number;
   reconnectionDelay?: number;
+  /** Enable session persistence (default: true when asyncStorage is provided) */
+  enablePersistence?: boolean;
+  /** Persistence configuration */
+  persistenceConfig?: PersistenceConfig;
+  /** AsyncStorage instance for persistence */
+  asyncStorage?: AsyncStorageInterface;
+  /** Enable read receipts (default: true) */
+  enableReadReceipts?: boolean;
+  /** Read receipts configuration */
+  readReceiptConfig?: ReadReceiptConfig;
+  /** Offline queue configuration */
+  offlineQueueConfig?: OfflineQueueConfig;
+}
+
+// ********** Read Receipt Configuration ********** //
+/** Configuration for read receipt behavior */
+export interface ReadReceiptConfig {
+  /** Enable or disable read receipts feature (default: true) */
+  enabled?: boolean;
+  /** Show read receipt indicators in UI (default: true) */
+  showIndicators?: boolean;
+  /** Debounce time in ms for batching read receipts (default: 500) */
+  batchDebounceMs?: number;
+  /** Automatically mark messages as read when viewed (default: true) */
+  autoMarkAsRead?: boolean;
+}
+
+// ********** Offline Queue Configuration ********** //
+/** Configuration for offline queue behavior */
+export interface OfflineQueueConfig {
+  /** Maximum number of messages to queue (default: 50) */
+  maxQueueSize?: number;
+  /** Maximum retry attempts per message (default: 5) */
+  maxRetries?: number;
+  /** Initial retry delay in ms (default: 1000) */
+  initialRetryDelay?: number;
+  /** Maximum retry delay in ms (default: 30000) */
+  maxRetryDelay?: number;
+  /** Backoff multiplier (default: 2) */
+  backoffMultiplier?: number;
+  /** Enable persistent storage (default: true) */
+  persistQueue?: boolean;
+  /** Auto-process queue when online (default: true) */
+  autoProcess?: boolean;
+}
+
+// ********** Persistence Types ********** //
+/** AsyncStorage interface for dependency injection */
+export interface AsyncStorageInterface {
+  getItem(key: string): Promise<string | null>;
+  setItem(key: string, value: string): Promise<void>;
+  removeItem(key: string): Promise<void>;
+  multiGet(keys: string[]): Promise<readonly [string, string | null][]>;
+  multiSet(keyValuePairs: [string, string][]): Promise<void>;
+  multiRemove(keys: string[]): Promise<void>;
+  getAllKeys(): Promise<readonly string[]>;
+}
+
+/** Configuration for persistence behavior */
+export interface PersistenceConfig {
+  /** Maximum number of messages to persist (default: 100) */
+  maxMessages?: number;
+  /** Storage key prefix for namespacing (default: '@conferbot') */
+  keyPrefix?: string;
+  /** Enable storage (can be disabled for testing) */
+  enabled?: boolean;
+  /** Session expiry time in milliseconds (default: 7 days) */
+  sessionExpiryMs?: number;
+}
+
+/** Persisted session data structure */
+export interface PersistedSession {
+  /** Unique chat session identifier */
+  chatSessionId: string;
+  /** Visitor identifier for returning user recognition */
+  visitorId: string;
+  /** Bot identifier this session belongs to */
+  botId: string;
+  /** Timestamp when session was created */
+  createdAt: string;
+  /** Timestamp when session was last updated */
+  updatedAt: string;
+  /** Whether the session is still active */
+  isActive: boolean;
+  /** Current node ID in the flow (for resumption) */
+  currentNodeId?: string;
+  /** List of visited node IDs */
+  visitedNodes?: string[];
+  /** Flow completion status */
+  isFlowComplete?: boolean;
+  /** Flow completion reason */
+  flowCompletionReason?: string;
+}
+
+/** Persisted user data structure */
+export interface PersistedUser {
+  /** User identifier */
+  userId?: string;
+  /** User display name */
+  name?: string;
+  /** User email address */
+  email?: string;
+  /** User phone number */
+  phone?: string;
+  /** Additional metadata */
+  metadata?: Record<string, any>;
+  /** Timestamp when data was last updated */
+  updatedAt: string;
 }
 
 // User identification
@@ -29,6 +137,36 @@ export interface ConferBotCustomization {
   userBubbleColor?: string;
 }
 
+// ********** Reaction Types ********** //
+// Common emoji reactions available in the picker
+export const REACTION_EMOJIS = ['👍', '👎', '❤️', '😊', '😮', '😢'] as const;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+
+// Individual reaction from a user
+export interface Reaction {
+  emoji: ReactionEmoji;
+  userId: string;
+  userName?: string;
+  timestamp: string;
+}
+
+// Grouped reactions for display (emoji with count and users)
+export interface ReactionGroup {
+  emoji: ReactionEmoji;
+  count: number;
+  users: Array<{
+    userId: string;
+    userName?: string;
+  }>;
+  hasUserReacted: boolean; // Whether current user has reacted with this emoji
+}
+
+// Reactions map for a message
+export interface MessageReactions {
+  messageId: string;
+  reactions: Reaction[];
+}
+
 // ********** Message Types ********** //
 // Message types matching embed-server record structure
 export type MessageType =
@@ -40,6 +178,7 @@ export type MessageType =
   | 'visitor-reconnected-message'
   | 'bot-message'
   | 'user-message'
+  | 'user-input-response'
   | 'system-message';
 
 // Agent details structure from embed-server
@@ -54,6 +193,9 @@ export interface BaseRecordItem {
   _id: string | number;
   type: MessageType;
   time: Date | string;
+  reactions?: Reaction[]; // Added reactions support
+  /** Queued message ID for offline queue tracking */
+  queuedMessageId?: string;
 }
 
 // Agent message record item
@@ -107,6 +249,13 @@ export interface UserMessageRecord extends BaseRecordItem {
   [key: string]: any;
 }
 
+// User input response record item
+export interface UserInputResponseRecord extends BaseRecordItem {
+  type: 'user-input-response';
+  text: string;
+  [key: string]: any;
+}
+
 // System message record item
 export interface SystemMessageRecord extends BaseRecordItem {
   type: 'system-message';
@@ -123,6 +272,7 @@ export type RecordItem =
   | VisitorReconnectedMessageRecord
   | BotMessageRecord
   | UserMessageRecord
+  | UserInputResponseRecord
   | SystemMessageRecord;
 
 // Message attachment
@@ -183,6 +333,8 @@ export interface ChatbotConfig {
     voiceMessage?: boolean;
     typing?: boolean;
     readReceipts?: boolean;
+    reactions?: boolean; // Added reactions feature flag
+    offlineQueue?: boolean; // Added offline queue feature flag
   };
 }
 
@@ -231,6 +383,10 @@ export enum SocketEvents {
   INVITE_AGENT_TO_CHAT = 'invite-agent-to-chat',
   DECLINE_AGENT_INVITATION = 'decline-agent-invitation',
   SHOW_ACCEPT_HANDOVER_BUTTON = 'show-accept-handover-button',
+
+  // Reaction events
+  MESSAGE_REACTION = 'message:reaction',
+  MESSAGE_REACTION_UPDATE = 'message:reaction:update',
 
   // Server to client events
   FETCHED_CHATBOT_DATA = 'fetched-chatbot-data',
@@ -305,6 +461,22 @@ export interface SendAgentMessagePayload {
   };
 }
 
+// Reaction socket payloads
+export interface MessageReactionPayload {
+  chatSessionId: string;
+  messageId: string;
+  emoji: ReactionEmoji;
+  action: 'add' | 'remove';
+  userId: string;
+  userName?: string;
+}
+
+export interface MessageReactionUpdatePayload {
+  chatSessionId: string;
+  messageId: string;
+  reactions: Reaction[];
+}
+
 // Socket event responses
 export interface FetchedChatbotDataResponse {
   chatbotData: any;
@@ -364,6 +536,30 @@ export type SessionCallback = (chatSessionId: string) => void;
 export type TypingCallback = (isTyping: boolean) => void;
 export type UnreadCountCallback = (count: number) => void;
 export type ErrorCallback = (error: Error) => void;
+export type ReactionCallback = (messageId: string, reactions: Reaction[]) => void;
+export type NetworkStatusCallback = (isOnline: boolean) => void;
+
+// ********** Message Status Types (Re-exported from messageStatus.ts) ********** //
+export {
+  MessageStatus,
+  ReadReceiptSocketEvents,
+  isStatusFinal,
+  isStatusSent,
+  isStatusPending,
+  isStatusMoreAdvanced,
+  getNextStatus,
+  getStatusText,
+  queuedStatusToMessageStatus,
+  DEFAULT_READ_RECEIPT_CONFIG,
+} from './messageStatus';
+
+export type {
+  MessageStatusEntry,
+  ReadReceiptData,
+  DeliveryReceiptData,
+  BatchReadReceiptPayload,
+  ReadReceiptConfig as FullReadReceiptConfig,
+} from './messageStatus';
 
 // ********** Context Types ********** //
 // ConferBot context state
@@ -376,6 +572,17 @@ export interface ConferBotContextState {
   currentAgent?: Agent;
   record: RecordItem[];
   chatbotConfig?: ChatbotConfig;
+  reactions: Map<string, Reaction[]>; // Added reactions state
+  // Persistence state
+  isRestoring: boolean;
+  hasPersistedSession: boolean;
+  // Read receipt state
+  messageStatuses: Map<string | number, import('./messageStatus').MessageStatusEntry>;
+  readReceiptsEnabled: boolean;
+  // Offline queue state
+  isOnline: boolean;
+  pendingMessageCount: number;
+  failedMessageCount: number;
 }
 
 // ConferBot context actions
@@ -386,6 +593,21 @@ export interface ConferBotContextActions {
   registerPushToken: (token: string) => Promise<void>;
   on: (event: SocketEvents, callback: (...args: any[]) => void) => () => void;
   off: (event: SocketEvents, callback: (...args: any[]) => void) => void;
+  // Reaction actions
+  addReaction: (messageId: string, emoji: ReactionEmoji) => void;
+  removeReaction: (messageId: string, emoji: ReactionEmoji) => void;
+  getReactions: (messageId: string) => Reaction[];
+  // Persistence actions
+  clearPersistedData: () => Promise<void>;
+  resetConversation: () => Promise<void>;
+  // Read receipt actions
+  getMessageStatus: (messageId: string | number) => import('./messageStatus').MessageStatus | undefined;
+  markMessageAsRead: (messageId: string | number) => void;
+  markVisibleMessagesAsRead: (messageIds: (string | number)[]) => void;
+  // Offline queue actions
+  retryFailedMessage: (messageId: string) => Promise<boolean>;
+  retryAllFailedMessages: () => Promise<number>;
+  clearFailedMessages: () => Promise<number>;
 }
 
 // Combined ConferBot context
