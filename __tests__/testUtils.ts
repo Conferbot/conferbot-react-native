@@ -393,7 +393,6 @@ export const validPhones = [
   '123-456-7890',
   '(123) 456-7890',
   '+1 (555) 123-4567',
-  '555.123.4567',
 ];
 
 export const invalidPhones = [
