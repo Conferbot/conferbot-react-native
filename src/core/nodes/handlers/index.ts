@@ -7,6 +7,16 @@
 
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
 
+// Import registration functions for internal use
+import { registerDisplayHandlers } from './DisplayNodeHandlers';
+import { registerAskHandlers } from './AskNodeHandlers';
+import { registerChoiceHandlers } from './ChoiceNodeHandlers';
+import { registerAdvancedInputHandlers } from './AdvancedInputHandlers';
+import { registerLegacyHandlers } from './LegacyNodeHandlers';
+import { registerLogicHandlers } from './LogicNodeHandlers';
+import { registerIntegrationHandlers } from './IntegrationNodeHandlers';
+import { registerSpecialFlowHandlers } from './SpecialNodeHandlers';
+
 // ========================================
 // DISPLAY NODE HANDLERS
 // ========================================
