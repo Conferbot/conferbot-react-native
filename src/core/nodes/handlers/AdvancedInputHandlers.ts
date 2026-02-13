@@ -202,7 +202,7 @@ interface FormQuestion {
  * Handles 'multiplequestions' nodes - multi-field form
  */
 export class MultipleQuestionsHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.MULTIPLE_QUESTIONS;
+  readonly nodeType = DisplayNodes.ASK_MULTIPLE_QUESTIONS;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
