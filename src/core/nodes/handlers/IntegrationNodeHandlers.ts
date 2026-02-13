@@ -409,7 +409,7 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
  * - URL validation and security checks
  */
 export class WebhookHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'webhook';
+  readonly nodeType = 'webhook-node';
 
   private webhookService: WebhookHandlerService;
 
@@ -640,7 +640,7 @@ export class WebhookHandler extends BaseIntegrationHandler {
  * - Configurable model, temperature, and token limits
  */
 export class GPTHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'gpt';
+  readonly nodeType = 'gpt-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -778,7 +778,7 @@ export class GPTHandler extends BaseIntegrationHandler {
  * with full pre-chat form, queue management, and post-chat survey support.
  */
 export class HumanHandoverHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'human-handover';
+  readonly nodeType = 'human-handover-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1102,7 +1102,7 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
  * Supports milliseconds, seconds, minutes, and hours.
  */
 export class DelayHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'delay';
+  readonly nodeType = 'delay-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1164,7 +1164,7 @@ export class DelayHandler extends BaseIntegrationHandler {
  * - Variable interpolation in all fields
  */
 export class EmailHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'email';
+  readonly nodeType = 'email-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1272,7 +1272,7 @@ export class EmailHandler extends BaseIntegrationHandler {
  * Extends EmailHandler with Gmail-specific features.
  */
 export class GmailHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'gmail';
+  readonly nodeType = 'gmail-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1670,7 +1670,7 @@ export class TelegramHandler extends BaseCommunicationHandler {
  * Google Sheets node handler with proper data formatting.
  */
 export class GoogleSheetsHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'google-sheets';
+  readonly nodeType = 'google-sheets-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1758,7 +1758,7 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
  * Google Calendar node handler
  */
 export class GoogleCalendarHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'google-calendar';
+  readonly nodeType = 'google-calendar-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1842,7 +1842,7 @@ export class GoogleCalendarHandler extends BaseIntegrationHandler {
  * Google Analytics node handler
  */
 export class GoogleAnalyticsHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'google-analytics';
+  readonly nodeType = 'google-analytics-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -2000,7 +2000,7 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
  * HubSpot node handler with proper contact/deal formatting.
  */
 export class HubSpotHandler extends BaseCRMHandler {
-  readonly nodeType = 'hubspot';
+  readonly nodeType = 'hubspot-node';
   protected readonly crmName = 'HubSpot';
   protected readonly socketEvent = IntegrationSocketEvents.HUBSPOT_EXECUTE;
   protected readonly apiEndpoint = '/api/integrations/hubspot';
@@ -2014,7 +2014,7 @@ export class HubSpotHandler extends BaseCRMHandler {
  * Salesforce node handler
  */
 export class SalesforceHandler extends BaseCRMHandler {
-  readonly nodeType = 'salesforce';
+  readonly nodeType = 'salesforce-node';
   protected readonly crmName = 'Salesforce';
   protected readonly socketEvent = IntegrationSocketEvents.SALESFORCE_EXECUTE;
   protected readonly apiEndpoint = '/api/integrations/salesforce';
@@ -2029,7 +2029,7 @@ export class SalesforceHandler extends BaseCRMHandler {
  * Zoho CRM node handler with proper lead/contact formatting.
  */
 export class ZohoCRMHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'zoho-crm';
+  readonly nodeType = 'zohocrm-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -2104,7 +2104,7 @@ export class ZohoCRMHandler extends BaseIntegrationHandler {
  * Mailchimp node handler
  */
 export class MailchimpHandler extends BaseCRMHandler {
-  readonly nodeType = 'mailchimp';
+  readonly nodeType = 'mailchimp-node';
   protected readonly crmName = 'Mailchimp';
   protected readonly socketEvent = IntegrationSocketEvents.MAILCHIMP_EXECUTE;
   protected readonly apiEndpoint = '/api/integrations/mailchimp';
@@ -2150,7 +2150,7 @@ export class MailchimpHandler extends BaseCRMHandler {
  * Zapier node handler with proper webhook triggering.
  */
 export class ZapierHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'zapier';
+  readonly nodeType = 'zapier-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -2235,7 +2235,7 @@ export class ZapierHandler extends BaseIntegrationHandler {
  * Airtable node handler with proper record structure.
  */
 export class AirtableHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'airtable';
+  readonly nodeType = 'airtable-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -2336,7 +2336,7 @@ export class AirtableHandler extends BaseIntegrationHandler {
  * Notion node handler with proper page/database formatting.
  */
 export class NotionHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'notion';
+  readonly nodeType = 'notion-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -2450,7 +2450,7 @@ export class NotionHandler extends BaseIntegrationHandler {
  * - Metadata handling
  */
 export class StripeHandler extends BaseIntegrationHandler {
-  readonly nodeType = 'stripe';
+  readonly nodeType = 'stripe-node';
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -2579,6 +2579,155 @@ export class StripeHandler extends BaseIntegrationHandler {
 }
 
 // ========================================
+// 22. GOOGLE MEET HANDLER
+// ========================================
+
+/**
+ * Handles google-meet-node - Google Meet integration.
+ * Emits socket event for meeting booking; supports calendar-style booking UI.
+ */
+export class GoogleMeetHandler extends BaseIntegrationHandler {
+  readonly nodeType = 'google-meet-node';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Google Meet node missing data');
+    }
+
+    const nodeId = this.getNodeId(node);
+    const operation = this.getString(data, 'operation', 'book');
+
+    if (operation === 'book') {
+      const timezone = this.getString(data, 'timeZone') ||
+                       this.getString(data, 'timezone', 'UTC');
+      const variableName = this.getString(data, 'answerVariable') ||
+                           this.getString(data, 'variableName', 'meet_booking');
+
+      // Display calendar UI for booking
+      const uiState: NodeUIState.Calendar = {
+        type: 'calendar',
+        nodeId,
+        question: 'Select a time for your meeting',
+        variableName,
+        mode: 'datetime',
+        showTimeSlots: true,
+      };
+
+      return NodeResult.displayUI(uiState);
+    }
+
+    // Non-booking operations: emit socket event and proceed
+    const payload = {
+      ...this.buildCommonPayload(state),
+      nodeId,
+      operation,
+    };
+
+    this.emitSocketEvent('google-meet:execute', payload);
+    this.storeIntegrationResult(state, 'googleMeet', true);
+
+    return this.proceed(node, { googleMeetSuccess: true });
+  }
+
+  async handleResponse(
+    response: any,
+    node: Record<string, unknown>,
+    state: ChatState
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data || {}, 'answerVariable') ||
+                         this.getString(data || {}, 'variableName', 'meet_booking');
+
+    if (response) {
+      state.setVariable(variableName, response);
+    }
+
+    const payload = {
+      ...this.buildCommonPayload(state),
+      nodeId,
+      operation: 'book',
+      bookingData: response,
+    };
+
+    this.emitSocketEvent('google-meet:execute', payload);
+    this.storeIntegrationResult(state, 'googleMeet', true);
+
+    return this.proceed(node, { googleMeetSuccess: true });
+  }
+}
+
+// ========================================
+// 23. GOOGLE DOCS HANDLER
+// ========================================
+
+/**
+ * Handles google-docs-node - Google Docs integration.
+ * Creates/updates Google Docs via socket event.
+ */
+export class GoogleDocsHandler extends BaseIntegrationHandler {
+  readonly nodeType = 'google-docs-node';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Google Docs node missing data');
+    }
+
+    const nodeId = this.getNodeId(node);
+    const operation = this.getString(data, 'operation', 'create');
+    const title = this.getString(data, 'title', '');
+
+    const payload = {
+      ...this.buildCommonPayload(state),
+      nodeId,
+      operation,
+      title: title ? state.resolveVariables(title) : undefined,
+    };
+
+    this.emitSocketEvent('google-docs:execute', payload);
+    this.storeIntegrationResult(state, 'googleDocs', true);
+
+    return this.proceed(node, { googleDocsSuccess: true, operation });
+  }
+}
+
+// ========================================
+// 24. GOOGLE DRIVE HANDLER
+// ========================================
+
+/**
+ * Handles google-drive-node - Google Drive integration.
+ * Uploads/downloads from Google Drive via socket event.
+ */
+export class GoogleDriveHandler extends BaseIntegrationHandler {
+  readonly nodeType = 'google-drive-node';
+
+  async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Google Drive node missing data');
+    }
+
+    const nodeId = this.getNodeId(node);
+    const operation = this.getString(data, 'operation', 'upload');
+
+    const payload = {
+      ...this.buildCommonPayload(state),
+      nodeId,
+      operation,
+    };
+
+    this.emitSocketEvent('google-drive:execute', payload);
+    this.storeIntegrationResult(state, 'googleDrive', true);
+
+    return this.proceed(node, { googleDriveSuccess: true, operation });
+  }
+}
+
+// ========================================
 // HANDLER EXPORTS AND REGISTRATION
 // ========================================
 
@@ -2599,6 +2748,9 @@ export const IntegrationHandlers = {
   GoogleSheetsHandler,
   GoogleCalendarHandler,
   GoogleAnalyticsHandler,
+  GoogleMeetHandler,
+  GoogleDocsHandler,
+  GoogleDriveHandler,
   HubSpotHandler,
   SalesforceHandler,
   ZohoCRMHandler,
@@ -2633,6 +2785,9 @@ export function createIntegrationHandlers(
     new GoogleSheetsHandler(),
     new GoogleCalendarHandler(),
     new GoogleAnalyticsHandler(),
+    new GoogleMeetHandler(),
+    new GoogleDocsHandler(),
+    new GoogleDriveHandler(),
     new HubSpotHandler(),
     new SalesforceHandler(),
     new ZohoCRMHandler(),
