@@ -542,6 +542,324 @@ export class QuizNodeHandler extends BaseNodeHandler {
 }
 
 // ========================================
+// TWO CHOICES NODE HANDLER
+// ========================================
+
+/**
+ * Handles 'two-choices-node' - displays 2 choice buttons with port-based routing
+ */
+export class TwoChoicesNodeHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.TWO_CHOICES;
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Two Choices node has no data');
+    }
+
+    const nodeId = this.getNodeId(node);
+
+    const choice1 = this.getString(data, 'choice1', 'Option 1');
+    const choice2 = this.getString(data, 'choice2', 'Option 2');
+    const disableSecond = this.getBoolean(data, 'disableSecondChoice', false);
+    const variableName = this.getString(data, 'answerVariable') ||
+                         this.getString(data, 'variableName') ||
+                         nodeId;
+
+    const buttons: NodeUIState.Buttons['buttons'] = [
+      { id: '0', label: choice1, value: choice1, style: 'primary' },
+    ];
+
+    if (!disableSecond) {
+      buttons.push({ id: '1', label: choice2, value: choice2, style: 'primary' });
+    }
+
+    state.addBotMessage('[Two Choices]', nodeId, this.nodeType);
+
+    const uiState: NodeUIState.Buttons = {
+      type: 'buttons',
+      nodeId,
+      question: '',
+      buttons,
+      variableName,
+      multiSelect: false,
+    };
+
+    return NodeResult.displayUI(uiState);
+  }
+
+  async handleResponse(
+    response: any,
+    node: Record<string, any>,
+    state: ChatState
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data || {}, 'answerVariable') ||
+                         this.getString(data || {}, 'variableName') ||
+                         nodeId;
+
+    let choiceId: string;
+    let choiceText: string;
+
+    if (typeof response === 'object' && response !== null) {
+      choiceId = String(response.id ?? '0');
+      choiceText = response.text || response.label || '';
+    } else {
+      choiceId = String(response);
+      choiceText = choiceId === '0'
+        ? this.getString(data || {}, 'choice1', 'Option 1')
+        : this.getString(data || {}, 'choice2', 'Option 2');
+    }
+
+    state.setAnswer(nodeId, variableName, choiceText, nodeId);
+    state.addUserMessage(choiceText, nodeId);
+
+    // Port-based routing: source-1 for choice 0, source-2 for choice 1
+    const portIndex = (parseInt(choiceId, 10) || 0) + 1;
+    const targetPort = `source-${portIndex}`;
+
+    return NodeResult.delayedProceed(null, 600, {
+      [variableName]: choiceText,
+      __targetPort: targetPort,
+    });
+  }
+}
+
+// ========================================
+// THREE CHOICES NODE HANDLER
+// ========================================
+
+/**
+ * Handles 'three-choices-node' - displays 3 choice buttons with port-based routing
+ */
+export class ThreeChoicesNodeHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.THREE_CHOICES;
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Three Choices node has no data');
+    }
+
+    const nodeId = this.getNodeId(node);
+
+    const choice1 = this.getString(data, 'choice1', 'Option 1');
+    const choice2 = this.getString(data, 'choice2', 'Option 2');
+    const choice3 = this.getString(data, 'choice3', 'Option 3');
+    const variableName = this.getString(data, 'answerVariable') ||
+                         this.getString(data, 'variableName') ||
+                         nodeId;
+
+    const buttons: NodeUIState.Buttons['buttons'] = [
+      { id: '0', label: choice1, value: choice1, style: 'primary' },
+      { id: '1', label: choice2, value: choice2, style: 'primary' },
+      { id: '2', label: choice3, value: choice3, style: 'primary' },
+    ];
+
+    state.addBotMessage('[Three Choices]', nodeId, this.nodeType);
+
+    const uiState: NodeUIState.Buttons = {
+      type: 'buttons',
+      nodeId,
+      question: '',
+      buttons,
+      variableName,
+      multiSelect: false,
+    };
+
+    return NodeResult.displayUI(uiState);
+  }
+
+  async handleResponse(
+    response: any,
+    node: Record<string, any>,
+    state: ChatState
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data || {}, 'answerVariable') ||
+                         this.getString(data || {}, 'variableName') ||
+                         nodeId;
+
+    let choiceId: string;
+    let choiceText: string;
+
+    if (typeof response === 'object' && response !== null) {
+      choiceId = String(response.id ?? '0');
+      choiceText = response.text || response.label || '';
+    } else {
+      choiceId = String(response);
+      const choiceMap: Record<string, string> = {
+        '0': this.getString(data || {}, 'choice1', 'Option 1'),
+        '1': this.getString(data || {}, 'choice2', 'Option 2'),
+        '2': this.getString(data || {}, 'choice3', 'Option 3'),
+      };
+      choiceText = choiceMap[choiceId] || 'Unknown';
+    }
+
+    state.setAnswer(nodeId, variableName, choiceText, nodeId);
+    state.addUserMessage(choiceText, nodeId);
+
+    const portIndex = (parseInt(choiceId, 10) || 0) + 1;
+    const targetPort = `source-${portIndex}`;
+
+    return NodeResult.delayedProceed(null, 600, {
+      [variableName]: choiceText,
+      __targetPort: targetPort,
+    });
+  }
+}
+
+// ========================================
+// SELECT OPTION NODE HANDLER (LEGACY)
+// ========================================
+
+/**
+ * Handles 'select-option-node' - legacy dropdown with up to 5 options from option1-option5 fields
+ */
+export class SelectOptionNodeHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.SELECT_OPTION;
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Select Option node has no data');
+    }
+
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data, 'answerVariable') ||
+                         this.getString(data, 'variableName') ||
+                         nodeId;
+
+    // Build options from option1..option5 fields
+    const options: NodeUIState.Dropdown['options'] = [];
+    for (let i = 1; i <= 5; i++) {
+      const optionKey = `option${i}`;
+      const disableKey = `disableOption${i}`;
+
+      if (this.getBoolean(data, disableKey, false)) continue;
+
+      const optionText = this.getString(data, optionKey, '');
+      if (optionText) {
+        options.push({
+          id: String(i - 1),
+          label: optionText,
+          value: optionText,
+        });
+      }
+    }
+
+    if (options.length === 0) {
+      return this.createError('Select Option node has no options');
+    }
+
+    state.addBotMessage('[Select Option]', nodeId, this.nodeType);
+
+    const uiState: NodeUIState.Dropdown = {
+      type: 'dropdown',
+      nodeId,
+      question: '',
+      options,
+      variableName,
+      placeholder: 'Select an option',
+      searchable: false,
+      multiSelect: false,
+    };
+
+    return NodeResult.displayUI(uiState);
+  }
+
+  async handleResponse(
+    response: any,
+    node: Record<string, any>,
+    state: ChatState
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data || {}, 'answerVariable') ||
+                         this.getString(data || {}, 'variableName') ||
+                         nodeId;
+
+    let optionText: string;
+    if (typeof response === 'object' && response !== null) {
+      optionText = response.text || response.label || String(response.value ?? '');
+    } else {
+      optionText = String(response);
+    }
+
+    state.setAnswer(nodeId, variableName, optionText, nodeId);
+    state.addUserMessage(optionText, nodeId);
+
+    return NodeResult.delayedProceed(this.getNextNodeId(node), 600, {
+      [variableName]: optionText,
+    });
+  }
+}
+
+// ========================================
+// USER RATING NODE HANDLER (LEGACY)
+// ========================================
+
+/**
+ * Handles 'user-rating-node' - legacy 5-star rating, returns numeric value
+ */
+export class UserRatingNodeHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.USER_RATING;
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('User Rating node has no data');
+    }
+
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data, 'answerVariable') ||
+                         this.getString(data, 'variableName') ||
+                         'userRating';
+
+    state.addBotMessage('[Rating]', nodeId, this.nodeType);
+
+    const uiState: NodeUIState.Rating = {
+      type: 'rating',
+      nodeId,
+      question: '',
+      maxRating: 5,
+      variableName,
+      style: 'stars',
+      allowHalf: false,
+    };
+
+    return NodeResult.displayUI(uiState);
+  }
+
+  async handleResponse(
+    response: any,
+    node: Record<string, any>,
+    state: ChatState
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data || {}, 'answerVariable') ||
+                         this.getString(data || {}, 'variableName') ||
+                         'userRating';
+
+    const rating = typeof response === 'number' ? response : parseInt(String(response), 10) || 0;
+
+    state.setAnswer(nodeId, variableName, rating, nodeId);
+    state.addUserMessage(String(rating), nodeId);
+
+    return this.proceed(node, { [variableName]: rating });
+  }
+}
+
+// ========================================
 // LEGACY HANDLER COLLECTION
 // ========================================
 
@@ -552,6 +870,10 @@ export const legacyHandlers: NodeHandler[] = [
   new UserInputNodeHandler(),
   new UserRangeNodeHandler(),
   new QuizNodeHandler(),
+  new TwoChoicesNodeHandler(),
+  new ThreeChoicesNodeHandler(),
+  new SelectOptionNodeHandler(),
+  new UserRatingNodeHandler(),
 ];
 
 /**
