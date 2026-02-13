@@ -811,7 +811,7 @@ export class RandomPathHandler extends BaseNodeHandler {
 
       // Select path based on weight
       for (const path of normalizedPaths) {
-        random -= path.weight!;
+        random -= path.weight ?? 1;
         if (random <= 0) {
           const portName = path.port || path.id;
 
