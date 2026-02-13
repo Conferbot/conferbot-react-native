@@ -68,7 +68,7 @@ interface SocketClient {
  * Enhanced GPT handler with multi-provider support and streaming
  */
 export class EnhancedGPTHandler extends BaseNodeHandler {
-  readonly nodeType = 'gpt';
+  readonly nodeType = 'gpt-node';
 
   private aiHandler: AIHandler;
   private socketClient: SocketClient | null = null;
