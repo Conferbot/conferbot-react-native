@@ -470,7 +470,7 @@ export class AskUrlHandler extends BaseAskHandler {
  * Handles 'ask-date' nodes - collects a date
  */
 export class AskDateHandler extends BaseAskHandler {
-  readonly nodeType = DisplayNodes.ASK_DATE;
+  readonly nodeType = 'ask-date-node';
   readonly inputType: NodeUIState.TextInput['inputType'] = 'date';
   readonly validationPattern = ValidationPatterns.date;
 
@@ -545,7 +545,7 @@ export class AskDateHandler extends BaseAskHandler {
  * Handles 'ask-address' nodes - collects an address
  */
 export class AskAddressHandler extends BaseAskHandler {
-  readonly nodeType = DisplayNodes.ASK_ADDRESS;
+  readonly nodeType = 'ask-address-node';
   readonly inputType: NodeUIState.TextInput['inputType'] = 'address';
   readonly validationPattern = undefined; // Address has no standard pattern
 
@@ -782,6 +782,82 @@ export class AskLocationHandler extends BaseNodeHandler {
 }
 
 // ========================================
+// ASK CUSTOM QUESTION HANDLER
+// ========================================
+
+/**
+ * Handles 'ask-custom-question-node' - generic text input with custom question prompt
+ */
+export class AskCustomQuestionHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.ASK_CUSTOM_QUESTION;
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Ask Custom Question node has no data');
+    }
+
+    const nodeId = this.getNodeId(node);
+
+    let question = this.getString(data, 'questionText') ||
+                   this.getString(data, 'question') ||
+                   this.getString(data, 'text') ||
+                   'Please answer the question';
+
+    question = this.resolveText(question, state);
+
+    const variableName = this.getString(data, 'answerVariable') ||
+                         this.getString(data, 'variableName') ||
+                         this.getString(data, 'variable') ||
+                         nodeId;
+
+    const placeholder = this.getString(data, 'placeholder', 'Type your answer');
+
+    state.addBotMessage(question, nodeId, this.nodeType);
+
+    const uiState: NodeUIState.TextInput = {
+      type: 'textInput',
+      nodeId,
+      question,
+      placeholder,
+      variableName,
+      inputType: 'text',
+      validation: {
+        required: this.getBoolean(data, 'required', true),
+      },
+      errorMessage: 'Please enter an answer',
+    };
+
+    return NodeResult.displayUI(uiState);
+  }
+
+  async handleResponse(
+    response: any,
+    node: Record<string, any>,
+    state: ChatState
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data || {}, 'answerVariable') ||
+                         this.getString(data || {}, 'variableName') ||
+                         this.getString(data || {}, 'variable') ||
+                         nodeId;
+
+    const answer = String(response ?? '').trim();
+
+    if (!answer && this.getBoolean(data || {}, 'required', true)) {
+      return NodeResult.error('Please enter an answer', true);
+    }
+
+    state.setAnswer(nodeId, variableName, answer, nodeId);
+    state.addUserMessage(answer, nodeId);
+
+    return this.proceed(node, { [variableName]: answer });
+  }
+}
+
+// ========================================
 // ASK HANDLER COLLECTION
 // ========================================
 
@@ -798,6 +874,7 @@ export const askHandlers: NodeHandler[] = [
   new AskAddressHandler(),
   new AskFileHandler(),
   new AskLocationHandler(),
+  new AskCustomQuestionHandler(),
 ];
 
 /**
