@@ -31,12 +31,12 @@ describe('Advanced Input Handlers', () => {
     const handler = new CalendarHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('calendar');
+      expect(handler.nodeType).toBe('calendar-node');
     });
 
     describe('handle method', () => {
       it('should display calendar UI state for date mode', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select a date',
           variableName: 'selectedDate',
           mode: 'date',
@@ -55,7 +55,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should display calendar UI state for time mode', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select a time',
           variableName: 'selectedTime',
           mode: 'time',
@@ -70,7 +70,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should display calendar UI state for datetime mode', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select date and time',
           variableName: 'appointment',
           mode: 'datetime',
@@ -85,7 +85,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should display calendar UI state for date range mode', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select date range',
           variableName: 'dateRange',
           mode: 'dateRange',
@@ -100,7 +100,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should include min and max date constraints', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select date',
           variableName: 'date',
           mode: 'date',
@@ -118,7 +118,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should include available time slots', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Book an appointment',
           variableName: 'appointment',
           mode: 'datetime',
@@ -140,7 +140,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should process single time slots into array', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Book',
           variableName: 'booking',
           availableSlots: [
@@ -157,7 +157,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should enable time slots when slots are provided', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Book',
           variableName: 'booking',
           availableSlots: [
@@ -176,7 +176,7 @@ describe('Advanced Input Handlers', () => {
       it('should resolve variables in question', async () => {
         chatState.setVariable('serviceName', 'Consultation');
 
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Book your {{serviceName}}',
           variableName: 'booking',
         });
@@ -190,7 +190,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should use default mode when invalid mode provided', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select',
           variableName: 'date',
           mode: 'invalid-mode',
@@ -205,7 +205,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should use alternative field names', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           text: 'Question',
           variable: 'dateVar',
           type: 'datetime',
@@ -217,7 +217,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should add question to transcript', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Pick a date',
           variableName: 'date',
         });
@@ -239,7 +239,7 @@ describe('Advanced Input Handlers', () => {
 
     describe('handleResponse method', () => {
       it('should store simple date response', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select date',
           variableName: 'selectedDate',
           mode: 'date',
@@ -252,7 +252,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should store date and time object response', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select appointment',
           variableName: 'appointment',
           mode: 'datetime',
@@ -272,7 +272,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should store date range response', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select range',
           variableName: 'dateRange',
           mode: 'dateRange',
@@ -292,7 +292,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate min date constraint', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select date',
           variableName: 'date',
           minDate: '2024-03-01',
@@ -304,7 +304,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate max date constraint', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select date',
           variableName: 'date',
           maxDate: '2024-12-31',
@@ -316,7 +316,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should return error for required empty response', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select date',
           variableName: 'date',
           required: true,
@@ -328,7 +328,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should allow empty response when not required', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select date (optional)',
           variableName: 'date',
           required: false,
@@ -344,7 +344,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should format date for transcript display', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select',
           variableName: 'date',
         });
@@ -357,7 +357,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should format datetime for transcript display', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select',
           variableName: 'appointment',
         });
@@ -369,7 +369,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should format date range for transcript display', async () => {
-        const node = createNode('calendar', {
+        const node = createNode('calendar-node', {
           question: 'Select',
           variableName: 'range',
         });
@@ -394,12 +394,12 @@ describe('Advanced Input Handlers', () => {
     const handler = new MultipleQuestionsHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('multiplequestions');
+      expect(handler.nodeType).toBe('ask-multiple-questions-node');
     });
 
     describe('handle method', () => {
       it('should display multiple questions UI state', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           title: 'Contact Information',
           questions: [
             { id: 'name', question: 'Full Name', type: 'text', variableName: 'fullName', required: true },
@@ -420,7 +420,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should map different field types correctly', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'q1', question: 'Name', type: 'string', variableName: 'name' },
             { id: 'q2', question: 'Email', type: 'email', variableName: 'email' },
@@ -447,7 +447,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should include options for select fields', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             {
               id: 'country',
@@ -473,7 +473,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should convert string options to label/value pairs', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             {
               id: 'color',
@@ -494,7 +494,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should include validation constraints', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             {
               id: 'password',
@@ -519,7 +519,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should include placeholder text', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             {
               id: 'email',
@@ -540,7 +540,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should include custom submit button label', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'q1', question: 'Question', type: 'text', variableName: 'answer' },
           ],
@@ -558,7 +558,7 @@ describe('Advanced Input Handlers', () => {
       it('should resolve variables in questions and options', async () => {
         chatState.setVariable('companyName', 'Acme Corp');
 
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           title: 'Feedback for {{companyName}}',
           questions: [
             {
@@ -585,7 +585,7 @@ describe('Advanced Input Handlers', () => {
         // - 'label' alternative to 'question'
         // - 'inputType' alternative to 'type'
         // - 'name' alternative to 'variableName'
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           heading: 'Form Title',  // alternative to 'title'
           questions: [
             { id: 'f1', label: 'Field 1', inputType: 'text', name: 'field1' },
@@ -605,7 +605,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should default required to true', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'q1', question: 'Question', type: 'text', variableName: 'answer' },
           ],
@@ -620,7 +620,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should return error when no questions provided', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           title: 'Empty Form',
           questions: [],
         });
@@ -631,7 +631,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should add title to transcript', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           title: 'Contact Form',
           questions: [
             { id: 'q1', question: 'Name', type: 'text', variableName: 'name' },
@@ -647,7 +647,7 @@ describe('Advanced Input Handlers', () => {
 
     describe('handleResponse method', () => {
       it('should store all form fields in state', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'name', question: 'Name', type: 'text', variableName: 'fullName' },
             { id: 'email', question: 'Email', type: 'email', variableName: 'userEmail' },
@@ -670,7 +670,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate required fields', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'name', question: 'Name', type: 'text', variableName: 'name', required: true },
             { id: 'email', question: 'Email', type: 'email', variableName: 'email', required: true },
@@ -691,7 +691,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate email format', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'email', question: 'Email', type: 'email', variableName: 'email' },
           ],
@@ -703,7 +703,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate phone format', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'phone', question: 'Phone', type: 'phone', variableName: 'phone' },
           ],
@@ -715,7 +715,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate number range', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'age', question: 'Age', type: 'number', variableName: 'age', min: 18, max: 100 },
           ],
@@ -729,7 +729,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate date format', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'date', question: 'Date', type: 'date', variableName: 'date' },
           ],
@@ -741,7 +741,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate string length constraints', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'code', question: 'Code', type: 'text', variableName: 'code', minLength: 4, maxLength: 8 },
           ],
@@ -755,7 +755,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should validate custom pattern', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'code', question: 'Code', type: 'text', variableName: 'code', pattern: '^[A-Z]{3}-[0-9]{3}$' },
           ],
@@ -769,7 +769,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should update user name metadata', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'name', question: 'Name', type: 'text', variableName: 'firstName' },
           ],
@@ -781,7 +781,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should update user email metadata', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'email', question: 'Email', type: 'email', variableName: 'contactEmail' },
           ],
@@ -793,7 +793,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should update user phone metadata', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'phone', question: 'Phone', type: 'phone', variableName: 'mobile' },
           ],
@@ -805,7 +805,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should add submission summary to transcript', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'q1', question: 'Q1', type: 'text', variableName: 'a1' },
             { id: 'q2', question: 'Q2', type: 'text', variableName: 'a2' },
@@ -819,7 +819,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should return error for non-object response', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'q1', question: 'Q', type: 'text', variableName: 'a' },
           ],
@@ -831,7 +831,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should skip validation for empty non-required fields', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'name', question: 'Name', type: 'text', variableName: 'name', required: true },
             { id: 'nickname', question: 'Nickname', type: 'text', variableName: 'nickname', required: false },
@@ -844,7 +844,7 @@ describe('Advanced Input Handlers', () => {
       });
 
       it('should include all stored data in proceed result', async () => {
-        const node = createNode('multiplequestions', {
+        const node = createNode('ask-multiple-questions-node', {
           questions: [
             { id: 'name', question: 'Name', type: 'text', variableName: 'name' },
             { id: 'email', question: 'Email', type: 'email', variableName: 'email' },
@@ -869,8 +869,8 @@ describe('Advanced Input Handlers', () => {
   describe('Advanced Input Handlers Collection', () => {
     it('should export all advanced input handlers', () => {
       expect(advancedInputHandlers).toHaveLength(2);
-      expect(advancedInputHandlers.map(h => h.nodeType)).toContain('calendar');
-      expect(advancedInputHandlers.map(h => h.nodeType)).toContain('multiplequestions');
+      expect(advancedInputHandlers.map(h => h.nodeType)).toContain('calendar-node');
+      expect(advancedInputHandlers.map(h => h.nodeType)).toContain('ask-multiple-questions-node');
     });
 
     it('should register handlers with registry', () => {
