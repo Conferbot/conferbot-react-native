@@ -47,11 +47,11 @@ function registerAllHandlersManually(registry: NodeHandlerRegistry): void {
 function createLeadGenerationFlow(): FlowDefinition {
   return {
     nodes: [
-      createNode('message', { text: 'Welcome to our lead generation bot!' }, { id: 'welcome' }),
-      createNode('ask-name', { question: 'What is your name?', variableName: 'customerName' }, { id: 'ask-name' }),
-      createNode('ask-email', { question: 'What is your email?', variableName: 'customerEmail' }, { id: 'ask-email' }),
-      createNode('ask-phone', { question: 'What is your phone number?', variableName: 'customerPhone' }, { id: 'ask-phone' }),
-      createNode('buttons', {
+      createNode('message-node', { text: 'Welcome to our lead generation bot!' }, { id: 'welcome' }),
+      createNode('ask-name-node', { question: 'What is your name?', variableName: 'customerName' }, { id: 'ask-name' }),
+      createNode('ask-email-node', { question: 'What is your email?', variableName: 'customerEmail' }, { id: 'ask-email' }),
+      createNode('ask-phone-number-node', { question: 'What is your phone number?', variableName: 'customerPhone' }, { id: 'ask-phone' }),
+      createNode('n-choices-node', {
         question: 'What service are you interested in?',
         buttons: [
           { id: 'web', label: 'Web Development', value: 'web' },
@@ -61,7 +61,7 @@ function createLeadGenerationFlow(): FlowDefinition {
         variableName: 'service',
       }, { id: 'ask-service' }),
       createNode('goal', { goalName: 'lead_captured', goalValue: { source: 'chatbot' } }, { id: 'goal' }),
-      createNode('message', { text: 'Thank you, {{customerName}}! We will contact you at {{customerEmail}}.' }, { id: 'thanks' }),
+      createNode('message-node', { text: 'Thank you, {{customerName}}! We will contact you at {{customerEmail}}.' }, { id: 'thanks' }),
       createNode('end_conversation', {}, { id: 'end' }),
     ],
     edges: [
@@ -83,25 +83,25 @@ function createLeadGenerationFlow(): FlowDefinition {
 function createConditionalSurveyFlow(): FlowDefinition {
   return {
     nodes: [
-      createNode('message', { text: 'Customer Satisfaction Survey' }, { id: 'intro' }),
-      createNode('rating', {
+      createNode('message-node', { text: 'Customer Satisfaction Survey' }, { id: 'intro' }),
+      createNode('rating-choice-node', {
         question: 'How would you rate our service?',
         maxRating: 5,
         style: 'stars',
         variableName: 'rating',
       }, { id: 'rating-node' }),
-      createNode('condition', {
+      createNode('condition-node', {
         variable: 'rating',
         operator: 'greaterThanOrEquals',
         value: 4,
       }, { id: 'check-rating' }),
-      createNode('message', { text: 'Great! We are glad you enjoyed our service.' }, { id: 'positive-feedback' }),
-      createNode('ask-email', {
+      createNode('message-node', { text: 'Great! We are glad you enjoyed our service.' }, { id: 'positive-feedback' }),
+      createNode('ask-email-node', {
         question: 'Would you like to receive updates? Enter your email:',
         variableName: 'newsletterEmail',
       }, { id: 'ask-newsletter' }),
-      createNode('message', { text: 'We are sorry to hear that. How can we improve?' }, { id: 'negative-feedback' }),
-      createNode('buttons', {
+      createNode('message-node', { text: 'We are sorry to hear that. How can we improve?' }, { id: 'negative-feedback' }),
+      createNode('n-choices-node', {
         question: 'What aspect needs improvement?',
         buttons: [
           { id: 'speed', label: 'Speed', value: 'speed' },
@@ -111,7 +111,7 @@ function createConditionalSurveyFlow(): FlowDefinition {
         variableName: 'improvementArea',
       }, { id: 'ask-improvement' }),
       createNode('goal', { goalName: 'survey_complete' }, { id: 'survey-goal' }),
-      createNode('message', { text: 'Thank you for your feedback!' }, { id: 'finale' }),
+      createNode('message-node', { text: 'Thank you for your feedback!' }, { id: 'finale' }),
     ],
     edges: [
       { id: 'e1', source: 'intro', target: 'rating-node' },
@@ -134,9 +134,9 @@ function createConditionalSurveyFlow(): FlowDefinition {
 function createQuizFlow(): FlowDefinition {
   return {
     nodes: [
-      createNode('message', { text: 'Welcome to the Knowledge Quiz!' }, { id: 'intro' }),
-      createNode('set-variable', { variableName: 'score', value: 0 }, { id: 'init-score' }),
-      createNode('buttons', {
+      createNode('message-node', { text: 'Welcome to the Knowledge Quiz!' }, { id: 'intro' }),
+      createNode('variable-node', { variableName: 'score', value: 0 }, { id: 'init-score' }),
+      createNode('n-choices-node', {
         question: 'Q1: What is the capital of France?',
         buttons: [
           { id: 'paris', label: 'Paris', value: 'paris' },
@@ -145,18 +145,18 @@ function createQuizFlow(): FlowDefinition {
         ],
         variableName: 'q1Answer',
       }, { id: 'q1' }),
-      createNode('condition', {
+      createNode('condition-node', {
         variable: 'q1Answer',
         operator: 'equals',
         value: 'paris',
       }, { id: 'check-q1' }),
-      createNode('math-operation', {
+      createNode('math-operation-node', {
         operation: 'add',
         operand1: 'score',
         operand2: 1,
         resultVariable: 'score',
       }, { id: 'add-point-q1' }),
-      createNode('buttons', {
+      createNode('n-choices-node', {
         question: 'Q2: What is 2 + 2?',
         buttons: [
           { id: '3', label: '3', value: '3' },
@@ -165,18 +165,18 @@ function createQuizFlow(): FlowDefinition {
         ],
         variableName: 'q2Answer',
       }, { id: 'q2' }),
-      createNode('condition', {
+      createNode('condition-node', {
         variable: 'q2Answer',
         operator: 'equals',
         value: '4',
       }, { id: 'check-q2' }),
-      createNode('math-operation', {
+      createNode('math-operation-node', {
         operation: 'add',
         operand1: 'score',
         operand2: 1,
         resultVariable: 'score',
       }, { id: 'add-point-q2' }),
-      createNode('message', { text: 'Quiz complete! Your score: {{score}}/2' }, { id: 'result' }),
+      createNode('message-node', { text: 'Quiz complete! Your score: {{score}}/2' }, { id: 'result' }),
       createNode('goal', { goalName: 'quiz_complete', goalValue: { score: '{{score}}' } }, { id: 'quiz-goal' }),
     ],
     edges: [
@@ -202,8 +202,8 @@ function createQuizFlow(): FlowDefinition {
 function createBookingFlow(): FlowDefinition {
   return {
     nodes: [
-      createNode('message', { text: 'Welcome to our booking system!' }, { id: 'welcome' }),
-      createNode('dropdown', {
+      createNode('message-node', { text: 'Welcome to our booking system!' }, { id: 'welcome' }),
+      createNode('n-select-option-node', {
         question: 'Select a service:',
         options: [
           { id: 'haircut', label: 'Haircut', value: 'haircut' },
@@ -212,14 +212,14 @@ function createBookingFlow(): FlowDefinition {
         ],
         variableName: 'selectedService',
       }, { id: 'select-service' }),
-      createNode('calendar', {
+      createNode('calendar-node', {
         question: 'Select a date and time:',
         mode: 'datetime',
         variableName: 'appointmentTime',
       }, { id: 'select-time' }),
-      createNode('ask-name', { question: 'Your name:', variableName: 'clientName' }, { id: 'get-name' }),
-      createNode('ask-phone', { question: 'Your phone number:', variableName: 'clientPhone' }, { id: 'get-phone' }),
-      createNode('message', {
+      createNode('ask-name-node', { question: 'Your name:', variableName: 'clientName' }, { id: 'get-name' }),
+      createNode('ask-phone-number-node', { question: 'Your phone number:', variableName: 'clientPhone' }, { id: 'get-phone' }),
+      createNode('message-node', {
         text: 'Booking confirmed!\nService: {{selectedService}}\nDate: {{appointmentTime}}\nName: {{clientName}}',
       }, { id: 'confirmation' }),
       createNode('goal', { goalName: 'booking_complete' }, { id: 'booking-goal' }),
@@ -717,7 +717,7 @@ describe('NodeFlowEngine Integration with ChatState', () => {
       expect(flow.startNodeId).toBe('intro');
 
       // Should have set-variable node for score
-      const setVarNode = flow.nodes.find((n) => n.type === 'set-variable');
+      const setVarNode = flow.nodes.find((n) => n.type === 'variable-node');
       expect(setVarNode).toBeDefined();
       expect(setVarNode?.data.variableName).toBe('score');
     });
@@ -730,10 +730,10 @@ describe('NodeFlowEngine Integration with ChatState', () => {
 
       // Should have various input types
       const nodeTypes = flow.nodes.map((n) => n.type);
-      expect(nodeTypes).toContain('dropdown');
-      expect(nodeTypes).toContain('calendar');
-      expect(nodeTypes).toContain('ask-name');
-      expect(nodeTypes).toContain('ask-phone');
+      expect(nodeTypes).toContain('n-select-option-node');
+      expect(nodeTypes).toContain('calendar-node');
+      expect(nodeTypes).toContain('ask-name-node');
+      expect(nodeTypes).toContain('ask-phone-number-node');
     });
 
     it('should have unique node ids in each flow', () => {
