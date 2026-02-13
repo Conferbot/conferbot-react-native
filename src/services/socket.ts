@@ -18,6 +18,8 @@ import {
   SOCKET_RECONNECTION_DELAY_MAX,
   HEADER_API_KEY,
   HEADER_BOT_ID,
+  ConferBotEndpoints,
+  ConferBotNetworkConfig,
 } from '../config/constants';
 
 // Socket connection options
@@ -50,7 +52,7 @@ class ConferBotSocket {
     this.apiKey = options.apiKey;
     this.botId = options.botId;
     this.userId = options.userId;
-    this.socketUrl = options.socketUrl || DEFAULT_SOCKET_URL;
+    this.socketUrl = options.socketUrl || ConferBotEndpoints.socketUrl;
   }
 
   // ********** Connection Methods ********** //
@@ -66,10 +68,10 @@ class ConferBotSocket {
         this.socket = io(this.socketUrl, {
           transports: ['websocket', 'polling'],
           reconnection: true,
-          reconnectionAttempts: SOCKET_RECONNECTION_ATTEMPTS,
-          reconnectionDelay: SOCKET_RECONNECTION_DELAY,
-          reconnectionDelayMax: SOCKET_RECONNECTION_DELAY_MAX,
-          timeout: SOCKET_TIMEOUT,
+          reconnectionAttempts: ConferBotNetworkConfig.reconnectionAttempts,
+          reconnectionDelay: ConferBotNetworkConfig.reconnectionDelay,
+          reconnectionDelayMax: ConferBotNetworkConfig.reconnectionDelayMax,
+          timeout: ConferBotNetworkConfig.socketTimeout,
           autoConnect: true,
           extraHeaders: {
             [HEADER_API_KEY]: this.apiKey,
@@ -568,7 +570,10 @@ class ConferBotSocket {
       this.listeners.set(event, new Set());
     }
 
-    this.listeners.get(event)!.add(callback);
+    const listeners = this.listeners.get(event);
+    if (listeners) {
+      listeners.add(callback);
+    }
 
     // Return unsubscribe function
     return () => this.off(event, callback);
