@@ -121,7 +121,44 @@ export interface ChatWidgetProps {
  *
  * @component
  */
-export const ChatWidget: React.FC<ChatWidgetProps> = ({
+
+// ========================================
+// ERROR BOUNDARY
+// ========================================
+
+interface ConferBotErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}
+
+interface ConferBotErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ConferBotErrorBoundary extends React.Component<
+  ConferBotErrorBoundaryProps,
+  ConferBotErrorBoundaryState
+> {
+  state: ConferBotErrorBoundaryState = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[ConferBot] Widget error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || null;
+    }
+    return this.props.children;
+  }
+}
+
+const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   visible: controlledVisible,
   onClose,
   title = 'Chat',
@@ -230,6 +267,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       },
     });
 
+
     engineInitialized.current = true;
 
     if (debug) {
@@ -284,6 +322,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
               edges: flowData.edges || [],
               startNodeId: currentNodeId,
             });
+
           }
 
           // Process the current node
@@ -293,6 +332,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
               console.error('[ChatWidget] Error resuming flow:', error);
               setIsNodeLoading(false);
             });
+
           }
         }
       }
@@ -344,6 +384,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     const unsubscribe = on('agent-typing-status' as SocketEvents, (data: any) => {
       setIsAgentTyping(data.isTyping || false);
     });
+
 
     return unsubscribe;
   }, [on]);
@@ -459,6 +500,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         name: `voice_${Date.now()}.m4a`,
       });
 
+
       // Add voice message to chat state
       if (chatState.current) {
         chatState.current.addRecord({
@@ -506,6 +548,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       isUploading: false,
       uploadProgress: 0,
     });
+
     setShowAttachmentPreview(true);
   }, []);
 
@@ -546,6 +589,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
               maxSize: MAX_ATTACHMENT_SIZE,
               quality: 0.8,
             });
+
             if (result) {
               handleFileSelected(result);
             }
@@ -557,6 +601,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         },
       });
 
+
       buttons.push({
         text: 'Choose from Gallery',
         onPress: async () => {
@@ -566,6 +611,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
               maxSize: MAX_ATTACHMENT_SIZE,
               quality: 0.8,
             });
+
             if (results.length > 0) {
               handleFileSelected(results[0]);
             }
@@ -576,6 +622,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
           }
         },
       });
+
     }
 
     if (hasFilePicker) {
@@ -587,6 +634,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
               multiple: false,
               maxSize: MAX_ATTACHMENT_SIZE,
             });
+
             if (results.length > 0) {
               handleFileSelected(results[0]);
             }
@@ -597,6 +645,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
           }
         },
       });
+
     }
 
     buttons.push({
@@ -604,6 +653,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       style: 'cancel',
       onPress: () => {},
     });
+
 
     Alert.alert('Attach File', 'Choose how you want to add a file', buttons);
   }, [debug, handleFileSelected]);
@@ -636,6 +686,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         }
         return { ...prev, uploadProgress: prev.uploadProgress + 10 };
       });
+
     }, 200);
 
     try {
@@ -1078,3 +1129,17 @@ const createStyles = (theme: ConferBotTheme) =>
       fontWeight: theme.typography.fontWeight.semibold,
     },
   });
+
+/**
+ * ChatWidget wrapped with error boundary protection
+ */
+export const ChatWidget: React.FC<ChatWidgetProps & { errorFallback?: React.ReactNode }> = ({
+  errorFallback,
+  ...props
+}) => {
+  return (
+    <ConferBotErrorBoundary fallback={errorFallback}>
+      <ChatWidgetInner {...props} />
+    </ConferBotErrorBoundary>
+  );
+};
