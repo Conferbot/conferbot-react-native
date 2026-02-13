@@ -362,10 +362,10 @@ describe('NodeHandlerRegistry', () => {
 
     it('should register expected number of handlers', () => {
       // We skip integration handlers in tests, so count will be lower
-      // Display: 7, Ask: 9, Choice: 7, Advanced: 2, Legacy: 3, Logic: 7, Special: 2 = 37
-      expect(registry.size).toBeGreaterThanOrEqual(35);
-      // The full count including integrations is 58
-      expect(getHandlerCount()).toBe(58);
+      // Display: 8, Ask: 10, Choice: 9, Advanced: 2, Legacy: 7, Logic: 7, Special: 2 = 45
+      expect(registry.size).toBeGreaterThanOrEqual(45);
+      // The full count including integrations is 69
+      expect(getHandlerCount()).toBe(69);
     });
 
     describe('Display Nodes', () => {
@@ -612,15 +612,15 @@ describe('NodeHandlerRegistry', () => {
 
   describe('Handler Count by Category', () => {
     it('should have correct count for display category', () => {
-      expect(HandlerCountByCategory[HandlerCategories.DISPLAY]).toBe(7);
+      expect(HandlerCountByCategory[HandlerCategories.DISPLAY]).toBe(8);
     });
 
     it('should have correct count for ask category', () => {
-      expect(HandlerCountByCategory[HandlerCategories.ASK]).toBe(9);
+      expect(HandlerCountByCategory[HandlerCategories.ASK]).toBe(10);
     });
 
     it('should have correct count for choice category', () => {
-      expect(HandlerCountByCategory[HandlerCategories.CHOICE]).toBe(7);
+      expect(HandlerCountByCategory[HandlerCategories.CHOICE]).toBe(9);
     });
 
     it('should have correct count for advanced_input category', () => {
@@ -628,15 +628,15 @@ describe('NodeHandlerRegistry', () => {
     });
 
     it('should have correct count for legacy category', () => {
-      expect(HandlerCountByCategory[HandlerCategories.LEGACY]).toBe(3);
+      expect(HandlerCountByCategory[HandlerCategories.LEGACY]).toBe(7);
     });
 
     it('should have correct count for logic category', () => {
-      expect(HandlerCountByCategory[HandlerCategories.LOGIC]).toBe(8);
+      expect(HandlerCountByCategory[HandlerCategories.LOGIC]).toBe(7);
     });
 
     it('should have correct count for integration category', () => {
-      expect(HandlerCountByCategory[HandlerCategories.INTEGRATION]).toBe(21);
+      expect(HandlerCountByCategory[HandlerCategories.INTEGRATION]).toBe(24);
     });
 
     it('should have correct count for special category', () => {
@@ -648,9 +648,8 @@ describe('NodeHandlerRegistry', () => {
         (sum, count) => sum + count,
         0
       );
-      // Note: The actual registered count may differ slightly due to subtype variations
-      // but should be close to the expected total
-      expect(sumOfCategories).toBe(59); // 7+9+7+2+3+8+21+2 = 59
+      // 8+10+9+2+7+7+24+2 = 69
+      expect(sumOfCategories).toBe(69);
     });
   });
 
@@ -686,12 +685,12 @@ describe('NodeHandlerRegistry', () => {
 
     it('handlers should return valid NodeResult', async () => {
       const chatState = new ChatState('test-session', 'test-bot');
-      const messageHandler = registry.getHandler('message');
+      const messageHandler = registry.getHandler('message-node');
 
       expect(messageHandler).not.toBeNull();
 
       const result = await messageHandler!.handle(
-        { id: 'test-node', type: 'message', data: { text: 'Hello' } },
+        { id: 'test-node', type: 'message-node', data: { text: 'Hello' } },
         chatState
       );
 
