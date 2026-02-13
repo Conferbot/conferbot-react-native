@@ -200,7 +200,7 @@ export function createMessageNode(
   text: string,
   overrides: Record<string, any> = {}
 ): Record<string, any> {
-  return createNode('message', { text }, overrides);
+  return createNode('message-node', { text }, overrides);
 }
 
 /**
@@ -211,7 +211,7 @@ export function createImageNode(
   caption?: string,
   overrides: Record<string, any> = {}
 ): Record<string, any> {
-  return createNode('image', { url, caption }, overrides);
+  return createNode('image-node', { url, caption }, overrides);
 }
 
 /**
@@ -222,7 +222,7 @@ export function createButtonsNode(
   buttons: Array<{ label: string; value: string }>,
   overrides: Record<string, any> = {}
 ): Record<string, any> {
-  return createNode('buttons', { question, buttons }, overrides);
+  return createNode('n-choices-node', { question, buttons }, overrides);
 }
 
 /**
@@ -233,7 +233,7 @@ export function createAskEmailNode(
   variableName: string,
   overrides: Record<string, any> = {}
 ): Record<string, any> {
-  return createNode('ask-email', { question, variableName }, overrides);
+  return createNode('ask-email-node', { question, variableName }, overrides);
 }
 
 // ========================================
