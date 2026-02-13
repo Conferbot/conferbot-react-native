@@ -80,12 +80,12 @@ describe('EnhancedGPTHandler', () => {
   describe('Basic Handler', () => {
     it('should have correct node type', () => {
       const handler = new EnhancedGPTHandler();
-      expect(handler.nodeType).toBe('gpt');
+      expect(handler.nodeType).toBe('gpt-node');
     });
 
     it('should return error when prompt is missing', async () => {
       const handler = new EnhancedGPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         model: 'gpt-4',
       });
 
@@ -112,7 +112,7 @@ describe('EnhancedGPTHandler', () => {
   describe('Non-streaming Mode', () => {
     it('should process GPT request without streaming', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Tell me about chatbots',
         streaming: false,
         variableName: 'response',
@@ -133,7 +133,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should store response in variable', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test prompt',
         streaming: false,
         variableName: 'aiAnswer',
@@ -146,7 +146,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should include provider and model info in UI state', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
       });
@@ -165,7 +165,7 @@ describe('EnhancedGPTHandler', () => {
       mockAIHandler.processGPTNode.mockRejectedValueOnce(new Error('API Error'));
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
         proceedOnError: false,
@@ -180,7 +180,7 @@ describe('EnhancedGPTHandler', () => {
       mockAIHandler.processGPTNode.mockRejectedValueOnce(new Error('API Error'));
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
         proceedOnError: true,
@@ -200,7 +200,7 @@ describe('EnhancedGPTHandler', () => {
       mockAIHandler.processGPTNode.mockRejectedValueOnce(new Error('Test error'));
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
         proceedOnError: true,
@@ -221,7 +221,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Tell me a story',
         streaming: true,
       });
@@ -242,7 +242,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: true,
         allowStopGeneration: true,
@@ -260,7 +260,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
       });
 
@@ -276,7 +276,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: true,
       });
@@ -298,7 +298,7 @@ describe('EnhancedGPTHandler', () => {
       handler.setSocketClient(mockSocket);
 
       // First start a streaming request
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: true,
         variableName: 'response',
@@ -325,7 +325,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should store partial content when stopped', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         variableName: 'response',
       });
@@ -344,7 +344,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: true,
       });
@@ -359,7 +359,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should handle streaming completion', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         variableName: 'response',
       });
@@ -377,7 +377,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should handle error response', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
       });
 
@@ -390,7 +390,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should handle direct text response', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         variableName: 'response',
       });
@@ -405,7 +405,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should handle response with response field', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         variableName: 'response',
       });
@@ -420,7 +420,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should handle content field in response', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         variableName: 'response',
       });
@@ -435,7 +435,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should default to gptResponse variable name', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         // No variableName specified
       });
@@ -455,7 +455,7 @@ describe('EnhancedGPTHandler', () => {
   describe('Configuration Parsing', () => {
     it('should parse all configuration options', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         systemPrompt: 'You are a helpful assistant',
         model: 'gpt-4-turbo',
@@ -477,7 +477,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should support message as alternative to prompt', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         message: 'Alternative prompt field',
         streaming: false,
       });
@@ -491,7 +491,7 @@ describe('EnhancedGPTHandler', () => {
       chatState.setVariable('topic', 'React Native');
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Tell me about {{topic}}',
         streaming: false,
       });
@@ -505,7 +505,7 @@ describe('EnhancedGPTHandler', () => {
       chatState.setVariable('role', 'technical support agent');
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'How do I fix this?',
         systemPrompt: 'You are a {{role}}',
         streaming: false,
@@ -519,7 +519,7 @@ describe('EnhancedGPTHandler', () => {
 
       for (const provider of providers) {
         const handler = new EnhancedGPTHandler(mockAIHandler);
-        const node = createNode('gpt', {
+        const node = createNode('gpt-node', {
           prompt: 'Test',
           provider,
           streaming: false,
@@ -531,7 +531,7 @@ describe('EnhancedGPTHandler', () => {
 
     it('should parse fallback providers array', async () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         provider: 'openai',
         fallbackProviders: ['anthropic', 'deepseek'],
@@ -551,7 +551,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
       });
@@ -575,7 +575,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
       });
@@ -601,7 +601,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: true,
       });
@@ -622,7 +622,7 @@ describe('EnhancedGPTHandler', () => {
       const handler = new EnhancedGPTHandler(mockAIHandler);
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: true,
       });
@@ -661,7 +661,7 @@ describe('EnhancedGPTHandler', () => {
     it('should set socket client when provided', async () => {
       const handler = createEnhancedGPTHandler(mockAIHandler, mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
       });
@@ -681,7 +681,7 @@ describe('EnhancedGPTHandler', () => {
       mockAIHandler.processGPTNode.mockRejectedValueOnce(new Error('Standard error'));
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
         proceedOnError: true,
@@ -699,7 +699,7 @@ describe('EnhancedGPTHandler', () => {
       mockAIHandler.processGPTNode.mockRejectedValueOnce('String error');
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
         proceedOnError: true,
@@ -724,7 +724,7 @@ describe('EnhancedGPTHandler', () => {
       mockAIHandler.processGPTNode.mockRejectedValueOnce(aiError);
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         streaming: false,
         proceedOnError: true,
@@ -752,7 +752,7 @@ describe('EnhancedGPTHandler', () => {
       chatState.addBotMessage('Sure, how can I help?', 'node3', 'message');
 
       const handler = new EnhancedGPTHandler(mockAIHandler);
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Answer the user',
         streaming: false,
       });
