@@ -22,6 +22,8 @@ export interface NodeFlowEngineConfig {
   debug?: boolean;
   /** Maximum nodes to process in one cycle (prevents infinite loops) */
   maxNodesPerCycle?: number;
+  /** Timeout in ms for processing a single node (HIGH FIX 1) */
+  nodeProcessingTimeout?: number;
   /** Callback when UI needs to update */
   onUIStateChange?: (uiState: NodeUIState | null) => void;
   /** Callback when waiting for user input */
@@ -75,6 +77,10 @@ export class NodeFlowEngine {
   private processingPromise: Promise<void> | null = null;
   private nodesProcessedInCycle: number = 0;
 
+  // Cycle detection (HIGH FIX 2)
+  private visitedNodes: Set<string> = new Set();
+  private readonly MAX_NODE_VISITS = 100;
+
   constructor(
     chatState: ChatState,
     registry?: NodeHandlerRegistry,
@@ -88,6 +94,7 @@ export class NodeFlowEngine {
       typingDelay: config?.typingDelay ?? 500,
       debug: config?.debug ?? false,
       maxNodesPerCycle: config?.maxNodesPerCycle ?? 100,
+      nodeProcessingTimeout: config?.nodeProcessingTimeout ?? 30000,
       onUIStateChange: config?.onUIStateChange ?? (() => {}),
       onWaitingForInput: config?.onWaitingForInput ?? (() => {}),
       onFlowComplete: config?.onFlowComplete ?? (() => {}),
@@ -150,6 +157,7 @@ export class NodeFlowEngine {
     }
 
     this.nodesProcessedInCycle = 0;
+    this.resetFlow();
     await this.processNode(this.startNodeId);
   }
 
@@ -162,6 +170,57 @@ export class NodeFlowEngine {
   }
 
   /**
+   * Processes a node handler with a timeout wrapper (HIGH FIX 1)
+   */
+  private async processNodeWithTimeout(
+    handler: NodeHandler,
+    nodeWithContext: Record<string, any>,
+    timeoutMs: number = 30000
+  ): Promise<NodeResult> {
+    return Promise.race([
+      handler.handle(nodeWithContext, this.chatState),
+      new Promise<NodeResult>((_, reject) =>
+        setTimeout(() => reject(new Error(`Node processing timed out after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ]).catch((error) => {
+      console.warn('[ConferBot] Node timeout:', error.message);
+      return { type: 'error', message: 'Node processing timed out', recoverable: true } as NodeResult;
+    });
+  }
+
+  /**
+   * Checks for flow cycle detection (HIGH FIX 2)
+   */
+  private checkCycleDetection(nodeId: string): boolean {
+    if (this.visitedNodes.size >= this.MAX_NODE_VISITS) {
+      console.error('[ConferBot] Flow cycle detected after', this.MAX_NODE_VISITS, 'nodes');
+      return true; // cycle detected
+    }
+    this.visitedNodes.add(nodeId);
+    return false;
+  }
+
+  /**
+   * Resets visited node tracking when starting a new flow (HIGH FIX 2)
+   */
+  public resetFlow(): void {
+    this.visitedNodes.clear();
+  }
+
+  /**
+   * Finds an edge for a given node and port with validation logging (HIGH FIX 5)
+   */
+  private findEdge(nodeId: string, port: string): NodeEdge | null {
+    const edge = this.edges.find(
+      (e) => e.source === nodeId && (e.sourceHandle === port || e.data?.port === port)
+    );
+    if (!edge) {
+      console.warn(`[ConferBot] No edge found for port: ${port} on node: ${nodeId}`);
+    }
+    return edge || null;
+  }
+
+  /**
    * Processes a node and handles the result
    */
   async processNode(nodeId: string): Promise<void> {
@@ -169,6 +228,12 @@ export class NodeFlowEngine {
     this.nodesProcessedInCycle++;
     if (this.nodesProcessedInCycle > this.config.maxNodesPerCycle) {
       this.handleError(new Error(`Max nodes per cycle exceeded (${this.config.maxNodesPerCycle})`));
+      return;
+    }
+
+    // Cycle detection (HIGH FIX 2)
+    if (this.checkCycleDetection(nodeId)) {
+      this.handleError(new Error(`Flow cycle detected after ${this.MAX_NODE_VISITS} visited nodes`));
       return;
     }
 
@@ -204,8 +269,12 @@ export class NodeFlowEngine {
         },
       };
 
-      // Handle the node
-      const result = await handler.handle(nodeWithContext, this.chatState);
+      // Handle the node with timeout (HIGH FIX 1)
+      const result = await this.processNodeWithTimeout(
+        handler,
+        nodeWithContext,
+        this.config.nodeProcessingTimeout
+      );
 
       // Process result
       await this.handleNodeResult(result, node, handler);
@@ -420,15 +489,18 @@ export class NodeFlowEngine {
       portName = nextNodeId.substring(7);
     }
 
-    // Find matching edge
+    // Use findEdge for port-based resolution with validation (HIGH FIX 5)
+    if (portName) {
+      const edge = this.findEdge(currentNodeId, portName);
+      if (edge) {
+        return edge.target;
+      }
+    }
+
+    // Find matching edge for default case
     for (const edge of this.edges) {
       if (edge.source === currentNodeId) {
-        // If port specified, match source handle
-        if (portName) {
-          if (edge.sourceHandle === portName || edge.data?.port === portName) {
-            return edge.target;
-          }
-        } else {
+        if (!portName) {
           // Default edge (no port requirement)
           if (!edge.sourceHandle || edge.sourceHandle === 'default' || edge.sourceHandle === 'out') {
             return edge.target;
@@ -441,6 +513,7 @@ export class NodeFlowEngine {
     if (portName) {
       for (const edge of this.edges) {
         if (edge.source === currentNodeId) {
+          console.warn(`[ConferBot] Falling back to first available edge for node: ${currentNodeId}`);
           return edge.target;
         }
       }
@@ -557,6 +630,7 @@ export class NodeFlowEngine {
     this._currentUIState = null;
     this._error = null;
     this.nodesProcessedInCycle = 0;
+    this.visitedNodes.clear();
     this.chatState.reset();
     this.notifyStateListeners();
   }
