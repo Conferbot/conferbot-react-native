@@ -2,7 +2,7 @@
  * Node Handlers Index
  *
  * Central export point for all node handlers in the Conferbot React Native SDK.
- * Provides unified registration and access to all 58 node type handlers.
+ * Provides unified registration and access to all node type handlers.
  */
 
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
@@ -29,6 +29,7 @@ export {
   FileHandler,
   HTMLHandler,
   RedirectHandler,
+  NavigateHandler,
   displayHandlers,
   registerDisplayHandlers,
 } from './DisplayNodeHandlers';
@@ -47,6 +48,7 @@ export {
   AskAddressHandler,
   AskFileHandler,
   AskLocationHandler,
+  AskCustomQuestionHandler,
   askHandlers,
   registerAskHandlers,
 } from './AskNodeHandlers';
@@ -63,6 +65,8 @@ export {
   DropdownHandler,
   RatingHandler,
   OpinionScaleHandler,
+  YesOrNoChoiceHandler,
+  NCheckOptionsHandler,
   choiceHandlers,
   registerChoiceHandlers,
 } from './ChoiceNodeHandlers';
@@ -86,6 +90,10 @@ export {
   UserInputNodeHandler,
   UserRangeNodeHandler,
   QuizNodeHandler,
+  TwoChoicesNodeHandler,
+  ThreeChoicesNodeHandler,
+  SelectOptionNodeHandler,
+  UserRatingNodeHandler,
   legacyHandlers,
   registerLegacyHandlers,
 } from './LegacyNodeHandlers';
@@ -130,6 +138,9 @@ export {
   GoogleSheetsHandler,
   GoogleCalendarHandler,
   GoogleAnalyticsHandler,
+  GoogleMeetHandler,
+  GoogleDocsHandler,
+  GoogleDriveHandler,
   HubSpotHandler,
   SalesforceHandler,
   ZohoCRMHandler,
@@ -192,57 +203,32 @@ export interface HandlerRegistrationConfig {
  * Registers ALL node handlers with the provided registry.
  * This is the primary entry point for initializing the complete handler system.
  *
- * Handler Categories (58 total):
- * - Display: 7 handlers (message, image, video, audio, file, html, redirect)
- * - Ask: 9 handlers (name, email, phone, number, url, date, address, file, location)
- * - Choice: 7 handlers (buttons, cards, carousel, picturechoice, dropdown, rating, opinionscale)
- * - Advanced Input: 2 handlers (calendar, multiplequestions)
- * - Legacy: 3 handlers (user-input-node, user-range-node, quiz-node)
- * - Logic: 8 handlers (condition, boolean-condition, math, random-path, set-variable, jump, business-hours)
- * - Integration: 21 handlers (webhook, gpt, human-handover, delay, email, gmail, slack, discord,
- *                              whatsapp, telegram, google-sheets, google-calendar, google-analytics,
- *                              hubspot, salesforce, zoho-crm, mailchimp, zapier, airtable, notion, stripe)
- * - Special: 2 handlers (goal, end-conversation)
- *
  * @param registry - The NodeHandlerRegistry instance to register handlers with
  * @param config - Optional configuration for handlers that require external dependencies
- *
- * @example
- * ```typescript
- * const registry = new NodeHandlerRegistry();
- * registerAllHandlers(registry, {
- *   socketClient: mySocketInstance,
- *   apiBaseUrl: 'https://api.conferbot.com',
- *   aiApiKey: 'sk-...',
- *   useEnhancedGPT: true
- * });
- * ```
  */
 export function registerAllHandlers(
   registry: NodeHandlerRegistry,
   config?: HandlerRegistrationConfig
 ): void {
-  // Display handlers (7 handlers)
+  // Display handlers (8 handlers including navigate)
   registerDisplayHandlers(registry);
 
-  // Ask/Input handlers (9 handlers)
+  // Ask/Input handlers (10 handlers including ask-custom-question)
   registerAskHandlers(registry);
 
-  // Choice handlers (7 handlers)
+  // Choice handlers (9 handlers including yes-or-no-choice, n-check-options)
   registerChoiceHandlers(registry);
 
   // Advanced input handlers (2 handlers)
   registerAdvancedInputHandlers(registry);
 
-  // Legacy compatibility handlers (3 handlers)
+  // Legacy compatibility handlers (7 handlers including two-choices, three-choices, select-option, user-rating)
   registerLegacyHandlers(registry);
 
-  // Logic/Flow control handlers (8 handlers)
+  // Logic/Flow control handlers (7 handlers)
   registerLogicHandlers(registry);
 
-  // Integration handlers (21 handlers)
-  // If useEnhancedGPT is true, we'll register the enhanced GPT handler
-  // instead of the basic one
+  // Integration handlers (24 handlers including google-meet, google-docs, google-drive)
   if (config?.useEnhancedGPT) {
     registerIntegrationHandlersWithEnhancedGPT(
       registry,
@@ -284,28 +270,14 @@ function registerIntegrationHandlersWithEnhancedGPT(
 
 /**
  * Total number of registered handlers across all categories.
- *
- * Breakdown:
- * - Display: 7 (message, image, video, audio, file, html, redirect)
- * - Ask: 9 (name, email, phone, number, url, date, address, file, location)
- * - Choice: 7 (buttons, cards, carousel, picturechoice, dropdown, rating, opinionscale)
- * - Advanced Input: 2 (calendar, multiplequestions)
- * - Legacy: 3 (user-input-node, user-range-node, quiz-node)
- * - Logic: 8 (condition, boolean-condition, math, random-path, set-variable, jump, business-hours + subtype)
- * - Integration: 21 (webhook, gpt, human-handover, delay, email, gmail, slack, discord, whatsapp,
- *                    telegram, google-sheets, google-calendar, google-analytics, hubspot,
- *                    salesforce, zoho-crm, mailchimp, zapier, airtable, notion, stripe)
- * - Special: 2 (goal, end-conversation)
- *
- * Total: 58 handlers (with subtype variations counted)
  */
-const TOTAL_HANDLER_COUNT = 58;
+const TOTAL_HANDLER_COUNT = 69;
 
 /**
  * Returns the total number of handlers registered by registerAllHandlers.
  * Useful for verification and debugging purposes.
  *
- * @returns The total count of registered handlers (58)
+ * @returns The total count of registered handlers
  */
 export function getHandlerCount(): number {
   return TOTAL_HANDLER_COUNT;
@@ -335,13 +307,13 @@ export type HandlerCategory = typeof HandlerCategories[keyof typeof HandlerCateg
  * Handler count breakdown by category
  */
 export const HandlerCountByCategory: Record<HandlerCategory, number> = {
-  [HandlerCategories.DISPLAY]: 7,
-  [HandlerCategories.ASK]: 9,
-  [HandlerCategories.CHOICE]: 7,
+  [HandlerCategories.DISPLAY]: 8,
+  [HandlerCategories.ASK]: 10,
+  [HandlerCategories.CHOICE]: 9,
   [HandlerCategories.ADVANCED_INPUT]: 2,
-  [HandlerCategories.LEGACY]: 3,
-  [HandlerCategories.LOGIC]: 8,
-  [HandlerCategories.INTEGRATION]: 21,
+  [HandlerCategories.LEGACY]: 7,
+  [HandlerCategories.LOGIC]: 7,
+  [HandlerCategories.INTEGRATION]: 24,
   [HandlerCategories.SPECIAL]: 2,
 };
 
