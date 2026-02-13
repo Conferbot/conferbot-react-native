@@ -12,6 +12,8 @@ import {
   HEADER_BOT_ID,
   HEADER_PLATFORM,
   PLATFORM_IDENTIFIER,
+  ConferBotEndpoints,
+  ConferBotNetworkConfig,
 } from '../config/constants';
 
 // Create axios instance with default config
@@ -26,8 +28,8 @@ class ConferBotAPI {
 
     // Initialize axios client
     this.client = axios.create({
-      baseURL: baseURL || DEFAULT_API_BASE_URL,
-      timeout: API_TIMEOUT,
+      baseURL: baseURL || ConferBotEndpoints.apiBaseUrl,
+      timeout: ConferBotNetworkConfig.apiTimeout,
       headers: {
         'Content-Type': 'application/json',
         [HEADER_API_KEY]: apiKey,
