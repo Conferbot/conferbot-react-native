@@ -398,6 +398,49 @@ export class RedirectHandler extends BaseNodeHandler {
 }
 
 // ========================================
+// NAVIGATE HANDLER
+// ========================================
+
+/**
+ * Handles 'navigate-node' - in-app navigation prompt with URL, auto-proceeds
+ */
+export class NavigateHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.NAVIGATE;
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Navigate node has no data');
+    }
+
+    const nodeId = this.getNodeId(node);
+
+    let url = this.getString(data, 'url', '');
+
+    if (!url) {
+      return this.createError('Navigate node has no URL');
+    }
+
+    // Resolve variables in URL
+    url = this.resolveText(url, state);
+
+    // Add to transcript
+    state.addBotMessage(`[Navigate: ${url}]`, nodeId, this.nodeType);
+
+    // Store navigation info in state for the UI to handle
+    state.setVariable('_navigate', {
+      url,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Auto-proceed after displaying navigation prompt
+    return NodeResult.proceed(this.getNextNodeId(node), {
+      navigateUrl: url,
+    });
+  }
+}
+
+// ========================================
 // DISPLAY HANDLER COLLECTION
 // ========================================
 
@@ -412,6 +455,7 @@ export const displayHandlers: NodeHandler[] = [
   new FileHandler(),
   new HTMLHandler(),
   new RedirectHandler(),
+  new NavigateHandler(),
 ];
 
 /**
