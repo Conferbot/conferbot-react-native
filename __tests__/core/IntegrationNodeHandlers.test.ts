@@ -70,12 +70,12 @@ describe('Integration Node Handlers', () => {
 
     it('should have correct node type', () => {
       const handler = new WebhookHandler();
-      expect(handler.nodeType).toBe('webhook');
+      expect(handler.nodeType).toBe('webhook-node');
     });
 
     it('should return error when URL is missing', async () => {
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         method: 'POST',
       });
 
@@ -98,7 +98,7 @@ describe('Integration Node Handlers', () => {
       });
 
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/webhook',
         method: 'POST',
         body: { name: 'Test', value: 42 },
@@ -122,7 +122,7 @@ describe('Integration Node Handlers', () => {
       });
 
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/data',
         method: 'GET',
         variableName: 'apiResponse',
@@ -145,7 +145,7 @@ describe('Integration Node Handlers', () => {
       });
 
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/users/{{userId}}',
         method: 'GET',
       });
@@ -156,7 +156,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle bearer token authentication', async () => {
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/secure',
         method: 'GET',
         authentication: {
@@ -170,7 +170,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle basic authentication', async () => {
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/secure',
         method: 'GET',
         authentication: {
@@ -185,7 +185,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle API key authentication', async () => {
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/secure',
         method: 'GET',
         authentication: {
@@ -200,7 +200,7 @@ describe('Integration Node Handlers', () => {
 
     it('should extract response data into variables', async () => {
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/data',
         method: 'GET',
         responseExtract: {
@@ -218,7 +218,7 @@ describe('Integration Node Handlers', () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/failing',
         method: 'POST',
         proceedOnError: true,
@@ -242,7 +242,7 @@ describe('Integration Node Handlers', () => {
       chatState.setAnswer('q2', 'name', 'John Doe');
 
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         url: 'https://api.example.com/submit',
         method: 'POST',
         includeAnswerVariables: true,
@@ -261,7 +261,7 @@ describe('Integration Node Handlers', () => {
       });
 
       const handler = new WebhookHandler();
-      const node = createNode('webhook', {
+      const node = createNode('webhook-node', {
         webhookUrl: 'https://api.example.com/webhook',
         method: 'POST',
       });
@@ -285,12 +285,12 @@ describe('Integration Node Handlers', () => {
 
     it('should have correct node type', () => {
       const handler = new GPTHandler();
-      expect(handler.nodeType).toBe('gpt');
+      expect(handler.nodeType).toBe('gpt-node');
     });
 
     it('should return error when prompt is missing', async () => {
       const handler = new GPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         model: 'gpt-4',
       });
 
@@ -312,7 +312,7 @@ describe('Integration Node Handlers', () => {
       });
 
       const handler = new GPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Tell me about chatbots',
         variableName: 'gptResponse',
         streaming: true,
@@ -339,7 +339,7 @@ describe('Integration Node Handlers', () => {
       chatState.setVariable('topic', 'artificial intelligence');
 
       const handler = new GPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Explain {{topic}} in simple terms',
         variableName: 'response',
       });
@@ -362,7 +362,7 @@ describe('Integration Node Handlers', () => {
       chatState.addUserMessage('I need information about your product', 'node2');
 
       const handler = new GPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Respond to the user',
         variableName: 'response',
       });
@@ -380,7 +380,7 @@ describe('Integration Node Handlers', () => {
       });
 
       const handler = new GPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'How do I reset my password?',
         systemPrompt: 'You are a helpful customer support assistant for TechCorp.',
         variableName: 'response',
@@ -392,7 +392,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle GPT response', async () => {
       const handler = new GPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         variableName: 'gptAnswer',
       });
@@ -406,7 +406,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle GPT error response', async () => {
       const handler = new GPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test',
         variableName: 'response',
       });
@@ -419,7 +419,7 @@ describe('Integration Node Handlers', () => {
 
     it('should use default variable name when not specified', async () => {
       const handler = new GPTHandler();
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test prompt',
       });
 
@@ -444,12 +444,12 @@ describe('Integration Node Handlers', () => {
 
     it('should have correct node type', () => {
       const handler = new HumanHandoverHandler();
-      expect(handler.nodeType).toBe('human-handover');
+      expect(handler.nodeType).toBe('human-handover-node');
     });
 
     it('should display waiting UI state when initiating handover', async () => {
       const handler = new HumanHandoverHandler();
-      const node = createNode('human-handover', {
+      const node = createNode('human-handover-node', {
         department: 'support',
         waitMessage: 'Please wait while we connect you...',
       });
@@ -466,7 +466,7 @@ describe('Integration Node Handlers', () => {
 
     it('should show pre-chat form when configured', async () => {
       const handler = new HumanHandoverHandler();
-      const node = createNode('human-handover', {
+      const node = createNode('human-handover-node', {
         showPreChatForm: true,
         preChatFields: [
           { id: 'name', label: 'Your Name', type: 'text', required: true },
@@ -485,7 +485,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle pre-chat form submission', async () => {
       const handler = new HumanHandoverHandler();
-      const node = createNode('human-handover', {
+      const node = createNode('human-handover-node', {
         showPreChatForm: true,
         preChatFields: [
           { id: 'name', label: 'Name', type: 'text', required: true },
@@ -510,7 +510,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle cancel action', async () => {
       const handler = new HumanHandoverHandler();
-      const node = createNode('human-handover', {});
+      const node = createNode('human-handover-node', {});
 
       const response = { action: 'cancel' };
       const result = await handler.handleResponse(response, node, chatState);
@@ -523,7 +523,7 @@ describe('Integration Node Handlers', () => {
       const handler = new HumanHandoverHandler();
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('human-handover', {
+      const node = createNode('human-handover-node', {
         showPostChatSurvey: true,
       });
 
@@ -539,7 +539,7 @@ describe('Integration Node Handlers', () => {
       const handler = new HumanHandoverHandler();
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('human-handover', {});
+      const node = createNode('human-handover-node', {});
 
       const response = {
         action: 'surveySubmit',
@@ -557,7 +557,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle survey skip', async () => {
       const handler = new HumanHandoverHandler();
-      const node = createNode('human-handover', {});
+      const node = createNode('human-handover-node', {});
 
       const response = { action: 'surveySkip' };
       const result = await handler.handleResponse(response, node, chatState);
@@ -568,7 +568,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle connection status updates', async () => {
       const handler = new HumanHandoverHandler();
-      const node = createNode('human-handover', {});
+      const node = createNode('human-handover-node', {});
 
       const response = {
         status: 'connected',
@@ -589,7 +589,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle no agents available', async () => {
       const handler = new HumanHandoverHandler();
-      const node = createNode('human-handover', {
+      const node = createNode('human-handover-node', {
         noAgentsMessage: 'Sorry, all agents are busy.',
       });
 
@@ -605,7 +605,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle timeout', async () => {
       const handler = new HumanHandoverHandler();
-      const node = createNode('human-handover', {
+      const node = createNode('human-handover-node', {
         timeoutMessage: 'Connection timed out.',
       });
 
@@ -630,12 +630,12 @@ describe('Integration Node Handlers', () => {
 
     it('should have correct node type', () => {
       const handler = new DelayHandler();
-      expect(handler.nodeType).toBe('delay');
+      expect(handler.nodeType).toBe('delay-node');
     });
 
     it('should return delayed proceed result in seconds', async () => {
       const handler = new DelayHandler();
-      const node = createNode('delay', {
+      const node = createNode('delay-node', {
         delay: 5,
         unit: 'seconds',
       });
@@ -650,7 +650,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle milliseconds unit', async () => {
       const handler = new DelayHandler();
-      const node = createNode('delay', {
+      const node = createNode('delay-node', {
         delay: 500,
         unit: 'milliseconds',
       });
@@ -664,7 +664,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle minutes unit', async () => {
       const handler = new DelayHandler();
-      const node = createNode('delay', {
+      const node = createNode('delay-node', {
         delay: 2,
         unit: 'minutes',
       });
@@ -678,7 +678,7 @@ describe('Integration Node Handlers', () => {
 
     it('should handle hours unit', async () => {
       const handler = new DelayHandler();
-      const node = createNode('delay', {
+      const node = createNode('delay-node', {
         delay: 1,
         unit: 'hours',
       });
@@ -693,7 +693,7 @@ describe('Integration Node Handlers', () => {
 
     it('should cap maximum delay to 10 minutes', async () => {
       const handler = new DelayHandler();
-      const node = createNode('delay', {
+      const node = createNode('delay-node', {
         delay: 30,
         unit: 'minutes',
       });
@@ -707,7 +707,7 @@ describe('Integration Node Handlers', () => {
 
     it('should default to seconds when unit not specified', async () => {
       const handler = new DelayHandler();
-      const node = createNode('delay', {
+      const node = createNode('delay-node', {
         delay: 3,
       });
 
@@ -720,7 +720,7 @@ describe('Integration Node Handlers', () => {
 
     it('should use duration as alternative to delay field', async () => {
       const handler = new DelayHandler();
-      const node = createNode('delay', {
+      const node = createNode('delay-node', {
         duration: 2,
         unit: 'seconds',
       });
@@ -734,7 +734,7 @@ describe('Integration Node Handlers', () => {
 
     it('should store delay info in state', async () => {
       const handler = new DelayHandler();
-      const node = createNode('delay', {
+      const node = createNode('delay-node', {
         delay: 1,
         unit: 'seconds',
       });
@@ -760,12 +760,12 @@ describe('Integration Node Handlers', () => {
 
     it('should have correct node type', () => {
       const handler = new EmailHandler();
-      expect(handler.nodeType).toBe('email');
+      expect(handler.nodeType).toBe('email-node');
     });
 
     it('should validate email configuration', async () => {
       const handler = new EmailHandler();
-      const node = createNode('email', {
+      const node = createNode('email-node', {
         // Missing required fields
       });
 
@@ -780,7 +780,7 @@ describe('Integration Node Handlers', () => {
       chatState.setVariable('userName', 'John');
 
       const handler = new EmailHandler();
-      const node = createNode('email', {
+      const node = createNode('email-node', {
         to: '{{recipientEmail}}',
         subject: 'Hello {{userName}}',
         body: 'Dear {{userName}}, thank you for contacting us.',
@@ -792,7 +792,7 @@ describe('Integration Node Handlers', () => {
 
     it('should support CC and BCC', async () => {
       const handler = new EmailHandler();
-      const node = createNode('email', {
+      const node = createNode('email-node', {
         to: 'primary@example.com',
         cc: 'cc@example.com',
         bcc: 'bcc@example.com',
@@ -805,7 +805,7 @@ describe('Integration Node Handlers', () => {
 
     it('should support HTML format', async () => {
       const handler = new EmailHandler();
-      const node = createNode('email', {
+      const node = createNode('email-node', {
         to: 'recipient@example.com',
         subject: 'HTML Email',
         body: '<h1>Hello</h1><p>This is an HTML email.</p>',
@@ -817,7 +817,7 @@ describe('Integration Node Handlers', () => {
 
     it('should proceed on error when configured', async () => {
       const handler = new EmailHandler();
-      const node = createNode('email', {
+      const node = createNode('email-node', {
         to: 'invalid-email',
         subject: 'Test',
         body: 'Test',
@@ -847,12 +847,12 @@ describe('Integration Node Handlers', () => {
 
     it('should have correct node type', () => {
       const handler = new GmailHandler();
-      expect(handler.nodeType).toBe('gmail');
+      expect(handler.nodeType).toBe('gmail-node');
     });
 
     it('should support saveAsDraft option', async () => {
       const handler = new GmailHandler();
-      const node = createNode('gmail', {
+      const node = createNode('gmail-node', {
         to: 'recipient@example.com',
         subject: 'Draft Email',
         body: 'This is a draft',
@@ -864,7 +864,7 @@ describe('Integration Node Handlers', () => {
 
     it('should support Gmail labels', async () => {
       const handler = new GmailHandler();
-      const node = createNode('gmail', {
+      const node = createNode('gmail-node', {
         to: 'recipient@example.com',
         subject: 'Labeled Email',
         body: 'Message with labels',
@@ -1075,14 +1075,14 @@ describe('Integration Node Handlers', () => {
     it('should have correct node type if available', () => {
       if (GoogleSheetsHandler) {
         const handler = new GoogleSheetsHandler();
-        expect(handler.nodeType).toBe('google-sheets');
+        expect(handler.nodeType).toBe('google-sheets-node');
       }
     });
 
     it('should support append row action', async () => {
       if (GoogleSheetsHandler) {
         const handler = new GoogleSheetsHandler();
-        const node = createNode('google-sheets', {
+        const node = createNode('google-sheets-node', {
           action: 'appendRow',
           spreadsheetId: 'test-spreadsheet-id',
           sheetName: 'Leads',
@@ -1107,7 +1107,7 @@ describe('Integration Node Handlers', () => {
       const handler = new EmailHandler();
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('email', {
+      const node = createNode('email-node', {
         to: 'test@example.com',
         subject: 'Test',
         body: 'Test message',
@@ -1132,7 +1132,7 @@ describe('Integration Node Handlers', () => {
       const handler = new GPTHandler();
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt', {
+      const node = createNode('gpt-node', {
         prompt: 'Test prompt',
         variableName: 'response',
       });
