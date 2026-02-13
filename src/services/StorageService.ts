@@ -226,7 +226,11 @@ export class StorageService {
         flowCompletionReason: sessionData.flowCompletionReason ?? existing?.flowCompletionReason,
       };
 
-      await this.storage!.setItem(this.getKey(StorageKeys.SESSION), JSON.stringify(data));
+      if (!this.storage) {
+        this.handleError('saveSession', new Error('Storage not initialized'));
+        return;
+      }
+      await this.storage.setItem(this.getKey(StorageKeys.SESSION), JSON.stringify(data));
 
       if (__DEV__) {
         console.log('[StorageService] Session saved:', data.chatSessionId);
@@ -245,7 +249,8 @@ export class StorageService {
     if (!this.isReady()) return null;
 
     try {
-      const data = await this.storage!.getItem(this.getKey(StorageKeys.SESSION));
+      if (!this.storage) return null;
+      const data = await this.storage.getItem(this.getKey(StorageKeys.SESSION));
 
       if (!data) return null;
 
@@ -283,7 +288,8 @@ export class StorageService {
     if (!this.isReady()) return;
 
     try {
-      await this.storage!.removeItem(this.getKey(StorageKeys.SESSION));
+      if (!this.storage) return;
+      await this.storage.removeItem(this.getKey(StorageKeys.SESSION));
 
       if (__DEV__) {
         console.log('[StorageService] Session cleared');
@@ -327,7 +333,8 @@ export class StorageService {
       // Limit messages to configured max
       const limitedMessages = messages.slice(-this.config.maxMessages);
 
-      await this.storage!.setItem(
+      if (!this.storage) return;
+      await this.storage.setItem(
         this.getKey(StorageKeys.MESSAGES),
         JSON.stringify(limitedMessages)
       );
@@ -349,7 +356,8 @@ export class StorageService {
     if (!this.isReady()) return [];
 
     try {
-      const data = await this.storage!.getItem(this.getKey(StorageKeys.MESSAGES));
+      if (!this.storage) return [];
+      const data = await this.storage.getItem(this.getKey(StorageKeys.MESSAGES));
 
       if (!data) return [];
 
@@ -390,7 +398,8 @@ export class StorageService {
     if (!this.isReady()) return;
 
     try {
-      await this.storage!.removeItem(this.getKey(StorageKeys.MESSAGES));
+      if (!this.storage) return;
+      await this.storage.removeItem(this.getKey(StorageKeys.MESSAGES));
 
       if (__DEV__) {
         console.log('[StorageService] Messages cleared');
@@ -427,7 +436,11 @@ export class StorageService {
         updatedAt: new Date().toISOString(),
       };
 
-      await this.storage!.setItem(this.getKey(StorageKeys.USER), JSON.stringify(data));
+      if (!this.storage) {
+        this.handleError('saveUser', new Error('Storage not initialized'));
+        return;
+      }
+      await this.storage.setItem(this.getKey(StorageKeys.USER), JSON.stringify(data));
 
       if (__DEV__) {
         console.log('[StorageService] User saved:', data.userId || data.email || 'anonymous');
@@ -446,7 +459,8 @@ export class StorageService {
     if (!this.isReady()) return null;
 
     try {
-      const data = await this.storage!.getItem(this.getKey(StorageKeys.USER));
+      if (!this.storage) return null;
+      const data = await this.storage.getItem(this.getKey(StorageKeys.USER));
 
       if (!data) return null;
 
@@ -464,7 +478,8 @@ export class StorageService {
     if (!this.isReady()) return;
 
     try {
-      await this.storage!.removeItem(this.getKey(StorageKeys.USER));
+      if (!this.storage) return;
+      await this.storage.removeItem(this.getKey(StorageKeys.USER));
 
       if (__DEV__) {
         console.log('[StorageService] User data cleared');
@@ -519,7 +534,11 @@ export class StorageService {
         updatedAt: new Date().toISOString(),
       };
 
-      await this.storage!.setItem(
+      if (!this.storage) {
+        this.handleError('saveAnswerVariables', new Error('Storage not initialized'));
+        return;
+      }
+      await this.storage.setItem(
         this.getKey(StorageKeys.ANSWER_VARIABLES),
         JSON.stringify(data)
       );
@@ -541,7 +560,8 @@ export class StorageService {
     if (!this.isReady()) return [];
 
     try {
-      const data = await this.storage!.getItem(this.getKey(StorageKeys.ANSWER_VARIABLES));
+      if (!this.storage) return [];
+      const data = await this.storage.getItem(this.getKey(StorageKeys.ANSWER_VARIABLES));
 
       if (!data) return [];
 
@@ -565,7 +585,8 @@ export class StorageService {
     if (!this.isReady()) return;
 
     try {
-      await this.storage!.removeItem(this.getKey(StorageKeys.ANSWER_VARIABLES));
+      if (!this.storage) return;
+      await this.storage.removeItem(this.getKey(StorageKeys.ANSWER_VARIABLES));
 
       if (__DEV__) {
         console.log('[StorageService] Answer variables cleared');
@@ -603,7 +624,10 @@ export class StorageService {
         this.getKey(StorageKeys.ANSWER_VARIABLES),
       ];
 
-      const results = await this.storage!.multiGet(keys);
+      if (!this.storage) {
+        return { session: null, user: null, messages: [], answerVariables: null, version: STORAGE_VERSION };
+      }
+      const results = await this.storage.multiGet(keys);
 
       const parseOrNull = <T>(data: string | null): T | null => {
         if (!data) return null;
@@ -693,7 +717,11 @@ export class StorageService {
       }
 
       if (keyValuePairs.length > 0) {
-        await this.storage!.multiSet(keyValuePairs);
+        if (!this.storage) {
+          this.handleError('saveAll', new Error('Storage not initialized'));
+          return;
+        }
+        await this.storage.multiSet(keyValuePairs);
       }
 
       if (__DEV__) {
@@ -712,7 +740,8 @@ export class StorageService {
 
     try {
       const keys = this.getAllKeys();
-      await this.storage!.multiRemove(keys);
+      if (!this.storage) return;
+      await this.storage.multiRemove(keys);
 
       if (__DEV__) {
         console.log('[StorageService] All data cleared');
@@ -752,12 +781,13 @@ export class StorageService {
    */
   private async migrateIfNeeded(): Promise<void> {
     try {
-      const versionData = await this.storage!.getItem(this.getKey(StorageKeys.VERSION));
+      if (!this.storage) return;
+      const versionData = await this.storage.getItem(this.getKey(StorageKeys.VERSION));
       const storedVersion = versionData ? parseInt(versionData, 10) : 0;
 
       if (storedVersion < STORAGE_VERSION) {
         await this.migrate(storedVersion, STORAGE_VERSION);
-        await this.storage!.setItem(
+        await this.storage.setItem(
           this.getKey(StorageKeys.VERSION),
           STORAGE_VERSION.toString()
         );
@@ -778,13 +808,14 @@ export class StorageService {
     // Version 0 -> 1: Initial version, clear any legacy data
     if (fromVersion === 0 && toVersion >= 1) {
       // Clear any malformed data from previous implementations
-      const allKeys = await this.storage!.getAllKeys();
+      if (!this.storage) return;
+      const allKeys = await this.storage.getAllKeys();
       const legacyKeys = allKeys.filter(
         (key) => key.startsWith('@conferbot') && !key.includes(`:${this.botId}:`)
       );
 
       if (legacyKeys.length > 0) {
-        await this.storage!.multiRemove(legacyKeys as string[]);
+        await this.storage.multiRemove(legacyKeys as string[]);
         if (__DEV__) {
           console.log('[StorageService] Cleared legacy keys:', legacyKeys.length);
         }
