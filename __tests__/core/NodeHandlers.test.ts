@@ -53,7 +53,7 @@ describe('Node Handlers', () => {
       const handler = new MessageHandler();
 
       it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('message');
+        expect(handler.nodeType).toBe('message-node');
       });
 
       it('should handle simple message node', async () => {
@@ -69,7 +69,7 @@ describe('Node Handlers', () => {
 
       it('should resolve variables in message text', async () => {
         chatState.setAnswer('q1', 'name', 'John');
-        const node = createNode('message', { text: 'Hello, {{name}}!' });
+        const node = createNode('message-node', { text: 'Hello, {{name}}!' });
 
         const result = await handler.handle(node, chatState);
 
@@ -90,7 +90,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle typing delay', async () => {
-        const node = createNode('message', {
+        const node = createNode('message-node', {
           text: 'Delayed message',
           typingDelay: 1000,
           showTyping: true,
@@ -113,7 +113,7 @@ describe('Node Handlers', () => {
       });
 
       it('should support alternative text field names', async () => {
-        const node = createNode('message', { message: 'Using message field' });
+        const node = createNode('message-node', { message: 'Using message field' });
         const result = await handler.handle(node, chatState);
 
         if (result.type === 'displayUI') {
@@ -126,7 +126,7 @@ describe('Node Handlers', () => {
       const handler = new ImageHandler();
 
       it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('image');
+        expect(handler.nodeType).toBe('image-node');
       });
 
       it('should handle image node with URL', async () => {
@@ -143,7 +143,7 @@ describe('Node Handlers', () => {
       });
 
       it('should return error when URL is missing', async () => {
-        const node = createNode('image', {});
+        const node = createNode('image-node', {});
         const result = await handler.handle(node, chatState);
 
         expect(result.type).toBe('error');
@@ -154,7 +154,7 @@ describe('Node Handlers', () => {
 
       it('should resolve variables in caption', async () => {
         chatState.setVariable('product', 'Widget');
-        const node = createNode('image', {
+        const node = createNode('image-node', {
           url: 'https://example.com/image.jpg',
           caption: 'Our {{product}}',
         });
@@ -180,11 +180,11 @@ describe('Node Handlers', () => {
       const handler = new VideoHandler();
 
       it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('video');
+        expect(handler.nodeType).toBe('video-node');
       });
 
       it('should handle video node', async () => {
-        const node = createNode('video', {
+        const node = createNode('video-node', {
           url: 'https://example.com/video.mp4',
           poster: 'https://example.com/poster.jpg',
           autoplay: false,
@@ -203,7 +203,7 @@ describe('Node Handlers', () => {
       });
 
       it('should return error when URL is missing', async () => {
-        const node = createNode('video', {});
+        const node = createNode('video-node', {});
         const result = await handler.handle(node, chatState);
 
         expect(result.type).toBe('error');
@@ -214,7 +214,7 @@ describe('Node Handlers', () => {
       const handler = new AudioHandler();
 
       it('should handle audio node', async () => {
-        const node = createNode('audio', {
+        const node = createNode('audio-node', {
           url: 'https://example.com/audio.mp3',
           autoplay: true,
         });
@@ -235,7 +235,7 @@ describe('Node Handlers', () => {
       const handler = new FileHandler();
 
       it('should handle file node', async () => {
-        const node = createNode('file', {
+        const node = createNode('file-node', {
           url: 'https://example.com/document.pdf',
           filename: 'document.pdf',
           size: 1024,
@@ -255,7 +255,7 @@ describe('Node Handlers', () => {
       });
 
       it('should extract filename from URL if not provided', async () => {
-        const node = createNode('file', {
+        const node = createNode('file-node', {
           url: 'https://example.com/path/to/document.pdf',
         });
 
@@ -271,7 +271,7 @@ describe('Node Handlers', () => {
       const handler = new HTMLHandler();
 
       it('should handle HTML node', async () => {
-        const node = createNode('html', {
+        const node = createNode('html-node', {
           html: '<div>Custom HTML</div>',
         });
 
@@ -287,7 +287,7 @@ describe('Node Handlers', () => {
 
       it('should resolve variables in HTML content', async () => {
         chatState.setVariable('color', 'red');
-        const node = createNode('html', {
+        const node = createNode('html-node', {
           html: '<div style="color: {{color}}">Text</div>',
         });
 
@@ -303,7 +303,7 @@ describe('Node Handlers', () => {
       const handler = new RedirectHandler();
 
       it('should handle redirect node', async () => {
-        const node = createNode('redirect', {
+        const node = createNode('user-redirect-node', {
           url: 'https://example.com',
           openInNewTab: true,
         });
@@ -318,7 +318,7 @@ describe('Node Handlers', () => {
       });
 
       it('should store redirect info in state', async () => {
-        const node = createNode('redirect', {
+        const node = createNode('user-redirect-node', {
           url: 'https://example.com',
         });
 
@@ -330,7 +330,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle redirect with delay', async () => {
-        const node = createNode('redirect', {
+        const node = createNode('user-redirect-node', {
           url: 'https://example.com',
           delay: 2000,
         });
@@ -345,7 +345,7 @@ describe('Node Handlers', () => {
 
       it('should resolve variables in URL', async () => {
         chatState.setVariable('page', 'products');
-        const node = createNode('redirect', {
+        const node = createNode('user-redirect-node', {
           url: 'https://example.com/{{page}}',
         });
 
@@ -373,7 +373,7 @@ describe('Node Handlers', () => {
       });
 
       it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('ask-email');
+        expect(handler.nodeType).toBe('ask-email-node');
       });
 
       it('should handle ask email node', async () => {
@@ -417,7 +417,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle ask name node', async () => {
-        const node = createNode('ask-name', {
+        const node = createNode('ask-name-node', {
           question: 'What is your name?',
           variableName: 'userName',
         });
@@ -431,7 +431,7 @@ describe('Node Handlers', () => {
       });
 
       it('should set user name in metadata', async () => {
-        const node = createNode('ask-name', {
+        const node = createNode('ask-name-node', {
           question: 'What is your name?',
           variableName: 'name',
         });
@@ -451,7 +451,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle ask phone node', async () => {
-        const node = createNode('ask-phone', {
+        const node = createNode('ask-phone-number-node', {
           question: 'What is your phone number?',
           variableName: 'userPhone',
         });
@@ -465,7 +465,7 @@ describe('Node Handlers', () => {
       });
 
       it('should set user phone in metadata', async () => {
-        const node = createNode('ask-phone', {
+        const node = createNode('ask-phone-number-node', {
           question: 'What is your phone number?',
           variableName: 'phone',
         });
@@ -485,7 +485,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle ask number node with constraints', async () => {
-        const node = createNode('ask-number', {
+        const node = createNode('ask-number-node', {
           question: 'Enter a number between 1 and 100',
           variableName: 'quantity',
           min: 1,
@@ -504,7 +504,7 @@ describe('Node Handlers', () => {
       });
 
       it('should parse number from response', async () => {
-        const node = createNode('ask-number', {
+        const node = createNode('ask-number-node', {
           question: 'Enter quantity',
           variableName: 'quantity',
         });
@@ -524,7 +524,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle ask URL node', async () => {
-        const node = createNode('ask-url', {
+        const node = createNode('ask-url-node', {
           question: 'Enter your website URL',
           variableName: 'website',
         });
@@ -553,7 +553,7 @@ describe('Node Handlers', () => {
       });
 
       it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('buttons');
+        expect(handler.nodeType).toBe('n-choices-node');
       });
 
       it('should handle buttons node', async () => {
@@ -574,7 +574,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle button selection response', async () => {
-        const node = createNode('buttons', {
+        const node = createNode('n-choices-node', {
           question: 'Choose:',
           buttons: [
             { id: 'btn-1', label: 'Yes', value: 'yes' },
@@ -601,7 +601,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle rating node', async () => {
-        const node = createNode('rating', {
+        const node = createNode('rating-choice-node', {
           question: 'Rate your experience',
           maxRating: 5,
           style: 'stars',
@@ -620,7 +620,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle rating response', async () => {
-        const node = createNode('rating', {
+        const node = createNode('rating-choice-node', {
           question: 'Rate:',
           maxRating: 5,
           variableName: 'userRating',
@@ -641,7 +641,7 @@ describe('Node Handlers', () => {
       });
 
       it('should handle dropdown node', async () => {
-        const node = createNode('dropdown', {
+        const node = createNode('n-select-option-node', {
           question: 'Select a country',
           options: [
             { id: '1', label: 'USA', value: 'us' },
