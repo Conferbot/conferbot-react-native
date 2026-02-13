@@ -34,6 +34,9 @@ import type {
 } from '../types';
 import { SocketEvents, MessageStatus } from '../types';
 
+// ********** Message Size Limit ********** //
+const MAX_MESSAGES = 500;
+
 // ********** Extended Context Types ********** //
 interface ExtendedConferBotContext extends ConferBotContextType {
   currentUIState: NodeUIState | null;
@@ -91,6 +94,36 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   user,
   children,
 }) => {
+  // ********** Helper: Trim messages to limit ********** //
+  const trimMessages = (messages: RecordItem[]): RecordItem[] => {
+    if (messages.length > MAX_MESSAGES) {
+      return messages.slice(-MAX_MESSAGES);
+    }
+    return messages;
+  };
+
+  // ********** Helper: Deduplicate messages (HIGH FIX 4) ********** //
+  const deduplicateMessages = (messages: RecordItem[]): RecordItem[] => {
+    const seen = new Set<string | number>();
+    return messages.filter(msg => {
+      if (!msg._id) return true; // Keep messages without IDs
+      if (seen.has(msg._id)) return false; // Skip duplicates
+      seen.add(msg._id);
+      return true;
+    });
+  };
+
+  // ********** Input Validation ********** //
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error('[ConferBot] API key is required');
+  }
+  if (!botId || botId.trim() === '') {
+    throw new Error('[ConferBot] Bot ID is required');
+  }
+  if (!apiKey.startsWith('conf_')) {
+    throw new Error('[ConferBot] Invalid API key format. API key must start with "conf_"');
+  }
+
   // ********** State Management ********** //
   const [isInitialized, setIsInitialized] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -377,33 +410,39 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
         persistFlowState();
       });
 
-      // Create flow engine
-      flowEngine.current = new NodeFlowEngine(chatStateRef.current, registry, {
-        socketClient: socketClient.current,
-        onUIStateChange: (uiState) => {
-          setCurrentUIState(uiState);
-          setIsNodeProcessing(false);
-        },
-        onWaitingForInput: (_nodeId, _uiState) => {
-          setIsNodeProcessing(false);
-        },
-        onFlowComplete: (reason) => {
-          if (__DEV__) {
-            console.log('[ConferBot] Flow complete:', reason);
-          }
-          setIsNodeProcessing(false);
-          // Persist flow completion
-          persistFlowState();
-        },
-        onError: (error, nodeId) => {
-          console.error('[ConferBot] Flow engine error:', error.message, { nodeId });
-          setIsNodeProcessing(false);
-        },
-        debug: __DEV__,
-      });
+      // Create flow engine (HIGH FIX 6: wrapped in try-catch)
+      try {
+        flowEngine.current = new NodeFlowEngine(chatStateRef.current, registry, {
+          socketClient: socketClient.current,
+          onUIStateChange: (uiState) => {
+            setCurrentUIState(uiState);
+            setIsNodeProcessing(false);
+          },
+          onWaitingForInput: (_nodeId, _uiState) => {
+            setIsNodeProcessing(false);
+          },
+          onFlowComplete: (reason) => {
+            if (__DEV__) {
+              console.log('[ConferBot] Flow complete:', reason);
+            }
+            setIsNodeProcessing(false);
+            // Persist flow completion
+            persistFlowState();
+          },
+          onError: (error, nodeId) => {
+            console.error('[ConferBot] Flow engine error:', error.message, { nodeId });
+            setIsNodeProcessing(false);
+          },
+          debug: __DEV__,
+        });
 
-      if (__DEV__) {
-        console.log('[ConferBot] Flow engine initialized for session:', sessionId);
+        if (__DEV__) {
+          console.log('[ConferBot] Flow engine initialized for session:', sessionId);
+        }
+      } catch (error) {
+        console.error('[ConferBot] Failed to initialize flow engine:', error);
+        flowEngine.current = null;
+        setIsNodeProcessing(false);
       }
     },
     [botId, persistAnswerVariables, persistFlowState]
@@ -437,11 +476,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
         // Merge persisted messages with server messages (server takes precedence)
         const serverRecord = historyResponse.data?.record || [];
         if (serverRecord.length > 0) {
-          setRecord(serverRecord);
+          setRecord(deduplicateMessages(trimMessages(serverRecord)));
           // Update persisted messages with server data
           await persistMessages(serverRecord);
         } else if (persistedState.messages.length > 0) {
-          setRecord(persistedState.messages);
+          setRecord(deduplicateMessages(trimMessages(persistedState.messages)));
         }
 
         // Initialize flow engine with restored state
@@ -530,8 +569,16 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
     // Cleanup on unmount
     return () => {
-      socketClient.current?.disconnect();
-      flowEngine.current?.reset();
+      if (socketClient.current) {
+        socketClient.current.removeAllListeners();
+        socketClient.current.disconnect();
+        socketClient.current = null;
+      }
+      if (flowEngine.current) {
+        flowEngine.current.reset();
+        flowEngine.current = null;
+      }
+      chatStateRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, botId]);
@@ -544,7 +591,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     // Bot response received (contains record update and potentially flow data)
     socketClient.current.on(SocketEvents.BOT_RESPONSE, (data: any) => {
       if (data.record) {
-        setRecord(data.record);
+        setRecord(deduplicateMessages(trimMessages(data.record)));
         // Persist messages on bot response
         persistMessages(data.record);
       }
@@ -571,7 +618,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     // Agent message received
     socketClient.current.on(SocketEvents.AGENT_MESSAGE, (data: any) => {
       if (data.record) {
-        setRecord(data.record);
+        setRecord(deduplicateMessages(trimMessages(data.record)));
         // Persist messages on agent message
         persistMessages(data.record);
       }
@@ -602,7 +649,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       setChatSessionId(undefined);
       setCurrentAgent(undefined);
       if (data.record) {
-        setRecord(data.record);
+        setRecord(deduplicateMessages(trimMessages(data.record)));
       }
       // Reset flow engine on chat end
       flowEngine.current?.reset();
@@ -676,7 +723,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
           // Load session history (record)
           const historyResponse = await apiClient.current.getSessionHistory(sessionId);
           if (historyResponse.success && historyResponse.data && historyResponse.data.record) {
-            setRecord(historyResponse.data.record);
+            setRecord(deduplicateMessages(trimMessages(historyResponse.data.record)));
             // Persist initial messages
             await persistMessages(historyResponse.data.record);
           }
@@ -723,7 +770,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
         }
 
         // Add to record immediately (optimistic update)
-        const updatedRecord = [...record, userMessageRecord];
+        const updatedRecord = deduplicateMessages(trimMessages([...record, userMessageRecord]));
         setRecord(updatedRecord);
 
         // Persist messages
