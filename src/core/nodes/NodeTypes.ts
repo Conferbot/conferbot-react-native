@@ -2,51 +2,59 @@
  * NodeTypes.ts
  *
  * Comprehensive node type definitions for the Conferbot React Native SDK.
- * Includes all 51 node types organized by category matching the web widget.
+ * All type strings match the server's kebab-case-node format exactly.
  */
 
 // ========================================
-// DISPLAY NODES (28 TYPES)
+// DISPLAY NODES
 // ========================================
 
 export const DisplayNodes = {
-  // Basic Display
-  MESSAGE: 'message',
-  IMAGE: 'image',
-  VIDEO: 'video',
-  AUDIO: 'audio',
-  FILE: 'file',
-  HTML: 'html',
-  REDIRECT: 'redirect',
+  // Basic Display (7)
+  MESSAGE: 'message-node',
+  IMAGE: 'image-node',
+  VIDEO: 'video-node',
+  AUDIO: 'audio-node',
+  FILE: 'file-node',
+  HTML: 'html-node',
+  REDIRECT: 'user-redirect-node',
 
-  // Ask Question Nodes
-  ASK_NAME: 'ask-name',
-  ASK_EMAIL: 'ask-email',
-  ASK_PHONE: 'ask-phone',
-  ASK_NUMBER: 'ask-number',
-  ASK_URL: 'ask-url',
-  ASK_DATE: 'ask-date',
-  ASK_ADDRESS: 'ask-address',
-  ASK_FILE: 'ask-file',
-  ASK_LOCATION: 'ask-location',
+  // Ask Question Nodes (9)
+  ASK_NAME: 'ask-name-node',
+  ASK_EMAIL: 'ask-email-node',
+  ASK_PHONE: 'ask-phone-number-node',
+  ASK_NUMBER: 'ask-number-node',
+  ASK_URL: 'ask-url-node',
+  ASK_LOCATION: 'ask-location-node',
+  ASK_CUSTOM_QUESTION: 'ask-custom-question-node',
+  ASK_FILE: 'ask-file-node',
+  ASK_MULTIPLE_QUESTIONS: 'ask-multiple-questions-node',
 
-  // Choice/Selection Nodes
-  BUTTONS: 'buttons',
-  CARDS: 'cards',
-  CAROUSEL: 'carousel',
-  PICTURE_CHOICE: 'picturechoice',
-  DROPDOWN: 'dropdown',
-  RATING: 'rating',
-  OPINON_SCALE: 'opinionscale',
+  // Choice/Selection Nodes (7)
+  N_CHOICES: 'n-choices-node',
+  IMAGE_CHOICE: 'image-choice-node',
+  RATING_CHOICE: 'rating-choice-node',
+  YES_OR_NO_CHOICE: 'yes-or-no-choice-node',
+  OPINION_SCALE_CHOICE: 'opinion-scale-choice-node',
+  N_SELECT_OPTION: 'n-select-option-node',
+  N_CHECK_OPTIONS: 'n-check-options-node',
 
-  // Advanced Input Nodes
-  CALENDAR: 'calendar',
-  MULTIPLE_QUESTIONS: 'multiplequestions',
+  // Calendar
+  CALENDAR: 'calendar-node',
 
-  // Legacy Nodes
+  // Legacy Nodes (already correct)
   USER_INPUT_NODE: 'user-input-node',
   USER_RANGE_NODE: 'user-range-node',
   QUIZ_NODE: 'quiz-node',
+
+  // Additional Legacy Nodes
+  TWO_CHOICES: 'two-choices-node',
+  THREE_CHOICES: 'three-choices-node',
+  SELECT_OPTION: 'select-option-node',
+  USER_RATING: 'user-rating-node',
+
+  // Special Display
+  NAVIGATE: 'navigate-node',
 } as const;
 
 // ========================================
@@ -54,13 +62,13 @@ export const DisplayNodes = {
 // ========================================
 
 export const LogicNodes = {
-  CONDITION: 'condition',
-  BOOLEAN_CONDITION: 'boolean-condition',
-  MATH_OPERATION: 'math-operation',
-  RANDOM_PATH: 'random-path',
-  SET_VARIABLE: 'set-variable',
-  JUMP: 'jump',
-  BUSINESS_HOURS: 'business-hours',
+  CONDITION: 'condition-node',
+  BOOLEAN_CONDITION: 'boolean-logic-node',
+  MATH_OPERATION: 'math-operation-node',
+  RANDOM_PATH: 'random-flow-node',
+  SET_VARIABLE: 'variable-node',
+  JUMP: 'jump-to-node',
+  BUSINESS_HOURS: 'business-hours-node',
 } as const;
 
 // ========================================
@@ -69,31 +77,33 @@ export const LogicNodes = {
 
 export const IntegrationNodes = {
   // Core Integrations
-  WEBHOOK: 'webhook',
-  GPT: 'gpt',
-  HUMAN_HANDOVER: 'human-handover',
-  DELAY: 'delay',
+  WEBHOOK: 'webhook-node',
+  GPT: 'gpt-node',
+  HUMAN_HANDOVER: 'human-handover-node',
+  DELAY: 'delay-node',
 
   // Email & Communication
-  EMAIL: 'email',
+  EMAIL: 'email-node',
+  GMAIL: 'gmail-node',
   SLACK: 'slack-node',
   DISCORD: 'discord-node',
-  WHATSAPP: 'whatsapp-node',
-  TELEGRAM: 'telegram-node',
 
   // Google Integrations
-  GOOGLE_SHEETS: 'google-sheets',
-  GOOGLE_CALENDAR: 'google-calendar',
-  GOOGLE_ANALYTICS: 'google-analytics',
+  GOOGLE_SHEETS: 'google-sheets-node',
+  GOOGLE_CALENDAR: 'google-calendar-node',
+  GOOGLE_MEET: 'google-meet-node',
+  GOOGLE_DOCS: 'google-docs-node',
+  GOOGLE_DRIVE: 'google-drive-node',
 
   // CRM & Marketing
-  HUBSPOT: 'hubspot',
-  SALESFORCE: 'salesforce',
-  MAILCHIMP: 'mailchimp',
+  HUBSPOT: 'hubspot-node',
 
   // Automation
-  ZAPIER: 'zapier',
-  AIRTABLE: 'airtable',
+  ZAPIER: 'zapier-node',
+  AIRTABLE: 'airtable-node',
+  NOTION: 'notion-node',
+  ZOHO_CRM: 'zohocrm-node',
+  STRIPE: 'stripe-node',
 } as const;
 
 // ========================================
@@ -191,28 +201,31 @@ const userInteractionNodes = new Set<string>([
   DisplayNodes.ASK_PHONE,
   DisplayNodes.ASK_NUMBER,
   DisplayNodes.ASK_URL,
-  DisplayNodes.ASK_DATE,
-  DisplayNodes.ASK_ADDRESS,
-  DisplayNodes.ASK_FILE,
   DisplayNodes.ASK_LOCATION,
+  DisplayNodes.ASK_CUSTOM_QUESTION,
+  DisplayNodes.ASK_FILE,
+  DisplayNodes.ASK_MULTIPLE_QUESTIONS,
 
   // Choice nodes
-  DisplayNodes.BUTTONS,
-  DisplayNodes.CARDS,
-  DisplayNodes.CAROUSEL,
-  DisplayNodes.PICTURE_CHOICE,
-  DisplayNodes.DROPDOWN,
-  DisplayNodes.RATING,
-  DisplayNodes.OPINON_SCALE,
+  DisplayNodes.N_CHOICES,
+  DisplayNodes.IMAGE_CHOICE,
+  DisplayNodes.RATING_CHOICE,
+  DisplayNodes.YES_OR_NO_CHOICE,
+  DisplayNodes.OPINION_SCALE_CHOICE,
+  DisplayNodes.N_SELECT_OPTION,
+  DisplayNodes.N_CHECK_OPTIONS,
 
-  // Advanced input
+  // Calendar
   DisplayNodes.CALENDAR,
-  DisplayNodes.MULTIPLE_QUESTIONS,
 
   // Legacy
   DisplayNodes.USER_INPUT_NODE,
   DisplayNodes.USER_RANGE_NODE,
   DisplayNodes.QUIZ_NODE,
+  DisplayNodes.TWO_CHOICES,
+  DisplayNodes.THREE_CHOICES,
+  DisplayNodes.SELECT_OPTION,
+  DisplayNodes.USER_RATING,
 ]);
 
 /**
@@ -231,6 +244,7 @@ const autoContinueNodes = new Set<string>([
   DisplayNodes.FILE,
   DisplayNodes.HTML,
   DisplayNodes.REDIRECT,
+  DisplayNodes.NAVIGATE,
 
   // All logic nodes
   LogicNodes.CONDITION,
@@ -245,18 +259,22 @@ const autoContinueNodes = new Set<string>([
   IntegrationNodes.WEBHOOK,
   IntegrationNodes.GPT,
   IntegrationNodes.EMAIL,
+  IntegrationNodes.GMAIL,
   IntegrationNodes.SLACK,
   IntegrationNodes.DISCORD,
-  IntegrationNodes.WHATSAPP,
-  IntegrationNodes.TELEGRAM,
   IntegrationNodes.GOOGLE_SHEETS,
   IntegrationNodes.GOOGLE_CALENDAR,
-  IntegrationNodes.GOOGLE_ANALYTICS,
+  IntegrationNodes.GOOGLE_MEET,
+  IntegrationNodes.GOOGLE_DOCS,
+  IntegrationNodes.GOOGLE_DRIVE,
   IntegrationNodes.HUBSPOT,
-  IntegrationNodes.SALESFORCE,
-  IntegrationNodes.MAILCHIMP,
   IntegrationNodes.ZAPIER,
   IntegrationNodes.AIRTABLE,
+  IntegrationNodes.NOTION,
+  IntegrationNodes.ZOHO_CRM,
+  IntegrationNodes.STRIPE,
+  IntegrationNodes.DELAY,
+  IntegrationNodes.HUMAN_HANDOVER,
 
   // Flow nodes
   FlowNodes.GOAL,
@@ -281,10 +299,9 @@ export const NodeValidationTypes: Record<string, string> = {
   [DisplayNodes.ASK_PHONE]: 'phone',
   [DisplayNodes.ASK_NUMBER]: 'number',
   [DisplayNodes.ASK_URL]: 'url',
-  [DisplayNodes.ASK_DATE]: 'date',
-  [DisplayNodes.ASK_ADDRESS]: 'address',
   [DisplayNodes.ASK_FILE]: 'file',
   [DisplayNodes.ASK_LOCATION]: 'location',
+  [DisplayNodes.ASK_CUSTOM_QUESTION]: 'text',
 };
 
 /**
