@@ -9,6 +9,7 @@
 import { BaseNodeHandler, NodeResult, NodeUIState } from '../NodeHandler';
 import { ChatState } from '../../state/ChatState';
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
+import { LogicNodes } from '../NodeTypes';
 
 // ========================================
 // CONDITION EVALUATOR HELPER
@@ -466,7 +467,7 @@ export class ConditionEvaluator {
  * Routes to different ports based on condition result (true/false).
  */
 export class ConditionHandler extends BaseNodeHandler {
-  readonly nodeType = 'condition';
+  readonly nodeType = LogicNodes.CONDITION;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -516,7 +517,7 @@ export class ConditionHandler extends BaseNodeHandler {
  * Routes to different ports based on combined condition result (true/false).
  */
 export class BooleanConditionHandler extends BaseNodeHandler {
-  readonly nodeType = 'boolean-condition';
+  readonly nodeType = LogicNodes.BOOLEAN_CONDITION;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -597,7 +598,7 @@ export type MathOperation =
  * Supports binary operations (add, subtract, etc.) and unary operations (round, abs, etc.).
  */
 export class MathOperationHandler extends BaseNodeHandler {
-  readonly nodeType = 'math-operation';
+  readonly nodeType = LogicNodes.MATH_OPERATION;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -780,7 +781,7 @@ export interface RandomPathOption {
  * Supports multiple paths with configurable percentages/weights.
  */
 export class RandomPathHandler extends BaseNodeHandler {
-  readonly nodeType = 'random-path';
+  readonly nodeType = LogicNodes.RANDOM_PATH;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -877,7 +878,7 @@ export interface VariableAssignment {
  * Supports static values, expressions, and variable references.
  */
 export class SetVariableHandler extends BaseNodeHandler {
-  readonly nodeType = 'set-variable';
+  readonly nodeType = LogicNodes.SET_VARIABLE;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1061,7 +1062,7 @@ export class SetVariableHandler extends BaseNodeHandler {
  * Used for creating loops, goto functionality, or flow shortcuts.
  */
 export class JumpHandler extends BaseNodeHandler {
-  readonly nodeType = 'jump';
+  readonly nodeType = LogicNodes.JUMP;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1148,7 +1149,7 @@ export interface BusinessHoursConfig {
  * Supports timezones, multiple schedules, holidays, and overrides.
  */
 export class BusinessHoursHandler extends BaseNodeHandler {
-  readonly nodeType = 'business-hours';
+  readonly nodeType = LogicNodes.BUSINESS_HOURS;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
