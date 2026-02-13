@@ -65,7 +65,7 @@ interface DropdownOption {
  * Handles 'buttons' nodes - displays button choices
  */
 export class ButtonsHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.BUTTONS;
+  readonly nodeType = DisplayNodes.N_CHOICES;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -200,7 +200,7 @@ export class ButtonsHandler extends BaseNodeHandler {
  * Handles 'cards' nodes - displays card selections
  */
 export class CardsHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.CARDS;
+  readonly nodeType = 'cards-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -320,7 +320,7 @@ export class CardsHandler extends BaseNodeHandler {
  * Handles 'carousel' nodes - displays a horizontal carousel of cards
  */
 export class CarouselHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.CAROUSEL;
+  readonly nodeType = 'carousel-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -425,7 +425,7 @@ export class CarouselHandler extends BaseNodeHandler {
  * Handles 'picturechoice' nodes - displays image-based choices
  */
 export class PictureChoiceHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.PICTURE_CHOICE;
+  readonly nodeType = DisplayNodes.IMAGE_CHOICE;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -545,7 +545,7 @@ export class PictureChoiceHandler extends BaseNodeHandler {
  * Handles 'dropdown' nodes - displays dropdown selection
  */
 export class DropdownHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.DROPDOWN;
+  readonly nodeType = DisplayNodes.N_SELECT_OPTION;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -669,7 +669,7 @@ export class DropdownHandler extends BaseNodeHandler {
  * Handles 'rating' nodes - displays star/rating selection
  */
 export class RatingHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.RATING;
+  readonly nodeType = DisplayNodes.RATING_CHOICE;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -768,7 +768,7 @@ export class RatingHandler extends BaseNodeHandler {
  * Handles 'opinionscale' nodes - displays numeric scale selection
  */
 export class OpinionScaleHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.OPINON_SCALE;
+  readonly nodeType = DisplayNodes.OPINION_SCALE_CHOICE;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -860,6 +860,189 @@ export class OpinionScaleHandler extends BaseNodeHandler {
 }
 
 // ========================================
+// YES OR NO CHOICE HANDLER
+// ========================================
+
+/**
+ * Handles 'yes-or-no-choice-node' - binary yes/no choice with 2-port routing
+ */
+export class YesOrNoChoiceHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.YES_OR_NO_CHOICE;
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('Yes/No Choice node has no data');
+    }
+
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data, 'answerVariable') ||
+                         this.getString(data, 'variableName') ||
+                         this.getString(data, 'variable') ||
+                         nodeId;
+
+    // Support custom options or default Yes/No
+    const optionsData = this.getArray<any>(data, 'options', []);
+
+    let buttons: NodeUIState.Buttons['buttons'];
+
+    if (optionsData.length > 0) {
+      buttons = optionsData.map((opt: any) => ({
+        id: opt.id || opt.value || '',
+        label: opt.label || opt.text || '',
+        value: opt.label || opt.text || opt.id || '',
+        style: 'primary' as const,
+      }));
+    } else {
+      buttons = [
+        { id: 'yes', label: 'Yes', value: 'Yes', style: 'primary' },
+        { id: 'no', label: 'No', value: 'No', style: 'primary' },
+      ];
+    }
+
+    state.addBotMessage('[Yes/No Choice]', nodeId, this.nodeType);
+
+    const uiState: NodeUIState.Buttons = {
+      type: 'buttons',
+      nodeId,
+      question: '',
+      buttons,
+      variableName,
+      multiSelect: false,
+    };
+
+    return NodeResult.displayUI(uiState);
+  }
+
+  async handleResponse(
+    response: any,
+    node: Record<string, any>,
+    state: ChatState
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data || {}, 'answerVariable') ||
+                         this.getString(data || {}, 'variableName') ||
+                         this.getString(data || {}, 'variable') ||
+                         nodeId;
+
+    let optionId: string;
+    let label: string;
+
+    if (typeof response === 'object' && response !== null) {
+      optionId = response.id || '';
+      label = response.text || response.label || optionId;
+    } else {
+      optionId = String(response);
+      label = optionId;
+    }
+
+    state.setAnswer(nodeId, variableName, label, nodeId);
+    state.addUserMessage(label, nodeId);
+
+    // Port-based routing: source-yes / source-no or source-{id}
+    const targetPort = `source-${optionId}`;
+
+    return NodeResult.delayedProceed(null, 600, {
+      [variableName]: label,
+      __targetPort: targetPort,
+    });
+  }
+}
+
+// ========================================
+// N CHECK OPTIONS HANDLER
+// ========================================
+
+/**
+ * Handles 'n-check-options-node' - multi-checkbox selection, returns comma-separated values
+ */
+export class NCheckOptionsHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.N_CHECK_OPTIONS;
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    if (!data) {
+      return this.createError('N Check Options node has no data');
+    }
+
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data, 'answerVariable') ||
+                         this.getString(data, 'variableName') ||
+                         this.getString(data, 'variable') ||
+                         nodeId;
+
+    // Get options array
+    const optionsData = this.getArray<any>(data, 'options', []);
+
+    if (optionsData.length === 0) {
+      return this.createError('N Check Options node has no options');
+    }
+
+    // Map options to button format with multi-select
+    const buttons: NodeUIState.Buttons['buttons'] = optionsData.map((opt: any, index: number) => {
+      const id = opt.id || String(index);
+      const text = opt.optionText || opt.text || opt.label || `Option ${index + 1}`;
+      return {
+        id,
+        label: text,
+        value: text,
+        style: 'primary' as const,
+      };
+    });
+
+    state.addBotMessage('[Check Options]', nodeId, this.nodeType);
+
+    const uiState: NodeUIState.Buttons = {
+      type: 'buttons',
+      nodeId,
+      question: '',
+      buttons,
+      variableName,
+      multiSelect: true,
+    };
+
+    return NodeResult.displayUI(uiState);
+  }
+
+  async handleResponse(
+    response: any,
+    node: Record<string, any>,
+    state: ChatState
+  ): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    const variableName = this.getString(data || {}, 'answerVariable') ||
+                         this.getString(data || {}, 'variableName') ||
+                         this.getString(data || {}, 'variable') ||
+                         nodeId;
+
+    // Response should be list of selected options
+    let selectedOptions: string[];
+    if (Array.isArray(response)) {
+      selectedOptions = response.map(String);
+    } else if (typeof response === 'string') {
+      selectedOptions = response.split(',').map((s: string) => s.trim());
+    } else {
+      selectedOptions = [String(response)];
+    }
+
+    const combinedText = selectedOptions.join(', ');
+
+    state.setAnswer(nodeId, variableName, combinedText, nodeId);
+    state.addUserMessage(combinedText, nodeId);
+
+    return this.proceed(node, {
+      [variableName]: combinedText,
+    });
+  }
+}
+
+// ========================================
 // CHOICE HANDLER COLLECTION
 // ========================================
 
@@ -874,6 +1057,8 @@ export const choiceHandlers: NodeHandler[] = [
   new DropdownHandler(),
   new RatingHandler(),
   new OpinionScaleHandler(),
+  new YesOrNoChoiceHandler(),
+  new NCheckOptionsHandler(),
 ];
 
 /**
