@@ -24,13 +24,13 @@ import {
 // ========================================
 
 class MockMessageHandler extends BaseNodeHandler {
-  readonly nodeType = 'message';
+  readonly nodeType = 'message-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     const text = this.resolveText(data?.text || data?.message || '', state);
 
-    state.addBotMessage(text, this.getNodeId(node), 'message');
+    state.addBotMessage(text, this.getNodeId(node), 'message-node');
 
     return NodeResult.displayUI(
       NodeUIState.message(this.getNodeId(node), text)
@@ -39,14 +39,14 @@ class MockMessageHandler extends BaseNodeHandler {
 }
 
 class MockButtonsHandler extends BaseNodeHandler {
-  readonly nodeType = 'buttons';
+  readonly nodeType = 'n-choices-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     const question = this.resolveText(data?.question || '', state);
     const buttons = data?.buttons || [];
 
-    state.addBotMessage(question, this.getNodeId(node), 'buttons');
+    state.addBotMessage(question, this.getNodeId(node), 'n-choices-node');
 
     return NodeResult.displayUI(
       NodeUIState.buttons(this.getNodeId(node), question, buttons, data?.variableName)
@@ -74,13 +74,13 @@ class MockButtonsHandler extends BaseNodeHandler {
 }
 
 class MockAskEmailHandler extends BaseNodeHandler {
-  readonly nodeType = 'ask-email';
+  readonly nodeType = 'ask-email-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
     const question = this.resolveText(data?.question || '', state);
 
-    state.addBotMessage(question, this.getNodeId(node), 'ask-email');
+    state.addBotMessage(question, this.getNodeId(node), 'ask-email-node');
 
     return NodeResult.displayUI(
       NodeUIState.textInput(
@@ -109,7 +109,7 @@ class MockAskEmailHandler extends BaseNodeHandler {
 }
 
 class MockConditionHandler extends BaseNodeHandler {
-  readonly nodeType = 'condition';
+  readonly nodeType = 'condition-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -143,7 +143,7 @@ class MockConditionHandler extends BaseNodeHandler {
 }
 
 class MockSetVariableHandler extends BaseNodeHandler {
-  readonly nodeType = 'set-variable';
+  readonly nodeType = 'variable-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -159,7 +159,7 @@ class MockSetVariableHandler extends BaseNodeHandler {
 }
 
 class MockJumpHandler extends BaseNodeHandler {
-  readonly nodeType = 'jump';
+  readonly nodeType = 'jump-to-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -199,7 +199,7 @@ class MockGoalHandler extends BaseNodeHandler {
 }
 
 class MockDelayHandler extends BaseNodeHandler {
-  readonly nodeType = 'delay';
+  readonly nodeType = 'delay-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -210,7 +210,7 @@ class MockDelayHandler extends BaseNodeHandler {
 }
 
 class MockHumanHandoverHandler extends BaseNodeHandler {
-  readonly nodeType = 'human-handover';
+  readonly nodeType = 'human-handover-node';
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -245,9 +245,9 @@ class MockHumanHandoverHandler extends BaseNodeHandler {
 function createLinearFlow(): FlowDefinition {
   return {
     nodes: [
-      createNode('message', { text: 'Welcome!' }, { id: 'node-1' }),
-      createNode('ask-email', { question: 'What is your email?', variableName: 'email' }, { id: 'node-2' }),
-      createNode('message', { text: 'Thanks for your email: {{email}}' }, { id: 'node-3' }),
+      createNode('message-node', { text: 'Welcome!' }, { id: 'node-1' }),
+      createNode('ask-email-node', { question: 'What is your email?', variableName: 'email' }, { id: 'node-2' }),
+      createNode('message-node', { text: 'Thanks for your email: {{email}}' }, { id: 'node-3' }),
     ],
     edges: [
       { id: 'edge-1', source: 'node-1', target: 'node-2' },
@@ -263,7 +263,7 @@ function createLinearFlow(): FlowDefinition {
 function createBranchingFlow(): FlowDefinition {
   return {
     nodes: [
-      createNode('buttons', {
+      createNode('n-choices-node', {
         question: 'Are you a new customer?',
         buttons: [
           { id: 'yes', label: 'Yes', value: 'yes' },
@@ -271,14 +271,14 @@ function createBranchingFlow(): FlowDefinition {
         ],
         variableName: 'isNewCustomer',
       }, { id: 'node-1' }),
-      createNode('condition', {
+      createNode('condition-node', {
         variable: 'isNewCustomer',
         operator: 'equals',
         value: 'yes',
       }, { id: 'node-2' }),
-      createNode('message', { text: 'Welcome new customer!' }, { id: 'node-3' }),
-      createNode('message', { text: 'Welcome back!' }, { id: 'node-4' }),
-      createNode('message', { text: 'Have a great day!' }, { id: 'node-5' }),
+      createNode('message-node', { text: 'Welcome new customer!' }, { id: 'node-3' }),
+      createNode('message-node', { text: 'Welcome back!' }, { id: 'node-4' }),
+      createNode('message-node', { text: 'Have a great day!' }, { id: 'node-5' }),
     ],
     edges: [
       { id: 'edge-1', source: 'node-1', target: 'node-2' },
@@ -297,9 +297,9 @@ function createBranchingFlow(): FlowDefinition {
 function createFlowWithEnd(): FlowDefinition {
   return {
     nodes: [
-      createNode('message', { text: 'Starting...' }, { id: 'node-1' }),
+      createNode('message-node', { text: 'Starting...' }, { id: 'node-1' }),
       createNode('goal', { goalName: 'flow_started' }, { id: 'node-2' }),
-      createNode('message', { text: 'Ending...' }, { id: 'node-3' }),
+      createNode('message-node', { text: 'Ending...' }, { id: 'node-3' }),
       createNode('end_conversation', {}, { id: 'node-4' }),
     ],
     edges: [
@@ -317,9 +317,9 @@ function createFlowWithEnd(): FlowDefinition {
 function createFlowWithHandover(): FlowDefinition {
   return {
     nodes: [
-      createNode('message', { text: 'Let me connect you to an agent.' }, { id: 'node-1' }),
-      createNode('human-handover', { waitMessage: 'Please wait...' }, { id: 'node-2' }),
-      createNode('message', { text: 'Thanks for chatting!' }, { id: 'node-3' }),
+      createNode('message-node', { text: 'Let me connect you to an agent.' }, { id: 'node-1' }),
+      createNode('human-handover-node', { waitMessage: 'Please wait...' }, { id: 'node-2' }),
+      createNode('message-node', { text: 'Thanks for chatting!' }, { id: 'node-3' }),
     ],
     edges: [
       { id: 'edge-1', source: 'node-1', target: 'node-2' },
@@ -589,9 +589,9 @@ describe('NodeFlowEngine', () => {
 
       const flow: FlowDefinition = {
         nodes: [
-          createNode('condition', { variable: 'x' }, { id: 'cond' }),
-          createNode('message', { text: 'A' }, { id: 'a' }),
-          createNode('message', { text: 'B' }, { id: 'b' }),
+          createNode('condition-node', { variable: 'x' }, { id: 'cond' }),
+          createNode('message-node', { text: 'A' }, { id: 'a' }),
+          createNode('message-node', { text: 'B' }, { id: 'b' }),
         ],
         edges: [
           { id: 'e1', source: 'cond', target: 'a', sourceHandle: 'true' },
@@ -608,7 +608,7 @@ describe('NodeFlowEngine', () => {
       engine = new NodeFlowEngine(chatState, registry, { typingDelay: 0 });
 
       const flow: FlowDefinition = {
-        nodes: [createNode('message', { text: 'Solo' }, { id: 'solo' })],
+        nodes: [createNode('message-node', { text: 'Solo' }, { id: 'solo' })],
         edges: [],
         startNodeId: 'solo',
       };
@@ -622,7 +622,7 @@ describe('NodeFlowEngine', () => {
 
       const flow: FlowDefinition = {
         nodes: [
-          { id: 'n1', type: 'message', data: { text: 'Hi' }, position: { x: 100, y: 200 } },
+          { id: 'n1', type: 'message-node', data: { text: 'Hi' }, position: { x: 100, y: 200 } },
         ],
         edges: [],
         startNodeId: 'n1',
@@ -700,16 +700,16 @@ describe('NodeFlowEngine', () => {
 
   describe('Mock Handlers', () => {
     it('should have all required handlers registered', () => {
-      expect(registry.hasHandler('message')).toBe(true);
-      expect(registry.hasHandler('buttons')).toBe(true);
-      expect(registry.hasHandler('ask-email')).toBe(true);
-      expect(registry.hasHandler('condition')).toBe(true);
-      expect(registry.hasHandler('set-variable')).toBe(true);
-      expect(registry.hasHandler('jump')).toBe(true);
+      expect(registry.hasHandler('message-node')).toBe(true);
+      expect(registry.hasHandler('n-choices-node')).toBe(true);
+      expect(registry.hasHandler('ask-email-node')).toBe(true);
+      expect(registry.hasHandler('condition-node')).toBe(true);
+      expect(registry.hasHandler('variable-node')).toBe(true);
+      expect(registry.hasHandler('jump-to-node')).toBe(true);
       expect(registry.hasHandler('end_conversation')).toBe(true);
       expect(registry.hasHandler('goal')).toBe(true);
-      expect(registry.hasHandler('delay')).toBe(true);
-      expect(registry.hasHandler('human-handover')).toBe(true);
+      expect(registry.hasHandler('delay-node')).toBe(true);
+      expect(registry.hasHandler('human-handover-node')).toBe(true);
     });
 
     it('should have fallback handler set', () => {
@@ -744,14 +744,14 @@ describe('NodeFlowEngine', () => {
       const flow = createFlowWithEnd();
 
       expect(flow.nodes).toHaveLength(4);
-      expect(flow.nodes.some((n) => n.type === 'end_conversation')).toBe(true);
+      expect(flow.nodes.some((n) => n.type === 'end_conversation' || n.type === 'end-conversation-node')).toBe(true);
     });
 
     it('should create valid flow with handover', () => {
       const flow = createFlowWithHandover();
 
       expect(flow.nodes).toHaveLength(3);
-      expect(flow.nodes.some((n) => n.type === 'human-handover')).toBe(true);
+      expect(flow.nodes.some((n) => n.type === 'human-handover-node')).toBe(true);
     });
   });
 
