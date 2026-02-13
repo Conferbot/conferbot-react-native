@@ -335,13 +335,13 @@ describe('Logic Node Handlers', () => {
     const handler = new ConditionHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('condition');
+      expect(handler.nodeType).toBe('condition-node');
     });
 
     it('should route to true port when condition is met', async () => {
       chatState.setVariable('userAge', 25);
 
-      const node = createNode('condition', {
+      const node = createNode('condition-node', {
         variable: 'userAge',
         operator: 'greaterThan',
         value: 18,
@@ -359,7 +359,7 @@ describe('Logic Node Handlers', () => {
     it('should route to false port when condition is not met', async () => {
       chatState.setVariable('userAge', 15);
 
-      const node = createNode('condition', {
+      const node = createNode('condition-node', {
         variable: 'userAge',
         operator: 'greaterThan',
         value: 18,
@@ -377,7 +377,7 @@ describe('Logic Node Handlers', () => {
     it('should handle string equality comparisons', async () => {
       chatState.setVariable('status', 'active');
 
-      const node = createNode('condition', {
+      const node = createNode('condition-node', {
         variable: 'status',
         operator: 'equals',
         value: 'active',
@@ -394,7 +394,7 @@ describe('Logic Node Handlers', () => {
     it('should use compareValue as alternative to value field', async () => {
       chatState.setVariable('count', 10);
 
-      const node = createNode('condition', {
+      const node = createNode('condition-node', {
         variable: 'count',
         operator: 'equals',
         compareValue: 10,
@@ -411,7 +411,7 @@ describe('Logic Node Handlers', () => {
     it('should default to equals operator when not specified', async () => {
       chatState.setVariable('value', 'test');
 
-      const node = createNode('condition', {
+      const node = createNode('condition-node', {
         variable: 'value',
         value: 'test',
       });
@@ -441,14 +441,14 @@ describe('Logic Node Handlers', () => {
     const handler = new BooleanConditionHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('boolean-condition');
+      expect(handler.nodeType).toBe('boolean-logic-node');
     });
 
     it('should evaluate multiple conditions with AND logic', async () => {
       chatState.setVariable('age', 25);
       chatState.setVariable('verified', true);
 
-      const node = createNode('boolean-condition', {
+      const node = createNode('boolean-logic-node', {
         logic: 'AND',
         conditions: [
           { variable: 'age', operator: 'greaterThan', value: 18 },
@@ -468,7 +468,7 @@ describe('Logic Node Handlers', () => {
       chatState.setVariable('age', 15);
       chatState.setVariable('hasParentalConsent', true);
 
-      const node = createNode('boolean-condition', {
+      const node = createNode('boolean-logic-node', {
         logic: 'OR',
         conditions: [
           { variable: 'age', operator: 'greaterThan', value: 18 },
@@ -487,7 +487,7 @@ describe('Logic Node Handlers', () => {
     it('should handle expression object format', async () => {
       chatState.setVariable('count', 5);
 
-      const node = createNode('boolean-condition', {
+      const node = createNode('boolean-logic-node', {
         expression: {
           logic: 'AND',
           conditions: [
@@ -508,7 +508,7 @@ describe('Logic Node Handlers', () => {
     it('should handle simple variable check when no conditions provided', async () => {
       chatState.setVariable('active', 'yes');
 
-      const node = createNode('boolean-condition', {
+      const node = createNode('boolean-logic-node', {
         variable: 'active',
       });
 
@@ -524,7 +524,7 @@ describe('Logic Node Handlers', () => {
       chatState.setVariable('a', 1);
       chatState.setVariable('b', 2);
 
-      const node = createNode('boolean-condition', {
+      const node = createNode('boolean-logic-node', {
         conditions: [
           { variable: 'a', operator: 'equals', value: 1 },
           { variable: 'b', operator: 'equals', value: 2 },
@@ -540,7 +540,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should return false when no variable or conditions provided', async () => {
-      const node = createNode('boolean-condition', {});
+      const node = createNode('boolean-logic-node', {});
 
       const result = await handler.handle(node, chatState);
 
@@ -559,12 +559,12 @@ describe('Logic Node Handlers', () => {
     const handler = new MathOperationHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('math-operation');
+      expect(handler.nodeType).toBe('math-operation-node');
     });
 
     describe('basic operations', () => {
       it('should perform addition', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'add',
           operand1: 10,
           operand2: 5,
@@ -578,7 +578,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should perform subtraction', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'subtract',
           operand1: 10,
           operand2: 3,
@@ -590,7 +590,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should perform multiplication', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'multiply',
           operand1: 6,
           operand2: 7,
@@ -602,7 +602,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should perform division', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'divide',
           operand1: 20,
           operand2: 4,
@@ -614,7 +614,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should perform modulo', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'modulo',
           operand1: 17,
           operand2: 5,
@@ -626,7 +626,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should perform power operation', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'power',
           operand1: 2,
           operand2: 8,
@@ -640,7 +640,7 @@ describe('Logic Node Handlers', () => {
 
     describe('unary operations', () => {
       it('should round numbers', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'round',
           operand1: 3.7,
           operand2: 0,
@@ -652,7 +652,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should round to specified decimal places', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'round',
           operand1: 3.14159,
           operand2: 2,
@@ -664,7 +664,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should floor numbers', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'floor',
           operand1: 3.9,
           resultVariable: 'floored',
@@ -675,7 +675,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should ceil numbers', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'ceil',
           operand1: 3.1,
           resultVariable: 'ceiled',
@@ -686,7 +686,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should calculate absolute value', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'abs',
           operand1: -42,
           resultVariable: 'absolute',
@@ -697,7 +697,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should calculate square root', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'sqrt',
           operand1: 16,
           resultVariable: 'squareRoot',
@@ -710,7 +710,7 @@ describe('Logic Node Handlers', () => {
 
     describe('min/max operations', () => {
       it('should find minimum', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'min',
           operand1: 10,
           operand2: 5,
@@ -722,7 +722,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should find maximum', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'max',
           operand1: 10,
           operand2: 5,
@@ -736,7 +736,7 @@ describe('Logic Node Handlers', () => {
 
     describe('random operation', () => {
       it('should generate random number within range', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'random',
           operand1: 1,
           operand2: 100,
@@ -757,7 +757,7 @@ describe('Logic Node Handlers', () => {
         chatState.setVariable('price', 100);
         chatState.setVariable('discount', 20);
 
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'subtract',
           operand1: '$price',
           operand2: '{{discount}}',
@@ -772,7 +772,7 @@ describe('Logic Node Handlers', () => {
         chatState.setVariable('quantity', 5);
         chatState.setVariable('unitPrice', 10);
 
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'multiply',
           operand1: 'quantity',
           operand2: 'unitPrice',
@@ -786,7 +786,7 @@ describe('Logic Node Handlers', () => {
 
     describe('edge cases', () => {
       it('should handle division by zero', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'divide',
           operand1: 10,
           operand2: 0,
@@ -798,7 +798,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should handle modulo by zero', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'modulo',
           operand1: 10,
           operand2: 0,
@@ -810,7 +810,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should use alternative field names for operands', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'add',
           value1: 5,
           value2: 3,
@@ -822,7 +822,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should handle null/undefined operands as 0', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'add',
           operand1: null,
           operand2: 5,
@@ -834,7 +834,7 @@ describe('Logic Node Handlers', () => {
       });
 
       it('should return error when result variable is missing', async () => {
-        const node = createNode('math-operation', {
+        const node = createNode('math-operation-node', {
           operation: 'add',
           operand1: 1,
           operand2: 2,
@@ -854,11 +854,11 @@ describe('Logic Node Handlers', () => {
     const handler = new SetVariableHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('set-variable');
+      expect(handler.nodeType).toBe('variable-node');
     });
 
     it('should set a single variable', async () => {
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         variableName: 'greeting',
         value: 'Hello, World!',
       });
@@ -869,7 +869,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should set multiple variables from array', async () => {
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         variables: [
           { name: 'firstName', value: 'John' },
           { name: 'lastName', value: 'Doe' },
@@ -885,7 +885,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should set multiple variables from assignments object', async () => {
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         assignments: {
           city: 'New York',
           country: 'USA',
@@ -901,7 +901,7 @@ describe('Logic Node Handlers', () => {
     it('should resolve variable references in values', async () => {
       chatState.setVariable('userName', 'Alice');
 
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         variableName: 'message',
         value: 'Hello, {{userName}}!',
       });
@@ -914,7 +914,7 @@ describe('Logic Node Handlers', () => {
     it('should resolve $ prefix variable references', async () => {
       chatState.setVariable('total', 100);
 
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         variableName: 'copy',
         value: '$total',
       });
@@ -928,7 +928,7 @@ describe('Logic Node Handlers', () => {
       chatState.setVariable('price', 50);
       chatState.setVariable('quantity', 3);
 
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         variableName: 'total',
         value: 'price * quantity',
       });
@@ -942,7 +942,7 @@ describe('Logic Node Handlers', () => {
       chatState.setVariable('a', 10);
       chatState.setVariable('b', 5);
 
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         variableName: 'sum',
         value: '{{a}} + {{b}}',
       });
@@ -959,7 +959,7 @@ describe('Logic Node Handlers', () => {
     it('should handle string concatenation in expressions', async () => {
       chatState.setVariable('firstName', 'John');
 
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         variableName: 'fullGreeting',
         value: 'firstName + " Doe"',
       });
@@ -971,7 +971,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should use alternative field name property', async () => {
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         name: 'altName',
         value: 'altValue',
       });
@@ -982,7 +982,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should handle expression property', async () => {
-      const node = createNode('set-variable', {
+      const node = createNode('variable-node', {
         variableName: 'computed',
         expression: '10 + 20',
       });
@@ -1001,11 +1001,11 @@ describe('Logic Node Handlers', () => {
     const handler = new JumpHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('jump');
+      expect(handler.nodeType).toBe('jump-to-node');
     });
 
     it('should return jumpTo result with target node ID', async () => {
-      const node = createNode('jump', {
+      const node = createNode('jump-to-node', {
         targetNodeId: 'node-abc123',
       });
 
@@ -1018,7 +1018,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should track jump count in state', async () => {
-      const node = createNode('jump', {
+      const node = createNode('jump-to-node', {
         targetNodeId: 'loop-node',
       });
 
@@ -1032,7 +1032,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should prevent infinite loops by limiting jumps', async () => {
-      const node = createNode('jump', {
+      const node = createNode('jump-to-node', {
         targetNodeId: 'infinite-loop',
         maxJumps: 5,
       });
@@ -1061,7 +1061,7 @@ describe('Logic Node Handlers', () => {
       ];
 
       for (const data of testCases) {
-        const node = createNode('jump', data);
+        const node = createNode('jump-to-node', data);
         const result = await handler.handle(node, chatState);
 
         expect(result.type).toBe('jumpTo');
@@ -1072,7 +1072,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should return error when target node ID is missing', async () => {
-      const node = createNode('jump', {});
+      const node = createNode('jump-to-node', {});
 
       const result = await handler.handle(node, chatState);
 
@@ -1083,7 +1083,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should include jump metadata in result data', async () => {
-      const node = createNode('jump', {
+      const node = createNode('jump-to-node', {
         targetNodeId: 'target-node',
       }, { id: 'source-node' });
 
@@ -1105,11 +1105,11 @@ describe('Logic Node Handlers', () => {
     const handler = new RandomPathHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('random-path');
+      expect(handler.nodeType).toBe('random-flow-node');
     });
 
     it('should select a path from weighted paths', async () => {
-      const node = createNode('random-path', {
+      const node = createNode('random-flow-node', {
         paths: [
           { id: 'path-a', port: 'port_0', weight: 50 },
           { id: 'path-b', port: 'port_1', weight: 50 },
@@ -1126,7 +1126,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should select a path from percentage-based paths', async () => {
-      const node = createNode('random-path', {
+      const node = createNode('random-flow-node', {
         paths: [
           { id: 'variant-a', percentage: 70 },
           { id: 'variant-b', percentage: 30 },
@@ -1142,7 +1142,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should select random default port when no paths defined', async () => {
-      const node = createNode('random-path', {
+      const node = createNode('random-flow-node', {
         portCount: 3,
       });
 
@@ -1155,7 +1155,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should use options as alternative to paths', async () => {
-      const node = createNode('random-path', {
+      const node = createNode('random-flow-node', {
         options: [
           { id: 'opt-1', weight: 1 },
           { id: 'opt-2', weight: 1 },
@@ -1173,7 +1173,7 @@ describe('Logic Node Handlers', () => {
 
     it('should distribute selections according to weights', async () => {
       // This is a statistical test - run many times and check distribution
-      const node = createNode('random-path', {
+      const node = createNode('random-flow-node', {
         paths: [
           { id: 'heavy', weight: 90 },
           { id: 'light', weight: 10 },
@@ -1195,7 +1195,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should default to equal weights when not specified', async () => {
-      const node = createNode('random-path', {
+      const node = createNode('random-flow-node', {
         paths: [
           { id: 'a' },
           { id: 'b' },
@@ -1209,7 +1209,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should default to 2 ports when portCount not specified', async () => {
-      const node = createNode('random-path', {});
+      const node = createNode('random-flow-node', {});
 
       const result = await handler.handle(node, chatState);
 
@@ -1228,7 +1228,7 @@ describe('Logic Node Handlers', () => {
     const handler = new BusinessHoursHandler();
 
     it('should have correct node type', () => {
-      expect(handler.nodeType).toBe('business-hours');
+      expect(handler.nodeType).toBe('business-hours-node');
     });
 
     it('should route to open port during business hours', async () => {
@@ -1237,7 +1237,7 @@ describe('Logic Node Handlers', () => {
       const currentHour = now.getHours();
 
       // Create a schedule that includes current time
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         timezone: 'UTC',
         schedules: [
           {
@@ -1262,7 +1262,7 @@ describe('Logic Node Handlers', () => {
       const currentDay = now.getDay();
 
       // Schedule with times that exclude current time
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         timezone: 'UTC',
         schedules: [
           {
@@ -1284,7 +1284,7 @@ describe('Logic Node Handlers', () => {
       const now = new Date();
       const currentDay = now.getDay();
 
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         schedules: [
           {
             day: currentDay,
@@ -1306,7 +1306,7 @@ describe('Logic Node Handlers', () => {
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
 
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         schedules: [
           {
             day: today.getDay(),
@@ -1331,7 +1331,7 @@ describe('Logic Node Handlers', () => {
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
 
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         schedules: [
           {
             day: today.getDay(),
@@ -1363,7 +1363,7 @@ describe('Logic Node Handlers', () => {
       const currentMinute = now.getMinutes();
       const currentTime = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
 
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         schedules: [
           {
             day: now.getDay(),
@@ -1390,7 +1390,7 @@ describe('Logic Node Handlers', () => {
       const now = new Date();
       const currentDay = now.getDay();
 
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         days: [currentDay],
         openTime: '00:00',
         closeTime: '23:59',
@@ -1408,7 +1408,7 @@ describe('Logic Node Handlers', () => {
       const now = new Date();
       const currentDay = now.getDay();
 
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         openTime: '00:00',
         closeTime: '23:59',
       });
@@ -1428,7 +1428,7 @@ describe('Logic Node Handlers', () => {
     });
 
     it('should handle overnight schedules', async () => {
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         schedules: [
           {
             day: 0,
@@ -1448,7 +1448,7 @@ describe('Logic Node Handlers', () => {
       const now = new Date();
       const differentDay = (now.getDay() + 3) % 7;
 
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         schedules: [
           {
             day: differentDay,
@@ -1471,7 +1471,7 @@ describe('Logic Node Handlers', () => {
     it('should route to open when no time restrictions', async () => {
       const now = new Date();
 
-      const node = createNode('business-hours', {
+      const node = createNode('business-hours-node', {
         schedules: [
           {
             day: now.getDay(),
