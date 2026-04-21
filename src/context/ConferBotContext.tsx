@@ -55,6 +55,8 @@ interface ExtendedConferBotContext extends ConferBotContextType {
   getMessageStatus: (messageId: string | number) => MessageStatus | undefined;
   markMessageAsRead: (messageId: string | number) => void;
   markVisibleMessagesAsRead: (messageIds: (string | number)[]) => void;
+  // Knowledge Base methods
+  rateKBArticle: (articleId: string, helpful: boolean, rating: number, feedback?: string) => void;
 }
 
 // ********** Extended Config Types ********** //
@@ -835,6 +837,28 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     }
   }, []);
 
+  // Rate a Knowledge Base article
+  const rateKBArticle = useCallback(
+    (articleId: string, helpful: boolean, rating: number, feedback?: string): void => {
+      if (!socketClient.current || !socketClient.current.isConnected()) {
+        if (__DEV__) {
+          console.warn('[ConferBot] Cannot rate article: socket not connected');
+        }
+        return;
+      }
+
+      socketClient.current.rateArticle({
+        articleId,
+        visitorId: user?.id || socketClient.current.getUserId(),
+        sessionId: chatSessionId,
+        helpful,
+        rating,
+        feedback,
+      });
+    },
+    [chatSessionId, user?.id]
+  );
+
   // Add event listener
   const on = useCallback(
     (event: SocketEvents, callback: (...args: any[]) => void): (() => void) => {
@@ -907,6 +931,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     getMessageStatus,
     markMessageAsRead: markAsRead,
     markVisibleMessagesAsRead,
+
+    // Knowledge Base Actions
+    rateKBArticle,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
