@@ -384,6 +384,9 @@ export enum SocketEvents {
   DECLINE_AGENT_INVITATION = 'decline-agent-invitation',
   SHOW_ACCEPT_HANDOVER_BUTTON = 'show-accept-handover-button',
 
+  // Knowledge Base events
+  RATE_ARTICLE = 'rate-article',
+
   // Reaction events
   MESSAGE_REACTION = 'message:reaction',
   MESSAGE_REACTION_UPDATE = 'message:reaction:update',
