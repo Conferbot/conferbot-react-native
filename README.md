@@ -1,20 +1,36 @@
 # Conferbot React Native SDK
 
-Official React Native SDK for integrating Conferbot chatbot into your iOS and Android mobile applications.
+[![npm version](https://img.shields.io/npm/v/@conferbot/react-native.svg)](https://www.npmjs.com/package/@conferbot/react-native)
+[![React Native](https://img.shields.io/badge/React%20Native-%3E%3D%200.70-blue.svg)](https://reactnative.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/npm/l/@conferbot/react-native.svg)](https://github.com/conferbot/react-native-sdk/blob/main/LICENSE)
+
+Native React Native SDK for embedding Conferbot chatbots into iOS and Android applications -- no WebView required.
 
 ## Features
 
-- 🚀 **Easy Integration** - Drop-in React Context provider for seamless integration
-- 💬 **Real-time Messaging** - Socket.IO based real-time communication
-- 📱 **Cross-Platform** - Works on both iOS and Android
-- 🎨 **Customizable** - Fully customizable UI components and styling
-- 🔔 **Push Notifications** - Built-in push notification support
-- 🤖 **AI-Powered** - Connect to Conferbot's AI chatbot engine
-- 👤 **Live Agent Handover** - Seamless handover to human agents
-- 📊 **Analytics** - Built-in event tracking and analytics
-- 💾 **Offline Support** - Queue messages when offline
-- 📎 **File Uploads** - Support for image and file attachments
-- ⌨️ **TypeScript** - Full TypeScript support with type definitions
+- **Native Components** -- Built entirely with React Native views, not a WebView wrapper
+- **Real-time Messaging** -- Socket.IO-based communication with automatic reconnection
+- **Offline Support** -- Messages are queued locally and sent when connectivity returns
+- **Push Notifications** -- Register device tokens for background message delivery
+- **Live Agent Handover** -- Seamless transition between bot and human agents
+- **Message Reactions** -- Users can react to messages with emoji
+- **Read Receipts** -- Delivery and read status indicators on messages
+- **Knowledge Base** -- Surface help articles directly in the chat interface
+- **Analytics** -- Built-in event tracking for sessions, messages, and user behavior
+- **Theming** -- Light and dark themes out of the box, fully customizable
+- **Session Persistence** -- Conversations survive app restarts via AsyncStorage
+- **File Uploads** -- Attach images and documents from the device
+- **TypeScript** -- Complete type definitions for every export
+
+## Requirements
+
+| Dependency     | Minimum Version |
+|----------------|-----------------|
+| React          | 17.0.0          |
+| React Native   | 0.70.0          |
+| iOS            | 12.0+           |
+| Android        | API 21+         |
 
 ## Installation
 
@@ -26,286 +42,336 @@ yarn add @conferbot/react-native
 
 ### Peer Dependencies
 
-This SDK requires React Native and React:
-
 ```bash
-npm install react@>=17.0.0 react-native@>=0.70.0
-# or
-yarn add react@>=17.0.0 react-native@>=0.70.0
+npm install react react-native @react-native-async-storage/async-storage
 ```
+
+`@react-native-async-storage/async-storage` is optional but required for session persistence and offline queue features.
 
 ## Quick Start
 
-### 1. Wrap your app with ConferBotProvider
+### 1. Drop-in ChatWidget
 
-```typescript
+The fastest path -- renders a complete chat UI with a single component.
+
+```tsx
 import React from 'react';
-import { ConferBotProvider } from '@conferbot/react-native';
+import { ConferBotProvider, ChatWidget } from '@conferbot/react-native';
 
 export default function App() {
   return (
-    <ConferBotProvider
-      apiKey="conf_sk_your_api_key_here"
-      botId="your_bot_id_here"
-      config={{
-        enableNotifications: true,
-        enableOfflineMode: true,
-      }}
-    >
-      {/* Your app components */}
+    <ConferBotProvider apiKey="YOUR_API_KEY" botId="YOUR_BOT_ID">
+      <ChatWidget />
     </ConferBotProvider>
   );
 }
 ```
 
-### 2. Use the useConferBot hook
+### 2. Headless (useConferBot Hook)
 
-```typescript
+Full control over the UI -- the hook manages connection state, messages, and actions.
+
+```tsx
 import React from 'react';
-import { View, Button } from 'react-native';
-import { useConferBot } from '@conferbot/react-native';
+import { View, Text, Button, FlatList } from 'react-native';
+import { ConferBotProvider, useConferBot } from '@conferbot/react-native';
 
-export default function HomeScreen() {
-  const { openChat, isOpen } = useConferBot();
+function ChatScreen() {
+  const { openChat, sendMessage, record, isConnected } = useConferBot();
 
   return (
-    <View>
-      <Button
-        title={isOpen ? 'Close Chat' : 'Open Support Chat'}
-        onPress={() => openChat()}
+    <View style={{ flex: 1 }}>
+      <Text>{isConnected ? 'Connected' : 'Connecting...'}</Text>
+      <FlatList
+        data={record}
+        keyExtractor={(item, i) => String(i)}
+        renderItem={({ item }) => <Text>{item.text}</Text>}
       />
+      <Button title="Send Hello" onPress={() => sendMessage('Hello!')} />
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <ConferBotProvider apiKey="YOUR_API_KEY" botId="YOUR_BOT_ID">
+      <ChatScreen />
+    </ConferBotProvider>
   );
 }
 ```
 
-## Example App
+### 3. Mix and Match (Individual Components)
 
-Want to see it in action? Check out the **example app** in the `/example` directory.
+Use pre-built components alongside your own custom UI.
 
-```bash
-cd example
-npm install
-npm run ios    # or npm run android
+```tsx
+import React from 'react';
+import { View } from 'react-native';
+import {
+  ConferBotProvider,
+  useConferBot,
+  MessageList,
+  ChatInput,
+  ChatHeader,
+  ConnectionStatus,
+} from '@conferbot/react-native';
+
+function CustomChat() {
+  const { record, sendMessage, currentAgent } = useConferBot();
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ChatHeader />
+      <ConnectionStatus />
+      <MessageList messages={record} />
+      <ChatInput onSend={sendMessage} />
+    </View>
+  );
+}
+
+export default function App() {
+  return (
+    <ConferBotProvider apiKey="YOUR_API_KEY" botId="YOUR_BOT_ID">
+      <CustomChat />
+    </ConferBotProvider>
+  );
+}
 ```
 
-The example demonstrates:
-- ✅ Drop-in widget (easiest integration)
-- ✅ Headless SDK (custom UI)
-- ✅ Mix & match (pre-built + custom components)
+## Configuration
 
-See [example/README.md](example/README.md) for detailed setup instructions.
+### ConferBotConfig
 
-## Features
+Pass a `config` prop to `ConferBotProvider` to control SDK behavior.
 
-- ✅ Native React Native components (no WebView)
-- ✅ Real-time chat with Socket.IO
-- ✅ Offline message queueing
-- ✅ Live agent handover
-- ✅ File uploads
-- ✅ Push notifications support
-- ✅ TypeScript support
-- ✅ iOS and Android compatible
+```tsx
+<ConferBotProvider
+  apiKey="YOUR_API_KEY"
+  botId="YOUR_BOT_ID"
+  config={{
+    enableNotifications: true,
+    enableOfflineMode: true,
+    enablePersistence: true,
+    enableReadReceipts: true,
+    autoConnect: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 3000,
+  }}
+>
+  {children}
+</ConferBotProvider>
+```
 
-## Documentation
+| Option                  | Type    | Default | Description                              |
+|-------------------------|---------|---------|------------------------------------------|
+| `enableNotifications`   | boolean | false   | Enable push notification support         |
+| `enableOfflineMode`     | boolean | false   | Queue messages when offline              |
+| `enablePersistence`     | boolean | false   | Persist sessions across app restarts     |
+| `enableReadReceipts`    | boolean | true    | Show message delivery/read indicators    |
+| `autoConnect`           | boolean | true    | Connect to socket on mount               |
+| `reconnectionAttempts`  | number  | 5       | Max reconnection attempts                |
+| `reconnectionDelay`     | number  | 3000    | Delay between reconnection attempts (ms) |
 
-For complete documentation, visit: [https://docs.conferbot.com/mobile/react-native](https://docs.conferbot.com/mobile/react-native)
+### ConferBotCustomization
 
-## API Reference
+Pass a `customization` prop to style the built-in UI components.
 
-### ConferBotProvider Props
+```tsx
+<ConferBotProvider
+  apiKey="YOUR_API_KEY"
+  botId="YOUR_BOT_ID"
+  customization={{
+    primaryColor: '#4F46E5',
+    fontFamily: 'Inter',
+    headerTitle: 'Support',
+    bubbleRadius: 12,
+    enableAvatar: true,
+    avatarUrl: 'https://example.com/avatar.png',
+    botBubbleColor: '#F3F4F6',
+    userBubbleColor: '#4F46E5',
+  }}
+>
+  {children}
+</ConferBotProvider>
+```
 
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `apiKey` | string | Yes | Your Conferbot API key |
-| `botId` | string | Yes | Your chatbot ID |
-| `config` | ConferBotConfig | No | Configuration options |
-| `customization` | ConferBotCustomization | No | UI customization |
-| `user` | ConferBotUser | No | User identification |
+### User Identification
 
-### useConferBot Hook
+Identify users so conversations persist across sessions and devices.
 
-#### State Properties
+```tsx
+<ConferBotProvider
+  apiKey="YOUR_API_KEY"
+  botId="YOUR_BOT_ID"
+  user={{
+    id: 'user_123',
+    name: 'Jane Doe',
+    email: 'jane@example.com',
+  }}
+>
+  {children}
+</ConferBotProvider>
+```
 
-- `isInitialized: boolean` - SDK initialization status
-- `isConnected: boolean` - Socket connection status
-- `isOpen: boolean` - Chat widget open/closed state
-- `chatSessionId?: string` - Current chat session ID
-- `unreadCount: number` - Number of unread messages
-- `currentAgent?: Agent` - Current live agent (if in handover)
-- `record: RecordItem[]` - Array of chat messages (matches embed-server format)
-- `chatbotConfig?: ChatbotConfig` - Chatbot configuration
+## Theming
 
-#### Methods
+The SDK ships with light and dark themes. Wrap your app in `ThemeProvider` to apply one globally or provide a custom theme.
 
-##### `openChat(): Promise<void>`
-Opens the chat and initializes a new session if needed.
+```tsx
+import { ThemeProvider, darkTheme } from '@conferbot/react-native';
 
-##### `closeChat(): void`
-Closes the chat interface.
+export default function App() {
+  return (
+    <ThemeProvider theme={darkTheme}>
+      <ConferBotProvider apiKey="YOUR_API_KEY" botId="YOUR_BOT_ID">
+        <ChatWidget />
+      </ConferBotProvider>
+    </ThemeProvider>
+  );
+}
+```
 
-##### `sendMessage(text: string, attachments?: MessageAttachment[]): Promise<void>`
-Sends a message to the chatbot or live agent.
+To customize further, spread a base theme and override specific tokens:
 
-##### `registerPushToken(token: string): Promise<void>`
-Registers a push notification token for the current device.
+```tsx
+import { defaultTheme } from '@conferbot/react-native';
 
-##### `on(event: SocketEvents, callback: Function): () => void`
-Subscribe to socket events. Returns an unsubscribe function.
+const customTheme = {
+  ...defaultTheme,
+  colors: {
+    ...defaultTheme.colors,
+    primary: '#4F46E5',
+  },
+};
+```
 
-##### `off(event: SocketEvents, callback: Function): void`
-Unsubscribe from socket events.
+## Push Notifications
+
+Register a device push token (from Firebase, APNs, or Expo) to receive messages when the app is backgrounded.
+
+```tsx
+const { registerPushToken } = useConferBot();
+
+// After obtaining a token from your push notification provider:
+await registerPushToken(deviceToken);
+```
+
+## Offline Support
+
+When `enableOfflineMode` is set, outbound messages are queued locally and flushed automatically once connectivity is restored. Use the `useOfflineQueue` and `useNetworkStatus` hooks for fine-grained control.
+
+```tsx
+import { useOfflineQueue, useNetworkStatus } from '@conferbot/react-native';
+
+const { isOnline } = useNetworkStatus();
+const { pendingCount, flush } = useOfflineQueue();
+```
+
+## Message Reactions
+
+Users can react to any message with emoji. The `useReactions` hook and the `ReactionPicker` / `MessageReactions` components handle state and rendering.
+
+```tsx
+import { useReactions, ReactionPicker } from '@conferbot/react-native';
+
+const { addReaction, removeReaction } = useReactions();
+```
+
+## Read Receipts
+
+Message status indicators (sent, delivered, read) update in real time. Enable via `config.enableReadReceipts` and use the `useReadReceipts` hook or `MessageStatusIndicator` component.
+
+## Knowledge Base
+
+Surface help articles inside the chat interface. The `KnowledgeBase` component connects to your Conferbot knowledge base and lets users search and browse articles without leaving the conversation.
+
+## Analytics
+
+Track session metrics, message counts, drop-off points, and custom events. Wrap your provider with `ConferBotWithAnalyticsProvider` or use the `useAnalytics` hook directly.
+
+```tsx
+import { ConferBotWithAnalyticsProvider } from '@conferbot/react-native';
+
+<ConferBotWithAnalyticsProvider apiKey="YOUR_API_KEY" botId="YOUR_BOT_ID">
+  <ChatWidget />
+</ConferBotWithAnalyticsProvider>
+```
+
+```tsx
+const { trackEvent } = useAnalytics();
+trackEvent('custom_action', { screen: 'checkout' });
+```
 
 ## Socket Events
 
-Listen to real-time events from the server:
+Subscribe to real-time events for advanced use cases.
 
-```typescript
-import { SocketEvents } from '@conferbot/react-native';
+```tsx
+import { useConferBot } from '@conferbot/react-native';
 
 const { on } = useConferBot();
 
 useEffect(() => {
-  // Listen for bot responses
-  const unsubscribe = on(SocketEvents.BOT_RESPONSE, (data) => {
-    console.log('Bot response:', data);
+  const unsubscribe = on('bot_response', (data) => {
+    console.log('Bot responded:', data);
   });
-
-  return () => unsubscribe();
+  return unsubscribe;
 }, []);
 ```
 
-### Available Events
+Key events: `bot_response`, `agent_message`, `agent_accepted`, `agent_left`, `agent_typing_status`, `chat_ended`, `connection_error`.
 
-- `BOT_RESPONSE` - Bot sent a message
-- `AGENT_MESSAGE` - Live agent sent a message
-- `AGENT_ACCEPTED` - Live agent accepted handover
-- `AGENT_LEFT` - Live agent left the chat
-- `AGENT_TYPING_STATUS` - Agent typing status changed
-- `CHAT_ENDED` - Chat session ended
-- `CONNECTION_ERROR` - Socket connection error
+## API Reference
 
-## Advanced Usage
+For the complete API surface -- every component prop, hook return value, and type definition -- see the [docs/](docs/) directory:
 
-### Handling Live Agent Handover
+- [API.md](docs/API.md) -- Full API reference
+- [COMPONENTS.md](docs/COMPONENTS.md) -- Component catalog
+- [COMPONENT_ARCHITECTURE.md](docs/COMPONENT_ARCHITECTURE.md) -- Component design patterns
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) -- SDK architecture overview
+- [EXAMPLES.md](docs/EXAMPLES.md) -- Additional code examples
 
-```tsx
-function ChatScreen() {
-  const { currentAgent, on } = useConferBot();
+## Example App
 
-  useEffect(() => {
-    const unsubscribe = on(SocketEvents.AGENT_ACCEPTED, (data) => {
-      Alert.alert('Agent Joined', `${data.agent.name} has joined the chat`);
-    });
+A working example app is included in the [`example/`](example/) directory.
 
-    return unsubscribe;
-  }, []);
-
-  return (
-    <View>
-      {currentAgent ? (
-        <Text>Chatting with {currentAgent.name}</Text>
-      ) : (
-        <Text>Chatting with bot</Text>
-      )}
-    </View>
-  );
-}
+```bash
+cd example
+npm install
+npx react-native run-ios    # or run-android
 ```
+
+The example demonstrates all three integration patterns (drop-in widget, headless hook, and mix-and-match components) along with theming, offline support, and analytics.
 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Build the SDK
-npm run build
-
-# Watch mode for development
-npm run watch
-
-# Run linter
-npm run lint
-
-# Fix linting issues
-npm run lint:fix
-
-# Type check
-npm run type-check
+npm install          # Install dependencies
+npm run build        # Compile TypeScript
+npm run watch        # Watch mode
+npm run lint         # Run ESLint
+npm run type-check   # Type check without emitting
+npm test             # Run tests
+npm run test:coverage # Tests with coverage report
 ```
 
-## Project Structure
+## Contributing
 
-```
-conferbot-react-native/
-├── src/
-│   ├── config/
-│   │   └── constants.ts          # Centralized configuration
-│   ├── context/
-│   │   └── ConferBotContext.tsx  # React Context provider
-│   ├── services/
-│   │   ├── api.ts                # REST API client
-│   │   └── socket.ts             # Socket.IO client
-│   ├── types/
-│   │   ├── index.ts              # Type definitions
-│   │   └── react.d.ts            # React type declarations
-│   └── index.ts                  # Main exports
-├── lib/                          # Build output (gitignored)
-├── docs/                         # Documentation
-├── package.json
-├── tsconfig.json
-├── .eslintrc.js
-└── README.md
-```
+Contributions are welcome. Please open an issue first to discuss what you would like to change, then submit a pull request.
 
-## Architecture
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-change`)
+3. Commit your changes
+4. Push to your fork and open a pull request
 
-The SDK follows a modular architecture:
+## License
 
-1. **Context Layer** - React Context for state management
-2. **Service Layer** - API and Socket.IO clients
-3. **Type Layer** - TypeScript definitions matching embed-server schema
-4. **Configuration** - Centralized constants in `/src/config/constants.ts`
+MIT -- see [LICENSE](LICENSE) for details.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
+## Links
 
-## Requirements
-
-- React Native >= 0.70.0
-- React >= 17.0.0
-- iOS >= 12.0
-- Android API Level >= 21
-
-## Troubleshooting
-
-### Socket Connection Issues
-
-If experiencing connection issues:
-
-1. Verify embed server is running (default: port 8001)
-2. Check API key and bot ID are correct
-3. Check network connectivity
-4. Review socket connection logs in `__DEV__` mode
-
-### Build Errors
-
-If you encounter peer dependency warnings:
-
-```bash
-npm install --legacy-peer-deps
-```
-
-### Type Errors
-
-Ensure type definitions are installed:
-
-```bash
-npm install --save-dev @types/react @types/react-native
-```
-
-## Support
-
-- **Documentation:** https://docs.conferbot.com
-- **GitHub Issues:** https://github.com/conferbot/react-native-sdk/issues
-- **Email:** support@conferbot.com
+- [Full Documentation](https://docs.conferbot.com/mobile/react-native)
+- [GitHub Issues](https://github.com/conferbot/react-native-sdk/issues)
+- [Conferbot Website](https://www.conferbot.com)
+- [Support](mailto:support@conferbot.com)
