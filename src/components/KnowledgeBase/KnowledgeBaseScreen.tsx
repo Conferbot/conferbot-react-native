@@ -74,8 +74,8 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
   const [searchResults, setSearchResults] = useState<KBArticle[]>([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
 
-  // Rating state (tracks which articles have been rated this session)
-  const [ratedArticles, setRatedArticles] = useState<Set<string>>(new Set());
+  // KB context for article rating
+  const { rateArticle, hasRatedArticle } = useKB();
 
   // Animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -187,19 +187,12 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
     });
   }, [currentScreen]);
 
-  // Handle article rating
+  // Handle article rating (delegates to KBContext which emits via socket)
   const handleRateArticle = useCallback(
     async (articleId: string, helpful: boolean): Promise<boolean> => {
-      if (ratedArticles.has(articleId)) {
-        return false;
-      }
-
-      // TODO: Emit rating event via socket
-      // For now, just track locally
-      setRatedArticles((prev) => new Set([...prev, articleId]));
-      return true;
+      return rateArticle(articleId, helpful);
     },
-    [ratedArticles]
+    [rateArticle]
   );
 
   // Animation helper
@@ -392,7 +385,7 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
           onBack={handleBack}
           onArticlePress={handleArticlePress}
           onRate={handleRateArticle}
-          hasRated={ratedArticles.has(selectedArticle._id)}
+          hasRated={hasRatedArticle(selectedArticle._id)}
           testID={`${testID}-detail`}
         />
       </Animated.View>
