@@ -461,6 +461,33 @@ class ConferBotSocket {
     }
   }
 
+  // ********** Knowledge Base Methods ********** //
+  /**
+   * Rate a knowledge base article
+   * Emits 'rate-article' event matching embed-server's chatbotHandler
+   */
+  rateArticle(data: {
+    articleId: string;
+    visitorId?: string;
+    sessionId?: string;
+    helpful: boolean;
+    rating: number;
+    feedback?: string;
+  }): void {
+    if (!this.socket || !this.isConnected()) {
+      if (__DEV__) {
+        console.warn('[ConferBot Socket] Cannot rate article: not connected');
+      }
+      return;
+    }
+
+    this.socket.emit(SocketEvents.RATE_ARTICLE, data);
+
+    if (__DEV__) {
+      console.log('[ConferBot Socket] Article rated:', data.articleId);
+    }
+  }
+
   // ********** Reaction Methods ********** //
   /**
    * Send a message reaction to the server
