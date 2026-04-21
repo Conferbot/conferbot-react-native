@@ -11,7 +11,6 @@ import type {
   KBArticle,
   ArticleViewPayload,
   ArticleEngagementPayload,
-  ArticleRatingPayload,
 } from './types';
 import { useConferBot } from '../../context/ConferBotContext';
 
@@ -119,7 +118,7 @@ const getDeviceType = (): 'mobile' | 'tablet' | 'desktop' => {
  */
 export const KBProvider: React.FC<KBProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(kbReducer, initialState);
-  const { chatSessionId } = useConferBot();
+  const { chatSessionId, rateKBArticle } = useConferBot();
 
   // Track engagement for current article
   const engagementRef = useRef<{
@@ -271,20 +270,12 @@ export const KBProvider: React.FC<KBProviderProps> = ({ children }) => {
 
       dispatch({ type: 'MARK_ARTICLE_RATED', payload: articleId });
 
-      // Emit rating event
-      if (socketRef.current) {
-        const payload: ArticleRatingPayload = {
-          articleId,
-          sessionId: chatSessionId,
-          helpful,
-          rating: helpful ? 5 : 1,
-        };
-        socketRef.current.emit('rate-article', payload);
-      }
+      // Emit rating event via ConferBot context socket
+      rateKBArticle(articleId, helpful, helpful ? 5 : 1);
 
       return true;
     },
-    [state.ratedArticles, chatSessionId]
+    [state.ratedArticles, rateKBArticle]
   );
 
   // Get all articles from all categories
