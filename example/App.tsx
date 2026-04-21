@@ -9,17 +9,19 @@ import {
   StatusBar,
 } from 'react-native';
 import { ConferBotProvider, ChatWidget } from '@conferbot/react-native';
+import { HeadlessExample } from './src/HeadlessExample';
+import { CustomExample } from './src/CustomExample';
 
-/**
- * Example App demonstrating Conferbot React Native SDK
- *
- * This example shows three usage patterns:
- * 1. Drop-in Widget (easiest)
- * 2. Headless SDK (custom UI)
- * 3. Mix & Match (use some components)
- */
+type Tab = 'widget' | 'headless' | 'custom';
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'widget', label: 'Widget' },
+  { key: 'headless', label: 'Headless' },
+  { key: 'custom', label: 'Custom' },
+];
 
 function App(): React.JSX.Element {
+  const [activeTab, setActiveTab] = useState<Tab>('widget');
   const [widgetVisible, setWidgetVisible] = useState(false);
 
   // Replace with your actual API key and bot ID
@@ -38,67 +40,37 @@ function App(): React.JSX.Element {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Conferbot SDK Example</Text>
-            <Text style={styles.subtitle}>
-              Tap an option below to see different usage patterns
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Option 1: Drop-in Widget</Text>
-            <Text style={styles.sectionDesc}>
-              Full-featured chat in a modal. Easiest integration.
-            </Text>
+        {/* Tab Bar */}
+        <View style={styles.tabBar}>
+          {TABS.map((tab) => (
             <TouchableOpacity
-              style={styles.button}
-              onPress={() => setWidgetVisible(true)}
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key)}
             >
-              <Text style={styles.buttonText}>Open Chat Widget</Text>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === tab.key && styles.tabTextActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
             </TouchableOpacity>
-          </View>
+          ))}
+        </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Option 2: Headless SDK</Text>
-            <Text style={styles.sectionDesc}>
-              Use the SDK context to build your own UI. See HeadlessExample.tsx
-            </Text>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonSecondary]}
-              onPress={() => {
-                // Navigate to headless example
-                console.log('See src/HeadlessExample.tsx for headless usage');
-              }}
-            >
-              <Text style={styles.buttonTextSecondary}>View Headless Example</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Tab Content */}
+        {activeTab === 'widget' && (
+          <WidgetExample
+            widgetVisible={widgetVisible}
+            setWidgetVisible={setWidgetVisible}
+          />
+        )}
+        {activeTab === 'headless' && <HeadlessExample />}
+        {activeTab === 'custom' && <CustomExample />}
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Option 3: Mix & Match</Text>
-            <Text style={styles.sectionDesc}>
-              Use our components where you want, custom where you need.
-            </Text>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonSecondary]}
-              onPress={() => {
-                // Navigate to custom example
-                console.log('See src/CustomExample.tsx for mix & match usage');
-              }}
-            >
-              <Text style={styles.buttonTextSecondary}>View Custom Example</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              📚 Check the docs/ folder for complete documentation
-            </Text>
-          </View>
-        </ScrollView>
-
-        {/* The widget */}
+        {/* The chat widget modal (rendered regardless of tab so it overlays properly) */}
         <ChatWidget
           visible={widgetVisible}
           onClose={() => setWidgetVisible(false)}
@@ -111,10 +83,74 @@ function App(): React.JSX.Element {
   );
 }
 
+/** Drop-in Widget tab content */
+function WidgetExample({
+  widgetVisible: _,
+  setWidgetVisible,
+}: {
+  widgetVisible: boolean;
+  setWidgetVisible: (v: boolean) => void;
+}) {
+  return (
+    <ScrollView contentContainerStyle={styles.scrollContent}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Conferbot SDK Example</Text>
+        <Text style={styles.subtitle}>
+          Use the tabs above to switch between usage patterns
+        </Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Drop-in Widget</Text>
+        <Text style={styles.sectionDesc}>
+          Full-featured chat in a modal. Easiest integration -- just wrap your
+          app in ConferBotProvider and render ChatWidget.
+        </Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setWidgetVisible(true)}
+        >
+          <Text style={styles.buttonText}>Open Chat Widget</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          Check the docs/ folder for complete documentation
+        </Text>
+      </View>
+    </ScrollView>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  tabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#999',
+  },
+  tabTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
   scrollContent: {
     padding: 20,
@@ -167,14 +203,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonSecondary: {
-    backgroundColor: '#F0F0F0',
-  },
-  buttonTextSecondary: {
-    color: '#007AFF',
     fontSize: 16,
     fontWeight: '600',
   },
