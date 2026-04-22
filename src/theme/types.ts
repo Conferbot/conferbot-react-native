@@ -46,6 +46,14 @@ export interface ConferBotTheme {
     borderLight: string;
     divider: string;
 
+    // Header colors
+    headerBg: string;
+    headerText: string;
+
+    // Choice/option button colors
+    optionBubble: string;
+    optionBubbleText: string;
+
     // Special colors
     link: string;
     typing: string;
@@ -85,10 +93,14 @@ export interface ConferBotTheme {
   spacing: {
     xs: number;    // 4
     sm: number;    // 8
-    md: number;    // 16
-    lg: number;    // 24
-    xl: number;    // 32
+    md: number;    // 12
+    lg: number;    // 16
+    xl: number;    // 24
     xxl: number;   // 48
+    bubblePaddingH: number;   // 14
+    bubblePaddingV: number;   // 10
+    messageSpacing: number;   // 10
+    chatContentPadding: number; // 14
   };
 
   borderRadius: {
@@ -98,6 +110,9 @@ export interface ConferBotTheme {
     lg: number;      // 12
     xl: number;      // 16
     full: number;    // 9999
+    bubble: number;       // 16
+    bubbleSmall: number;  // 4
+    button: number;       // 12
   };
 
   shadows: {
