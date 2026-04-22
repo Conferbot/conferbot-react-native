@@ -9,6 +9,7 @@ import {
 import { useTheme } from '../../theme';
 import { MessageBubble } from '../MessageBubble';
 import { TypingIndicator } from '../TypingIndicator';
+import { Avatar } from '../Avatar';
 import { EmptyState } from '../EmptyState';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Reaction, ReactionEmoji, MessageStatusEntry } from '../../types';
@@ -270,7 +271,10 @@ export const MessageList: React.FC<MessageListProps> = ({
     if (!showTypingIndicator) return null;
     return (
       <View style={styles.typingContainer}>
-        <TypingIndicator visible={true} />
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+          <Avatar name="Bot" size={32} />
+          <TypingIndicator visible={true} />
+        </View>
       </View>
     );
   };
