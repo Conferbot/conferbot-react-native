@@ -35,6 +35,7 @@ export interface ChatHeaderProps {
   title?: string;
   subtitle?: string;
   agent?: Agent;
+  botAvatarUrl?: string;
   showConnectionStatus?: boolean;
   onClose?: () => void;
   onAvatarPress?: () => void;
@@ -63,6 +64,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   title = 'Chat',
   subtitle,
   agent,
+  botAvatarUrl,
   showConnectionStatus = true,
   onClose,
   onAvatarPress,
@@ -85,23 +87,21 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       accessibilityLabel={`Chat header. ${displayTitle}${displaySubtitle ? `. ${displaySubtitle}` : ''}`}
       testID={testID}
     >
-      {/* Avatar */}
-      {agent && (
-        <TouchableOpacity
-          onPress={onAvatarPress}
-          disabled={!onAvatarPress}
-          accessible={true}
-          accessibilityLabel={`Agent ${agent.name}`}
-          accessibilityRole="button"
-          testID={`${testID}-avatar`}
-        >
-          <Avatar
-            source={agent.avatar}
-            name={agent.name}
-            size={40}
-          />
-        </TouchableOpacity>
-      )}
+      {/* Avatar — always shown (bot avatar or agent avatar) */}
+      <TouchableOpacity
+        onPress={onAvatarPress}
+        disabled={!onAvatarPress}
+        accessible={true}
+        accessibilityLabel={agent ? `Agent ${agent.name}` : `Bot ${displayTitle}`}
+        accessibilityRole="button"
+        testID={`${testID}-avatar`}
+      >
+        <Avatar
+          source={agent?.avatar || botAvatarUrl}
+          name={agent?.name || displayTitle}
+          size={32}
+        />
+      </TouchableOpacity>
 
       {/* Title and subtitle */}
       <View style={styles.titleContainer}>
@@ -165,28 +165,25 @@ const createStyles = (theme: ConferBotTheme) =>
     container: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.md,
-      backgroundColor: theme.colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      paddingHorizontal: 12,
+      backgroundColor: theme.colors.headerBg,
       height: theme.layout.headerHeight,
-      gap: theme.spacing.md,
-      ...theme.shadows.sm,
+      gap: 10,
+      ...theme.shadows.md,
     },
     titleContainer: {
       flex: 1,
       justifyContent: 'center',
     },
     title: {
-      fontSize: theme.typography.fontSize.lg,
+      fontSize: 16,
       fontWeight: theme.typography.fontWeight.semibold,
-      color: theme.colors.text,
-      marginBottom: 2,
+      color: theme.colors.headerText,
+      marginBottom: 1,
     },
     subtitle: {
-      fontSize: theme.typography.fontSize.sm,
-      color: theme.colors.textSecondary,
+      fontSize: 11,
+      color: theme.colors.headerText + 'BF', // 75% opacity
     },
     actionsContainer: {
       flexDirection: 'row',
@@ -201,6 +198,6 @@ const createStyles = (theme: ConferBotTheme) =>
     },
     closeIcon: {
       fontSize: 20,
-      color: theme.colors.textSecondary,
+      color: theme.colors.headerText,
     },
   });
