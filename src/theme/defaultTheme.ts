@@ -1,57 +1,65 @@
 import type { ConferBotTheme } from './types';
 
-// Default light theme for Conferbot React Native SDK
+// Default light theme matching Android SDK's LightTheme
 export const defaultTheme: ConferBotTheme = {
   mode: 'light',
 
   colors: {
-    // Primary brand colors (iOS blue)
-    primary: '#007AFF',
-    primaryLight: '#5AC8FA',
-    primaryDark: '#0051D5',
+    // Primary brand color (Android: #0100EC)
+    primary: '#0100EC',
+    primaryLight: '#5A5AFF',
+    primaryDark: '#0000B3',
 
     // Secondary colors
-    secondary: '#5856D6',
-    secondaryLight: '#7B79F1',
-    secondaryDark: '#3C3B9E',
+    secondary: '#6750A4',
+    secondaryLight: '#9A82DB',
+    secondaryDark: '#3C2A6E',
 
     // Background colors
-    background: '#F2F2F7',
-    surface: '#FFFFFF',
+    background: '#FFFBFF',
+    surface: '#FFFBFF',
     overlay: 'rgba(0, 0, 0, 0.5)',
 
-    // Message bubble colors
-    userBubble: '#007AFF',
+    // Message bubble colors (Android palette)
+    userBubble: '#0100EC',
     userBubbleText: '#FFFFFF',
-    botBubble: '#E9E9EB',
-    botBubbleText: '#000000',
-    agentBubble: '#34C759',
-    agentBubbleText: '#FFFFFF',
-    systemBubble: '#F2F2F7',
-    systemBubbleText: '#8E8E93',
+    botBubble: '#F5F5F5',
+    botBubbleText: '#1C1B1F',
+    agentBubble: '#E8F5E9',
+    agentBubbleText: '#1B5E20',
+    systemBubble: '#F5F5F5',
+    systemBubbleText: '#6B6B6B',
 
     // Status colors
-    success: '#34C759',
+    success: '#4CAF50',
     warning: '#FF9500',
-    error: '#FF3B30',
-    info: '#5AC8FA',
+    error: '#B3261E',
+    info: '#0100EC',
 
     // Text colors
-    text: '#000000',
-    textSecondary: '#8E8E93',
+    text: '#1C1B1F',
+    textSecondary: '#49454F',
     textDisabled: '#C7C7CC',
     textInverse: '#FFFFFF',
 
     // Border colors
-    border: '#C6C6C8',
-    borderLight: '#E5E5EA',
-    divider: '#E5E5EA',
+    border: '#E0E0E0',
+    borderLight: '#E0E0E0',
+    divider: '#E0E0E0',
+
+    // Header (Android: primary + white)
+    headerBg: '#0100EC',
+    headerText: '#FFFFFF',
+
+    // Choice buttons
+    optionBubble: '#F5F5F5',
+    optionBubbleText: '#1C1B1F',
 
     // Special colors
-    link: '#007AFF',
-    typing: '#8E8E93',
-    online: '#34C759',
-    offline: '#8E8E93',
+    link: '#0100EC',
+    typing: '#9E9E9E',
+    online: '#4CAF50',
+    offline: '#9E9E9E',
   },
 
   typography: {
@@ -78,7 +86,7 @@ export const defaultTheme: ConferBotTheme = {
 
     lineHeight: {
       tight: 1.2,
-      normal: 1.5,
+      normal: 1.4,
       relaxed: 1.75,
     },
   },
@@ -86,10 +94,14 @@ export const defaultTheme: ConferBotTheme = {
   spacing: {
     xs: 4,
     sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
+    md: 12,
+    lg: 16,
+    xl: 24,
     xxl: 48,
+    bubblePaddingH: 14,
+    bubblePaddingV: 10,
+    messageSpacing: 10,
+    chatContentPadding: 14,
   },
 
   borderRadius: {
@@ -99,6 +111,9 @@ export const defaultTheme: ConferBotTheme = {
     lg: 12,
     xl: 16,
     full: 9999,
+    bubble: 16,
+    bubbleSmall: 4,
+    button: 12,
   },
 
   shadows: {
@@ -154,8 +169,8 @@ export const defaultTheme: ConferBotTheme = {
   },
 
   layout: {
-    headerHeight: 60,
-    inputHeight: 56,
+    headerHeight: 56,
+    inputHeight: 48,
     maxBubbleWidth: '75%',
     avatarSize: 32,
     iconSize: 24,
