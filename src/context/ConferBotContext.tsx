@@ -44,6 +44,10 @@ interface ExtendedConferBotContext extends ConferBotContextType {
   flowEngine: NodeFlowEngine | null;
   chatState: ChatState | null;
   submitNodeResponse: (response: any, portName?: string) => void;
+  // Server customizations
+  serverCustomizations: Record<string, any> | null;
+  botName: string | null;
+  botAvatarUrl: string | null;
   // Persistence methods (already in ConferBotContextType, but explicitly listed here)
   isRestoring: boolean;
   hasPersistedSession: boolean;
@@ -122,7 +126,8 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   if (!botId || botId.trim() === '') {
     throw new Error('[ConferBot] Bot ID is required');
   }
-  if (!apiKey.startsWith('conf_')) {
+  // Validate API key format (skip in dev mode for testing)
+  if (!__DEV__ && !apiKey.startsWith('conf_')) {
     throw new Error('[ConferBot] Invalid API key format. API key must start with "conf_"');
   }
 
@@ -142,6 +147,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   // Node Flow Engine State
   const [currentUIState, setCurrentUIState] = useState<NodeUIState | null>(null);
   const [isNodeProcessing, setIsNodeProcessing] = useState(false);
+
+  // Server customizations (theme colors, bot name, avatar, etc.)
+  const [serverCustomizations, setServerCustomizations] = useState<Record<string, any> | null>(null);
 
   // Persistence State
   const [isRestoring, setIsRestoring] = useState(true);
@@ -590,6 +598,54 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   const setupSocketListeners = useCallback(() => {
     if (!socketClient.current) return;
 
+    // Chatbot data fetched — contains elements (nodes/edges) and customizations
+    socketClient.current.on(SocketEvents.FETCHED_CHATBOT_DATA, (data: any) => {
+      if (__DEV__) {
+        console.log('[ConferBot] Chatbot data received');
+      }
+
+      const chatbotData = data?.chatbotData;
+      if (!chatbotData) return;
+
+      // Parse server customizations
+      const customizations = chatbotData.customizations;
+      if (customizations) {
+        setServerCustomizations(customizations);
+        if (__DEV__) {
+          console.log('[ConferBot] Server customizations loaded:', Object.keys(customizations).length, 'keys');
+          console.log('[ConferBot] botName/logoText:', customizations.botName || customizations.logoText);
+          console.log('[ConferBot] avatar:', customizations.avatar);
+        }
+      }
+
+      // Parse elements (nodes and edges)
+      const elements = chatbotData.elements;
+      if (elements && Array.isArray(elements) && elements.length > 0) {
+        const firstElement = elements[0];
+        const nodes = firstElement.nodes || [];
+        const edges = firstElement.edges || [];
+
+        if (__DEV__) {
+          console.log('[ConferBot] Loaded', nodes.length, 'nodes and', edges.length, 'edges');
+        }
+
+        // Start flow engine with parsed data
+        if (nodes.length > 0 && flowEngine.current) {
+          setIsNodeProcessing(true);
+          const flowDefinition: FlowDefinition = {
+            nodes,
+            edges,
+            startNodeId: nodes[0]?.id || '',
+          };
+          flowEngine.current.loadFlow(flowDefinition);
+          flowEngine.current.start().catch((error) => {
+            console.error('[ConferBot] Failed to start flow:', error);
+            setIsNodeProcessing(false);
+          });
+        }
+      }
+    });
+
     // Bot response received (contains record update and potentially flow data)
     socketClient.current.on(SocketEvents.BOT_RESPONSE, (data: any) => {
       if (data.record) {
@@ -898,6 +954,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     isNodeProcessing,
     flowEngine: flowEngine.current,
     chatState: chatStateRef.current,
+
+    // Server customizations
+    serverCustomizations,
+    botName: serverCustomizations?.botName || serverCustomizations?.logoText || null,
+    botAvatarUrl: serverCustomizations?.avatar || serverCustomizations?.logo || null,
 
     // Persistence State
     isRestoring,
