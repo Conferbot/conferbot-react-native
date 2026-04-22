@@ -25,8 +25,8 @@ function App(): React.JSX.Element {
   const [widgetVisible, setWidgetVisible] = useState(false);
 
   // Replace with your actual API key and bot ID
-  const API_KEY = 'conf_sk_your_api_key_here';
-  const BOT_ID = 'your_bot_id_here';
+  const API_KEY = 'test_key';
+  const BOT_ID = '69e8503cf33718a92ea792fe';
 
   return (
     <ConferBotProvider
