@@ -127,30 +127,47 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isAgent = message.type === 'agent-message';
   const isSystem = message.type === 'system-message';
 
-  // Get colors based on message type
+  // Asymmetric bubble radius matching Android SDK
+  const r = theme.borderRadius.bubble;
+  const rSmall = theme.borderRadius.bubbleSmall;
+
+  // Get colors and radius based on message type
   const getBubbleStyle = () => {
     if (isUser) {
       return {
         backgroundColor: theme.colors.userBubble,
         alignSelf: 'flex-end' as const,
+        borderTopLeftRadius: r,
+        borderTopRightRadius: r,
+        borderBottomLeftRadius: r,
+        borderBottomRightRadius: rSmall,
       };
     }
     if (isAgent) {
       return {
         backgroundColor: theme.colors.agentBubble,
         alignSelf: 'flex-start' as const,
+        borderTopLeftRadius: r,
+        borderTopRightRadius: r,
+        borderBottomLeftRadius: rSmall,
+        borderBottomRightRadius: r,
       };
     }
     if (isSystem) {
       return {
         backgroundColor: theme.colors.systemBubble,
         alignSelf: 'center' as const,
+        borderRadius: r,
       };
     }
-    // Bot message (default)
+    // Bot message (default) — squared bottom-left
     return {
       backgroundColor: theme.colors.botBubble,
       alignSelf: 'flex-start' as const,
+      borderTopLeftRadius: r,
+      borderTopRightRadius: r,
+      borderBottomLeftRadius: rSmall,
+      borderBottomRightRadius: r,
     };
   };
 
@@ -439,9 +456,9 @@ const createStyles = (theme: ConferBotTheme) =>
     container: {
       flexDirection: 'row',
       marginVertical: theme.spacing.xs,
-      marginHorizontal: theme.spacing.md,
+      marginHorizontal: theme.spacing.chatContentPadding,
       alignItems: 'flex-end',
-      gap: theme.spacing.sm,
+      gap: 10,
     },
     avatarContainer: {
       marginBottom: theme.spacing.xs,
@@ -451,11 +468,12 @@ const createStyles = (theme: ConferBotTheme) =>
       flexShrink: 1,
     },
     bubble: {
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.sm,
-      borderRadius: theme.borderRadius.lg,
+      paddingHorizontal: theme.spacing.bubblePaddingH,
+      paddingVertical: theme.spacing.bubblePaddingV,
+      borderRadius: theme.borderRadius.bubble,
       minWidth: 60,
       maxWidth: '100%',
+      ...theme.shadows.sm,
     },
     messageText: {
       fontSize: theme.typography.fontSize.md,
