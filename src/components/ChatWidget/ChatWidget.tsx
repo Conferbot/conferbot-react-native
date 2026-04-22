@@ -188,6 +188,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     chatSessionId,
     chatbotConfig,
     on,
+    botName,
+    botAvatarUrl,
   } = useConferBot();
 
   // Use controlled visible if provided, otherwise use context isOpen
@@ -955,9 +957,10 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       >
         {/* Header */}
         <ChatHeader
-          title={title}
+          title={botName || title}
           subtitle={getSubtitle()}
           agent={currentAgent}
+          botAvatarUrl={botAvatarUrl || undefined}
           onClose={handleClose}
           showConnectionStatus={true}
           testID={`${testID}-header`}
