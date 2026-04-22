@@ -49,6 +49,14 @@ export const darkTheme: ConferBotTheme = {
     borderLight: '#2C2C2E',
     divider: '#38383A',
 
+    // Header
+    headerBg: '#0A84FF',
+    headerText: '#FFFFFF',
+
+    // Choice buttons
+    optionBubble: '#2C2C2E',
+    optionBubbleText: '#FFFFFF',
+
     // Special colors
     link: '#0A84FF',
     typing: '#98989D',
