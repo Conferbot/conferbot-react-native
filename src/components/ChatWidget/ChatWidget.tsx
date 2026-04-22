@@ -16,6 +16,7 @@ import { useConferBot } from '../../context/ConferBotContext';
 import { ChatHeader } from '../ChatHeader';
 import { MessageList } from '../MessageList';
 import { ChatInput } from '../ChatInput';
+import { ChatBottomBar } from '../ChatBottomBar/ChatBottomBar';
 import { NodeRenderer } from '../NodeComponents';
 import { NodeFlowEngine, ChatState } from '../../core';
 import { NodeUIState } from '../../core/nodes/NodeHandler';
@@ -982,18 +983,12 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           </View>
         )}
 
-        {/* Input - shown when no interactive node is active */}
+        {/* Unified input + footer — one seamless bottom bar */}
         {shouldShowInput() && (
-          <ChatInput
+          <ChatBottomBar
             onSend={handleSendMessage}
             placeholder={placeholder}
             disabled={!isConnected}
-            enableAttachments={enableAttachments}
-            onAttachmentPress={handleAttachmentPress}
-            enableVoiceMessage={voiceRecordingAvailable}
-            onVoiceSend={handleVoiceSend}
-            voiceMaxDuration={voiceMaxDuration}
-            voiceMinDuration={voiceMinDuration}
             testID={`${testID}-input`}
           />
         )}
