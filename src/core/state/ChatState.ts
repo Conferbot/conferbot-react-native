@@ -1138,6 +1138,8 @@ export class ChatState {
    * Resets the state for a new conversation
    */
   reset(): void {
+    // Generate a new session ID (same approach as web widget)
+    this._sessionId = Math.random().toString(36).substring(2, 15);
     this._answerVariables.clear();
     this._variables.clear();
     this._userMetadata = {};
