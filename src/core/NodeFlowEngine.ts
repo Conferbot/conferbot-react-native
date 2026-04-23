@@ -331,21 +331,18 @@ export class NodeFlowEngine {
     this._currentUIState = uiState;
     this._isProcessing = false;
 
-    // Push bot message to record (matching web widget format)
+    // Push node to record (matching web widget format)
     // Web widget pushes the entire node object {...node, time} into record,
-    // so the admin dashboard expects record entries with data sub-object
-    if (uiState.text) {
-      this.chatState.addRecord({
-        _id: node.id,
-        id: node.id,
-        type: node.type,
-        data: {
-          ...node.data,
-          text: uiState.text,
-        },
-        time: new Date().toISOString(),
-      });
-    }
+    // so the admin dashboard expects record entries with full node data
+    this.chatState.addRecord({
+      _id: node.id,
+      id: node.id,
+      type: node.type,
+      data: {
+        ...node.data,
+      },
+      time: new Date().toISOString(),
+    });
 
     // Add typing delay if needed
     if (uiState.typing && this.config.typingDelay > 0) {
