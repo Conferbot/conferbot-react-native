@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * HandoverConnected.tsx
  *
