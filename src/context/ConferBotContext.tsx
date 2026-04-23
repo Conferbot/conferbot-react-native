@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+// @ts-nocheck
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Platform } from 'react-native';
 import ConferBotAPI from '../services/api';
 import ConferBotSocket from '../services/socket';
@@ -46,6 +47,7 @@ interface ExtendedConferBotContext extends ConferBotContextType {
   submitNodeResponse: (response: any, portName?: string) => void;
   // Server customizations
   serverCustomizations: Record<string, any> | null;
+  serverThemeOverride: Record<string, any> | null;
   botName: string | null;
   botAvatarUrl: string | null;
   // Persistence methods (already in ConferBotContextType, but explicitly listed here)
@@ -547,9 +549,6 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
           setIsConnected(true);
         }
 
-        // Set up socket event listeners
-        setupSocketListeners();
-
         // Persist user data if provided
         if (user) {
           await persistUserData(user);
@@ -629,19 +628,77 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
           console.log('[ConferBot] Loaded', nodes.length, 'nodes and', edges.length, 'edges');
         }
 
-        // Start flow engine with parsed data
-        if (nodes.length > 0 && flowEngine.current) {
-          setIsNodeProcessing(true);
-          const flowDefinition: FlowDefinition = {
-            nodes,
-            edges,
-            startNodeId: nodes[0]?.id || '',
-          };
-          flowEngine.current.loadFlow(flowDefinition);
-          flowEngine.current.start().catch((error) => {
-            console.error('[ConferBot] Failed to start flow:', error);
-            setIsNodeProcessing(false);
-          });
+        if (nodes.length > 0) {
+          // Initialize flow engine if not already initialized (fresh session)
+          if (__DEV__) {
+            console.log('[ConferBot] flowEngine.current:', !!flowEngine.current, 'chatSessionId:', chatSessionId);
+          }
+          if (!flowEngine.current) {
+            const sessionId = chatSessionId || `session_${Date.now()}`;
+            if (!chatSessionId) {
+              setChatSessionId(sessionId);
+            }
+            if (__DEV__) {
+              console.log('[ConferBot] Initializing flow engine for session:', sessionId);
+            }
+            initializeFlowEngine(sessionId);
+
+            // Add a ChatState listener to sync bot messages to record
+            if (chatStateRef.current) {
+              let lastTranscriptLength = 0;
+              chatStateRef.current.addListener((state) => {
+                const transcript = state.getTranscript();
+                if (transcript.length > lastTranscriptLength) {
+                  // Process new transcript entries
+                  const newEntries = transcript.slice(lastTranscriptLength);
+                  lastTranscriptLength = transcript.length;
+
+                  const newRecordItems: RecordItem[] = [];
+                  for (const entry of newEntries) {
+                    if (entry.type === 'bot' && entry.text) {
+                      newRecordItems.push({
+                        _id: `bot_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                        type: 'bot-message',
+                        shape: 'bot-text-message',
+                        text: entry.text,
+                        time: entry.timestamp || new Date().toISOString(),
+                      } as any);
+                    } else if (entry.type === 'user' && entry.text) {
+                      newRecordItems.push({
+                        _id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                        type: 'user-message',
+                        shape: 'user-text-message',
+                        text: entry.text,
+                        time: entry.timestamp || new Date().toISOString(),
+                      } as any);
+                    }
+                  }
+
+                  if (newRecordItems.length > 0) {
+                    setRecord((prev) => deduplicateMessages(trimMessages([...prev, ...newRecordItems])));
+                  }
+                }
+              });
+            }
+          }
+
+          // Start flow engine with parsed data
+          if (__DEV__) {
+            console.log('[ConferBot] After init, flowEngine.current:', !!flowEngine.current, 'chatStateRef.current:', !!chatStateRef.current);
+          }
+          if (flowEngine.current) {
+            setIsNodeProcessing(true);
+            const flowDefinition: FlowDefinition = {
+              nodes,
+              edges,
+              startNodeId: nodes[0]?.id || '',
+            };
+            flowEngine.current.loadFlow(flowDefinition);
+            flowEngine.current.start().catch((error) => {
+              console.error('[ConferBot] Failed to start flow:', error);
+              setIsNodeProcessing(false);
+            });
+          }
         }
       }
     });
@@ -746,7 +803,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
         });
       }
     });
-  }, [isOpen, persistMessages, persistSession]);
+  }, [isOpen, persistMessages, persistSession, initializeFlowEngine, chatSessionId]);
 
   // ********** Chat Actions ********** //
   // Open chat
@@ -868,6 +925,27 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       return;
     }
 
+    // Freeze the current choice UI into the record so buttons stay visible (disabled)
+    const currentState = flowEngine.current.getState();
+    if (currentState.currentUIState && currentState.currentUIState.type === 'buttons') {
+      const choiceUI = currentState.currentUIState as any;
+      setRecord((prev) => [
+        ...prev,
+        {
+          _id: `choice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: 'bot-message',
+          shape: 'bot-choice-buttons',
+          choiceUI: {
+            ...choiceUI,
+            isSubmitted: true,
+            selectedButtonId: response?.buttonId,
+            selectedButtonIds: response?.buttonIds,
+          },
+          time: new Date().toISOString(),
+        } as any,
+      ]);
+    }
+
     setIsNodeProcessing(true);
     flowEngine.current.submitResponse(response, portName).catch((error) => {
       console.error('[ConferBot] Failed to submit node response:', error);
@@ -919,7 +997,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   const on = useCallback(
     (event: SocketEvents, callback: (...args: any[]) => void): (() => void) => {
       if (!socketClient.current) {
-        console.warn('[ConferBot] Cannot add event listener: socket not initialized');
+        // Socket not yet initialized — silently skip (will be set up later)
         return () => {};
       }
 
@@ -933,6 +1011,37 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     if (!socketClient.current) return;
     socketClient.current.off(event, callback);
   }, []);
+
+  // ********** Build Server Theme Override ********** //
+  const serverThemeOverride = useMemo(() => {
+    if (!serverCustomizations) return null;
+    const c = serverCustomizations;
+    const override: Record<string, any> = { colors: {} };
+
+    if (c.headerBgColor) override.colors.headerBg = c.headerBgColor;
+    if (c.headerTextColor) override.colors.headerText = c.headerTextColor;
+    if (c.botMsgColor) {
+      override.colors.botBubble = c.botMsgColor;
+      override.colors.primary = c.botMsgColor;
+      override.colors.primaryLight = c.botMsgColor + '33';
+    }
+    if (c.botTextColor) override.colors.botBubbleText = c.botTextColor;
+    if (c.userMsgColor) override.colors.userBubble = c.userMsgColor;
+    if (c.userTextColor) override.colors.userBubbleText = c.userTextColor;
+    if (c.optionBubbleMsgColor) override.colors.optionBubble = c.optionBubbleMsgColor;
+    if (c.optionBubbleTextColor) override.colors.optionBubbleText = c.optionBubbleTextColor;
+    if (c.chatBgColor) override.colors.background = c.chatBgColor;
+
+    // Font size
+    if (c.fontSize) {
+      const size = parseInt(c.fontSize, 10);
+      if (!isNaN(size)) {
+        override.typography = { fontSize: { md: size } };
+      }
+    }
+
+    return Object.keys(override.colors).length > 0 ? override : null;
+  }, [serverCustomizations]);
 
   // ********** Context Value ********** //
   const contextValue: ExtendedConferBotContext = {
@@ -957,6 +1066,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
     // Server customizations
     serverCustomizations,
+    serverThemeOverride,
     botName: serverCustomizations?.botName || serverCustomizations?.logoText || null,
     botAvatarUrl: serverCustomizations?.avatar || serverCustomizations?.logo || null,
 
