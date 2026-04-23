@@ -318,19 +318,4 @@ export const HandlerCountByCategory: Record<HandlerCategory, number> = {
   [HandlerCategories.SPECIAL]: 2,
 };
 
-// ========================================
-// LEGACY EXPORTS (for backwards compatibility)
-// ========================================
-
-/**
- * @deprecated Use registerAllHandlers instead
- */
-export function registerAllDisplayHandlers(registry: NodeHandlerRegistry): void {
-  registerDisplayHandlers(registry);
-  registerAskHandlers(registry);
-  registerChoiceHandlers(registry);
-  registerAdvancedInputHandlers(registry);
-  registerLegacyHandlers(registry);
-}
-
 export default registerAllHandlers;
