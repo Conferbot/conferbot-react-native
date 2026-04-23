@@ -6,6 +6,7 @@
  * transcript, session records, message status tracking, and message reactions.
  */
 
+import { Platform } from 'react-native';
 import {
   MessageStatus,
   MessageStatusEntry,
@@ -849,6 +850,27 @@ export class ChatState {
   setRecord(record: RecordEntry[]): void {
     this._record = [...record];
     this.notifyListeners();
+  }
+
+  /**
+   * Builds the response data payload for sending to the server via socket.
+   * Matches the web widget's `response-record` format.
+   */
+  buildResponseData(): Record<string, any> {
+    return {
+      version: 'v2',
+      chatSessionId: this._sessionId,
+      botId: this._botId,
+      chatDate: new Date().toISOString(),
+      deviceInfo: `ReactNative/${Platform.OS}`,
+      location: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      record: this._record,
+      answerVariables: this.getAnswerVariables().map((av) => ({
+        nodeId: av.nodeId,
+        key: av.variableName,
+        value: av.value,
+      })),
+    };
   }
 
   // ========================================
