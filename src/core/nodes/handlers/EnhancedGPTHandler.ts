@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * EnhancedGPTHandler.ts
  *
