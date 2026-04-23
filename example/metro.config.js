@@ -1,21 +1,28 @@
 const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 const path = require('path');
+const exclusionList = require('metro-config/src/defaults/exclusionList');
 
-/**
- * Metro configuration
- * https://facebook.github.io/metro/docs/configuration
- *
- * This config allows the example app to use the SDK from the parent directory
- */
+const sdkRoot = path.resolve(__dirname, '..');
+const exampleNodeModules = path.resolve(__dirname, 'node_modules');
 
 const config = {
-  watchFolders: [
-    path.resolve(__dirname, '..'),
-  ],
+  watchFolders: [sdkRoot],
   resolver: {
+    // Block the parent's react-native — use only example's version
+    blockList: exclusionList([
+      new RegExp(path.resolve(sdkRoot, 'node_modules', 'react-native') + '/.*'),
+      new RegExp(path.resolve(sdkRoot, 'node_modules', 'react') + '/.*'),
+      new RegExp(path.resolve(sdkRoot, 'node_modules', '@react-native') + '/.*'),
+      new RegExp(path.resolve(sdkRoot, 'node_modules', '@react-native-community') + '/.*'),
+    ]),
+    // Resolve SDK source directly (skip lib/ for live development)
+    sourceExts: ['tsx', 'ts', 'jsx', 'js', 'json'],
     extraNodeModules: {
-      '@conferbot/react-native': path.resolve(__dirname, '..'),
+      '@conferbot/react-native': sdkRoot,
+      'react': path.resolve(exampleNodeModules, 'react'),
+      'react-native': path.resolve(exampleNodeModules, 'react-native'),
     },
+    nodeModulesPaths: [exampleNodeModules],
   },
 };
 
