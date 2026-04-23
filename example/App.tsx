@@ -8,9 +8,15 @@ import {
   ScrollView,
   StatusBar,
 } from 'react-native';
-import { ConferBotProvider, ChatWidget } from '@conferbot/react-native';
+import { ConferBotProvider, ChatWidget, ConferBotEndpoints } from '@conferbot/react-native';
 import { HeadlessExample } from './src/HeadlessExample';
 import { CustomExample } from './src/CustomExample';
+
+// Configure to local embed-server (10.0.2.2 = host localhost from Android emulator)
+ConferBotEndpoints.configure({
+  socketUrl: 'http://10.0.2.2:8001',
+  apiBaseUrl: 'http://10.0.2.2:8001/api/v1/mobile',
+});
 
 type Tab = 'widget' | 'headless' | 'custom';
 
