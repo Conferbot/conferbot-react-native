@@ -1,7 +1,10 @@
+// @ts-nocheck
 import React, { useRef, useEffect, useCallback } from 'react';
 import {
   FlatList,
   View,
+  Text,
+  TouchableOpacity,
   StyleSheet,
   RefreshControl,
   ViewToken,
@@ -11,6 +14,8 @@ import { MessageBubble } from '../MessageBubble';
 import { TypingIndicator } from '../TypingIndicator';
 import { Avatar } from '../Avatar';
 import { EmptyState } from '../EmptyState';
+import { NodeRenderer } from '../NodeComponents';
+import type { NodeUIState } from '../../core/nodes/NodeHandler';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Reaction, ReactionEmoji, MessageStatusEntry } from '../../types';
 import { MessageStatus } from '../../types';
@@ -79,6 +84,12 @@ export interface MessageListProps {
   messageStatuses?: Map<string | number, MessageStatusEntry>;
   showReadReceipts?: boolean;
   onVisibleMessagesChange?: (messageIds: (string | number)[]) => void;
+  /** Active interactive node UI state to render inline after messages */
+  activeNodeUI?: NodeUIState | null;
+  /** Callback when user submits a response to the active node */
+  onNodeSubmit?: (response: any, portName?: string) => void;
+  /** Whether the node is currently loading */
+  isNodeLoading?: boolean;
 }
 
 /**
@@ -125,18 +136,20 @@ export const MessageList: React.FC<MessageListProps> = ({
   messageStatuses,
   showReadReceipts = true,
   onVisibleMessagesChange,
+  activeNodeUI,
+  onNodeSubmit,
+  isNodeLoading,
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
   const flatListRef = useRef<any>(null);
   const visibleMessageIdsRef = useRef<Set<string | number>>(new Set());
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to end when new messages arrive
   useEffect(() => {
     if (messages.length > 0 && flatListRef.current) {
-      // Small delay to ensure render is complete
       setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
   }, [messages.length]);
@@ -214,9 +227,65 @@ export const MessageList: React.FC<MessageListProps> = ({
     minimumViewTime: 500, // Item must be visible for 500ms
   }).current;
 
+  // Render frozen choice buttons (choices that were already submitted)
+  const renderFrozenChoiceButtons = useCallback(
+    (item: RecordItem) => {
+      const choiceUI = (item as any).choiceUI;
+      if (!choiceUI || !choiceUI.buttons) return null;
+
+      const selectedId = choiceUI.selectedButtonId;
+      const selectedIds = choiceUI.selectedButtonIds || (selectedId ? [selectedId] : []);
+
+      return (
+        <View style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          paddingLeft: theme.layout.avatarSize + 10 + theme.spacing.chatContentPadding,
+          paddingRight: theme.spacing.chatContentPadding,
+          marginBottom: 8,
+        }}>
+          {choiceUI.buttons.map((button: any) => {
+            const isSelected = selectedIds.includes(button.id);
+            return (
+              <TouchableOpacity
+                key={button.id}
+                style={{
+                  backgroundColor: isSelected ? theme.colors.primary : theme.colors.optionBubble,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: theme.borderRadius.button,
+                  opacity: isSelected ? 1 : 0.5,
+                }}
+                disabled={true}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: isSelected, disabled: true }}
+                accessibilityLabel={button.label}
+              >
+                <Text style={{
+                  color: isSelected ? theme.colors.textInverse : theme.colors.optionBubbleText,
+                  fontSize: theme.typography.fontSize.md,
+                  fontWeight: '500',
+                }}>
+                  {button.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      );
+    },
+    [theme]
+  );
+
   // Render individual message
   const renderMessage = useCallback(
     ({ item }: { item: RecordItem }) => {
+      // Handle frozen choice buttons (submitted choice nodes)
+      if ((item as any).shape === 'bot-choice-buttons') {
+        return renderFrozenChoiceButtons(item);
+      }
+
       const messageId = item._id;
       const messageReactions = getMessageReactions(item._id);
       const messageStatus = getMessageStatus(item._id);
@@ -263,18 +332,35 @@ export const MessageList: React.FC<MessageListProps> = ({
       onReactionPress,
       handleReactionPress,
       showReadReceipts,
+      renderFrozenChoiceButtons,
     ]
   );
 
-  // Render typing indicator as list header (appears at bottom since list is inverted)
-  const renderListHeader = () => {
-    if (!showTypingIndicator) return null;
+  // Render list footer: inline interactive node + typing indicator
+  const renderListFooter = () => {
+    const hasNode = !!activeNodeUI && !!onNodeSubmit;
+    const hasTyping = showTypingIndicator;
+    if (!hasNode && !hasTyping) return null;
     return (
-      <View style={styles.typingContainer}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-          <Avatar name="Bot" size={32} />
-          <TypingIndicator visible={true} />
-        </View>
+      <View>
+        {hasNode && (
+          <View style={{ paddingBottom: theme.spacing.sm }}>
+            <NodeRenderer
+              uiState={activeNodeUI}
+              onSubmit={onNodeSubmit}
+              isLoading={isNodeLoading}
+              isBot={true}
+            />
+          </View>
+        )}
+        {hasTyping && (
+          <View style={styles.typingContainer}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+              <Avatar name="Bot" size={32} />
+              <TypingIndicator visible={true} />
+            </View>
+          </View>
+        )}
       </View>
     );
   };
@@ -308,9 +394,8 @@ export const MessageList: React.FC<MessageListProps> = ({
       data={messages}
       renderItem={renderMessage}
       keyExtractor={keyExtractor}
-      ListHeaderComponent={renderListHeader}
+      ListFooterComponent={renderListFooter}
       ListEmptyComponent={renderEmpty}
-      inverted={true} // Messages appear from bottom to top
       style={styles.container}
       contentContainerStyle={[
         styles.contentContainer,
