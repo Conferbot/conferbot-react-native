@@ -287,7 +287,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setReactions(new Map());
     setCurrentUIState(null);
     setIsNodeProcessing(false);
+
+    // Fully dispose the flow engine so it re-initializes fresh
+    // (matching web widget behavior: clear state + reload)
     flowEngine.current?.reset();
+    flowEngine.current = null;
     chatStateRef.current = null;
 
     // Clear persisted conversation data (keeps user data)
@@ -296,8 +300,14 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       setHasPersistedSession(false);
     }
 
+    // Re-fetch chatbot data to trigger fresh flow engine initialization
+    // with a new chatSessionId (like web widget's page reload)
+    if (socketClient.current?.isConnected()) {
+      socketClient.current.getChatbotData();
+    }
+
     if (__DEV__) {
-      console.log('[ConferBot] Conversation reset');
+      console.log('[ConferBot] Conversation reset — new session will be created');
     }
   }, []);
 
@@ -647,7 +657,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
             console.log('[ConferBot] flowEngine.current:', !!flowEngine.current, 'chatSessionId:', chatSessionId);
           }
           if (!flowEngine.current) {
-            const sessionId = chatSessionId || `session_${Date.now()}`;
+            const sessionId = chatSessionId || Math.random().toString(36).substring(2, 15);
             if (!chatSessionId) {
               setChatSessionId(sessionId);
             }
@@ -655,6 +665,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
               console.log('[ConferBot] Initializing flow engine for session:', sessionId);
             }
             initializeFlowEngine(sessionId);
+
+            // Join chat room with new session (needed for restart and fresh init)
+            if (socketClient.current?.isConnected()) {
+              socketClient.current.joinChatRoomVisitor(sessionId);
+            }
 
             // Add a ChatState listener to sync bot messages to record
             if (chatStateRef.current) {
