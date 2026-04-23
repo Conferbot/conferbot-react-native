@@ -1,5 +1,8 @@
 // ********** Main Export File ********** //
 
+// ========== Configuration ========== //
+export { ConferBotEndpoints } from './config/constants';
+
 // ========== Core SDK (Headless) ========== //
 // Export context and provider
 export { ConferBotProvider, useConferBot } from './context/ConferBotContext';
