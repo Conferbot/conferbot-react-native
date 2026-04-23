@@ -16,6 +16,21 @@ import { ChatState } from '../../state/ChatState';
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
 import { DisplayNodes } from '../NodeTypes';
 
+/** Strip HTML tags from text */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
 // ========================================
 // BUTTON OPTION INTERFACE
 // ========================================
@@ -75,12 +90,14 @@ export class ButtonsHandler extends BaseNodeHandler {
 
     const nodeId = this.getNodeId(node);
 
-    // Get question text
-    let question = this.getString(data, 'question') ||
+    // Get question text (server sends 'choicePrompt' field)
+    let question = this.getString(data, 'choicePrompt') ||
+                   this.getString(data, 'question') ||
                    this.getString(data, 'text') ||
                    this.getString(data, 'message') ||
                    'Please select an option';
 
+    question = stripHtml(question);
     question = this.resolveText(question, state);
 
     // Get variable name
@@ -88,10 +105,11 @@ export class ButtonsHandler extends BaseNodeHandler {
                          this.getString(data, 'variable') ||
                          'selection';
 
-    // Get buttons array
-    const buttonsData = this.getArray<any>(data, 'buttons', []) ||
-                        this.getArray<any>(data, 'options', []) ||
-                        this.getArray<any>(data, 'choices', []);
+    // Get buttons array — check each field until we find a non-empty array
+    // (can't use || because empty arrays are truthy in JS)
+    let buttonsData = this.getArray<any>(data, 'buttons');
+    if (!buttonsData.length) buttonsData = this.getArray<any>(data, 'options');
+    if (!buttonsData.length) buttonsData = this.getArray<any>(data, 'choices');
 
     if (buttonsData.length === 0) {
       return this.createError('Buttons node has no button options');
@@ -100,7 +118,9 @@ export class ButtonsHandler extends BaseNodeHandler {
     // Map buttons to standard format
     const buttons: NodeUIState.Buttons['buttons'] = buttonsData.map((btn: any, index: number) => {
       const id = btn.id || btn._id || `btn_${index}`;
-      let label = btn.label || btn.text || btn.title || `Option ${index + 1}`;
+      let label = btn.choiceLabel || btn.choiceText || btn.label || btn.text || btn.title || `Option ${index + 1}`;
+      // Strip HTML from choice labels
+      label = stripHtml(label);
       label = this.resolveText(label, state);
 
       return {
@@ -116,7 +136,8 @@ export class ButtonsHandler extends BaseNodeHandler {
     const multiSelect = this.getBoolean(data, 'multiSelect') ||
                         this.getBoolean(data, 'multiple', false);
 
-    // Add to transcript
+    // Add question to transcript so it persists in the message list
+    // (the ButtonGroup UI will only show choice pills, not the question)
     state.addBotMessage(question, nodeId, this.nodeType);
 
     // Create UI state
@@ -150,28 +171,43 @@ export class ButtonsHandler extends BaseNodeHandler {
     }
 
     // Get the selected button(s) data
-    const buttonsData = this.getArray<any>(data || {}, 'buttons', []) ||
-                        this.getArray<any>(data || {}, 'options', []) ||
-                        this.getArray<any>(data || {}, 'choices', []);
+    let buttonsData = this.getArray<any>(data || {}, 'buttons');
+    if (!buttonsData.length) buttonsData = this.getArray<any>(data || {}, 'options');
+    if (!buttonsData.length) buttonsData = this.getArray<any>(data || {}, 'choices');
 
-    // Handle multi-select
-    const selectedIds = Array.isArray(response) ? response : [response];
+    // Handle multi-select — ButtonGroup sends { buttonId, value, label, variableName }
+    let selectedIds: any[];
+    if (response?.buttonId) {
+      selectedIds = [response.buttonId];
+    } else if (response?.buttonIds) {
+      selectedIds = response.buttonIds;
+    } else if (Array.isArray(response)) {
+      selectedIds = response;
+    } else {
+      selectedIds = [response];
+    }
+
     const selectedButtons = buttonsData.filter((btn: any) =>
       selectedIds.includes(btn.id) ||
       selectedIds.includes(btn._id) ||
       selectedIds.includes(btn.value) ||
-      selectedIds.includes(btn.label)
+      selectedIds.includes(btn.label) ||
+      selectedIds.includes(btn.choiceLabel) ||
+      selectedIds.includes(btn.choiceText)
     );
 
-    // Get values and labels
-    const values = selectedButtons.map((btn: any) => btn.value ?? btn.label);
-    const labels = selectedButtons.map((btn: any) => btn.label || btn.text);
+    // Get values and labels (strip HTML from server data)
+    const values = selectedButtons.map((btn: any) => btn.value ?? btn.choiceLabel ?? btn.choiceText ?? btn.label);
+    const labels = selectedButtons.map((btn: any) => {
+      const raw = btn.choiceLabel || btn.choiceText || btn.label || btn.text || '';
+      return stripHtml(raw);
+    });
     const finalValue = Array.isArray(response) ? values : values[0];
 
     // Store answer
     state.setAnswer(nodeId, variableName, finalValue, nodeId);
 
-    // Add to transcript
+    // Add to transcript (HTML-stripped label)
     state.addUserMessage(labels.join(', '), nodeId);
 
     // Check for specific next node from button
@@ -180,12 +216,9 @@ export class ButtonsHandler extends BaseNodeHandler {
       return NodeResult.jumpTo(selectedButton.nextNodeId, { [variableName]: finalValue });
     }
 
-    // Check for port-based routing
+    // Port-based routing using the choice button's ID (edges use source-{choiceId} format)
     if (selectedButton?.id) {
-      const portNextNodeId = this.getNextNodeId(node, selectedButton.id);
-      if (portNextNodeId && portNextNodeId.startsWith('__port:')) {
-        return NodeResult.proceed(portNextNodeId, { [variableName]: finalValue });
-      }
+      return this.proceedToPort(selectedButton.id, { [variableName]: finalValue });
     }
 
     return this.proceed(node, { [variableName]: finalValue });
