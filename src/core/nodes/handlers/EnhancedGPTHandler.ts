@@ -56,7 +56,7 @@ export interface EnhancedGPTUIState extends NodeUIState.GPTResponse {
 
 /** Socket client interface */
 interface SocketClient {
-  emit(event: string, payload: any): void;
+  emitToServer(event: string, payload: any): void;
   on?(event: string, callback: (data: any) => void): void;
   off?(event: string, callback?: (data: any) => void): void;
 }
@@ -453,7 +453,7 @@ export class EnhancedGPTHandler extends BaseNodeHandler {
   private emitSocketEvent(event: string, payload: any): void {
     if (this.socketClient) {
       try {
-        this.socketClient.emit(event, payload);
+        this.socketClient.emitToServer(event, payload);
       } catch (error) {
         console.error(`[EnhancedGPTHandler] Socket emit error:`, error);
       }
