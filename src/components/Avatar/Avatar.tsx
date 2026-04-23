@@ -93,14 +93,14 @@ export const Avatar: React.FC<AvatarProps> = ({
     return colors[Math.abs(hash) % colors.length];
   };
 
+  const hasImageSource = source && (typeof source === 'string' ? source.length > 0 : source.uri.length > 0);
+
   const containerStyle = {
     width: avatarSize,
     height: avatarSize,
     borderRadius: getBorderRadius(),
-    backgroundColor: getBackgroundColor(name),
+    backgroundColor: hasImageSource ? 'transparent' : 'transparent',
   };
-
-  const hasImageSource = source && (typeof source === 'string' ? source.length > 0 : source.uri.length > 0);
 
   return (
     <View
