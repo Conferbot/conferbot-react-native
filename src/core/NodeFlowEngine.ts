@@ -348,6 +348,7 @@ export class NodeFlowEngine {
       this.notifyStateListeners();
     } else {
       // Auto-continue for non-interactive display nodes
+      this.sendResponseToServer();
       const nextNodeId = this.resolveNextNode(node.id, null);
       if (nextNodeId) {
         await this.delay(this.config.typingDelay);
@@ -371,6 +372,9 @@ export class NodeFlowEngine {
       this.handleFlowComplete(data.completionStatus || 'completed');
       return;
     }
+
+    // Send state to server before proceeding
+    this.sendResponseToServer();
 
     // Resolve actual next node ID
     const resolvedNextId = this.resolveNextNode(node.id, nextNodeId);
@@ -415,6 +419,7 @@ export class NodeFlowEngine {
       return;
     }
 
+    this.sendResponseToServer();
     await this.processNode(targetNodeId);
   }
 
@@ -448,6 +453,9 @@ export class NodeFlowEngine {
     this.notifyStateListeners();
 
     try {
+      // Send response to server after user interaction
+      this.sendResponseToServer();
+
       // Handle response if handler supports it
       if (handler.handleResponse) {
         const nodeWithContext = {
@@ -527,6 +535,21 @@ export class NodeFlowEngine {
   }
 
   // ========================================
+  // SERVER COMMUNICATION
+  // ========================================
+
+  /**
+   * Sends current chat state to server via socket.
+   * Matches web widget's `response-record` event and Android/Flutter SDK behavior.
+   */
+  private sendResponseToServer(): void {
+    if (!this.config.socketClient) return;
+
+    const responseData = this.chatState.buildResponseData();
+    this.config.socketClient.sendResponseRecord(responseData);
+  }
+
+  // ========================================
   // ERROR HANDLING
   // ========================================
 
@@ -553,8 +576,11 @@ export class NodeFlowEngine {
     this._isWaitingForInput = false;
     this._currentUIState = null;
     this.chatState.markConversationComplete(reason);
-    this.notifyStateListeners();
 
+    // Send final state to server
+    this.sendResponseToServer();
+
+    this.notifyStateListeners();
     this.config.onFlowComplete?.(reason);
   }
 
