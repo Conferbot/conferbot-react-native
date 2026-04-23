@@ -39,6 +39,9 @@ export class MessageHandler extends BaseNodeHandler {
                this.getString(data, 'message') ||
                this.getString(data, 'content', '');
 
+    // Strip HTML tags
+    text = stripHtml(text);
+
     // Resolve variables in the message text
     text = this.resolveText(text, state);
 
@@ -441,6 +444,69 @@ export class NavigateHandler extends BaseNodeHandler {
 }
 
 // ========================================
+// WELCOME NODE HANDLER
+// ========================================
+
+/**
+ * Strips HTML tags from text, leaving only plain text content
+ */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+/**
+ * Handles 'welcome-node' type — the initial greeting from the bot.
+ * Treats it as a message node: strips HTML, adds to transcript, auto-proceeds.
+ */
+export class WelcomeNodeHandler extends BaseNodeHandler {
+  readonly nodeType = 'welcome-node';
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = this.getNodeData(node);
+    const nodeId = this.getNodeId(node);
+
+    // Get welcome message text
+    let text = '';
+    if (data) {
+      text = this.getString(data, 'text') ||
+             this.getString(data, 'message') ||
+             this.getString(data, 'content', '');
+    }
+
+    // Strip HTML tags
+    text = stripHtml(text);
+
+    if (text) {
+      // Resolve variables
+      text = this.resolveText(text, state);
+      // Add to transcript
+      state.addBotMessage(text, nodeId, this.nodeType);
+    }
+
+    // Create UI state for display (auto-proceed like message node)
+    const uiState: NodeUIState.Message = {
+      type: 'message',
+      nodeId,
+      text: text || 'Welcome!',
+      showAvatar: true,
+      typing: false,
+    };
+
+    return NodeResult.displayUI(uiState);
+  }
+}
+
+// ========================================
 // DISPLAY HANDLER COLLECTION
 // ========================================
 
@@ -448,6 +514,7 @@ export class NavigateHandler extends BaseNodeHandler {
  * Array of all display node handlers
  */
 export const displayHandlers: NodeHandler[] = [
+  new WelcomeNodeHandler(),
   new MessageHandler(),
   new ImageHandler(),
   new VideoHandler(),
