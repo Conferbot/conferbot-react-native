@@ -11,9 +11,10 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "dependencies": {
+    "@conferbot/react-native": "file:..",
+    "@react-native-async-storage/async-storage": "^3.0.2",
     "react": "18.2.0",
-    "react-native": "0.73.0",
-    "@conferbot/react-native": "file:.."
+    "react-native": "0.73.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
