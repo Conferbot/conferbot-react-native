@@ -41,6 +41,7 @@
     "notion",
     "stripe"
   ],
+  "license": "Apache-2.0",
   "author": "Conferbot <support@conferbot.com>",
   "repository": {
     "type": "git",
