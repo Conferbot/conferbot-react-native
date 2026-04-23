@@ -14,7 +14,7 @@ import {
   NodeFlowEngine,
   ChatState,
   NodeHandlerRegistry,
-  registerAllDisplayHandlers,
+  registerAllHandlers,
   NodeUIState,
   FlowDefinition,
 } from '../core';
@@ -165,6 +165,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   // Node Flow Engine References
   const flowEngine = useRef<NodeFlowEngine | null>(null);
   const chatStateRef = useRef<ChatState | null>(null);
+  const workspaceIdRef = useRef<string | null>(null);
 
   // Track if persistence is enabled
   const persistenceEnabled = config?.enablePersistence !== false && !!config?.asyncStorage;
@@ -382,9 +383,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
         return;
       }
 
-      // Initialize handler registry
+      // Initialize handler registry with all handlers (display, ask, choice, logic, integration, special)
       const registry = NodeHandlerRegistry.getInstance();
-      registerAllDisplayHandlers(registry);
+      registerAllHandlers(registry, {
+        socketClient: socketClient.current,
+      });
 
       // Create chat state - either restore from persisted or create new
       if (persistedState?.session && persistedState.answerVariables) {
@@ -606,6 +609,15 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       const chatbotData = data?.chatbotData;
       if (!chatbotData) return;
 
+      // Store workspaceId for handover and other integrations
+      if (chatbotData.workspaceId) {
+        if (chatStateRef.current) {
+          chatStateRef.current.setVariable('_workspaceId', chatbotData.workspaceId);
+        }
+        // Also store in ref so it's available when chatState initializes later
+        workspaceIdRef.current = chatbotData.workspaceId;
+      }
+
       // Parse server customizations
       const customizations = chatbotData.customizations;
       if (customizations) {
@@ -614,6 +626,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
           console.log('[ConferBot] Server customizations loaded:', Object.keys(customizations).length, 'keys');
           console.log('[ConferBot] botName/logoText:', customizations.botName || customizations.logoText);
           console.log('[ConferBot] avatar:', customizations.avatar);
+          console.log('[ConferBot] enableTagline:', customizations.enableTagline, 'tagline:', customizations.tagline);
         }
       }
 
@@ -687,6 +700,17 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
             console.log('[ConferBot] After init, flowEngine.current:', !!flowEngine.current, 'chatStateRef.current:', !!chatStateRef.current);
           }
           if (flowEngine.current) {
+            // Set metadata on chatState for handover and integrations
+            if (chatStateRef.current) {
+              if (workspaceIdRef.current) {
+                chatStateRef.current.setVariable('_workspaceId', workspaceIdRef.current);
+              }
+              const resolvedBotName = customizations?.botName || customizations?.logoText || '';
+              if (resolvedBotName) {
+                chatStateRef.current.setVariable('_botName', resolvedBotName);
+              }
+            }
+
             setIsNodeProcessing(true);
             const flowDefinition: FlowDefinition = {
               nodes,
