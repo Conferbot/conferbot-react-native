@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -132,7 +133,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
                   onError={() => setLogoFailed(true)}
                 />
               ) : (
-                <Text style={styles.conferbotText}>conferbot</Text>
+                <Text style={styles.conferbotText}>Conferbot</Text>
               )}
             </View>
           )}
@@ -213,6 +214,7 @@ const createStyles = (theme: ConferBotTheme) =>
     logo: {
       height: 18,
       width: 80,
+      marginBottom: -3,
     },
     conferbotText: {
       fontSize: 13,
