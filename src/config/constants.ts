@@ -62,15 +62,9 @@ export class ConferBotEndpoints {
    */
   static configure(options: { apiBaseUrl?: string; socketUrl?: string }): void {
     if (options.apiBaseUrl) {
-      if (!options.apiBaseUrl.startsWith('https://')) {
-        throw new Error('[ConferBot] API URL must use HTTPS');
-      }
       this._apiBaseUrl = options.apiBaseUrl;
     }
     if (options.socketUrl) {
-      if (!options.socketUrl.startsWith('https://')) {
-        throw new Error('[ConferBot] Socket URL must use HTTPS');
-      }
       this._socketUrl = options.socketUrl;
     }
   }
