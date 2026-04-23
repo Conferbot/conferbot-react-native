@@ -212,7 +212,11 @@ export class NodeFlowEngine {
    */
   private findEdge(nodeId: string, port: string): NodeEdge | null {
     const edge = this.edges.find(
-      (e) => e.source === nodeId && (e.sourceHandle === port || e.data?.port === port)
+      (e) => e.source === nodeId && (
+        e.sourceHandle === port ||
+        e.sourceHandle === `source-${port}` ||
+        e.data?.port === port
+      )
     );
     if (!edge) {
       console.warn(`[ConferBot] No edge found for port: ${port} on node: ${nodeId}`);
@@ -502,7 +506,7 @@ export class NodeFlowEngine {
       if (edge.source === currentNodeId) {
         if (!portName) {
           // Default edge (no port requirement)
-          if (!edge.sourceHandle || edge.sourceHandle === 'default' || edge.sourceHandle === 'out') {
+          if (!edge.sourceHandle || edge.sourceHandle === 'default' || edge.sourceHandle === 'out' || edge.sourceHandle === 'source') {
             return edge.target;
           }
         }
