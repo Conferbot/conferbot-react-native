@@ -214,6 +214,7 @@ const createStyles = (theme: ConferBotTheme) =>
     logo: {
       height: 18,
       width: 80,
+      marginLeft: -6,
       marginBottom: -3,
     },
     conferbotText: {
