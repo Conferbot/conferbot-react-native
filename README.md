@@ -3,9 +3,15 @@
 [![npm version](https://img.shields.io/npm/v/@conferbot/react-native.svg)](https://www.npmjs.com/package/@conferbot/react-native)
 [![React Native](https://img.shields.io/badge/React%20Native-%3E%3D%200.70-blue.svg)](https://reactnative.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/npm/l/@conferbot/react-native.svg)](https://github.com/conferbot/react-native-sdk/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/conferbot/react-native-sdk/blob/main/LICENSE)
 
 Native React Native SDK for embedding Conferbot chatbots into iOS and Android applications -- no WebView required.
+
+<p align="center">
+  <img src="docs/screenshots/chat-widget.png" width="280" alt="Chat Widget" />
+  <img src="docs/screenshots/choice-node.png" width="280" alt="Choice Node" />
+  <img src="docs/screenshots/themed-chat.png" width="280" alt="Themed Chat" />
+</p>
 
 ## Features
 
@@ -47,6 +53,17 @@ npm install react react-native @react-native-async-storage/async-storage
 ```
 
 `@react-native-async-storage/async-storage` is optional but required for session persistence and offline queue features.
+
+## Getting Your API Key and Bot ID
+
+You need two credentials to use the SDK:
+
+1. **Log in** to [Conferbot Dashboard](https://app.conferbot.com)
+2. **Create or select a bot** from the dashboard
+3. **Find your Bot ID**: Go to **Bot Settings** > **General** -- the Bot ID is displayed at the top
+4. **Find your API Key**: Go to **Workspace Settings** > **API Keys** -- copy the key starting with `conf_`
+
+> **Note:** For development and testing, you can use the example app's built-in test credentials. For production, always use your own API key and bot ID.
 
 ## Quick Start
 
@@ -334,15 +351,47 @@ For the complete API surface -- every component prop, hook return value, and typ
 
 ## Example App
 
-A working example app is included in the [`example/`](example/) directory.
+A fully working example app is included in the [`example/`](example/) directory. It demonstrates all three integration patterns with a tab-based UI.
+
+### Running the Example
 
 ```bash
+# 1. Clone the repo
+git clone https://github.com/conferbot/react-native-sdk.git
+cd react-native-sdk
+
+# 2. Install SDK dependencies
+npm install
+
+# 3. Set up the example app
 cd example
 npm install
-npx react-native run-ios    # or run-android
+
+# 4. Configure your bot credentials
+#    Open example/App.tsx and replace:
+#      const API_KEY = 'test_key';
+#      const BOT_ID = '69e8503cf33718a92ea792fe';
+#    with your own API key and Bot ID from the Conferbot dashboard.
+
+# 5. (Optional) Point to production server
+#    Remove or update the ConferBotEndpoints.configure() block in App.tsx.
+#    By default, the SDK connects to https://embed.conferbot.com
+
+# 6. Run on Android
+npx react-native run-android
+
+# 7. Or run on iOS
+cd ios && pod install && cd ..
+npx react-native run-ios
 ```
 
-The example demonstrates all three integration patterns (drop-in widget, headless hook, and mix-and-match components) along with theming, offline support, and analytics.
+### What the Example Shows
+
+| Tab | Pattern | Description |
+|-----|---------|-------------|
+| **Widget** | Drop-in | Full chat UI opens in a modal -- one component, zero config |
+| **Headless** | Hook-based | Custom UI with `useConferBot()` hook for full control |
+| **Custom** | Mix & match | Pre-built components (`MessageList`, `ChatInput`) in a custom layout |
 
 ## Development
 
@@ -367,7 +416,7 @@ Contributions are welcome. Please open an issue first to discuss what you would 
 
 ## License
 
-MIT -- see [LICENSE](LICENSE) for details.
+Apache 2.0 -- see [LICENSE](LICENSE) for details.
 
 ## Links
 
