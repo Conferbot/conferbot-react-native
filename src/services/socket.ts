@@ -614,7 +614,25 @@ class ConferBotSocket {
     }
   }
 
-  // Emit event to all listeners
+  // Emit event to the server via the underlying socket.io connection.
+  // Used by integration handlers (e.g., handover, webhooks) that need to send
+  // arbitrary events to the embed-server.
+  emitToServer(event: string, payload: any): void {
+    if (!this.socket || !this.isConnected()) {
+      if (__DEV__) {
+        console.warn(`[ConferBot Socket] Cannot emit "${event}": not connected`);
+      }
+      return;
+    }
+
+    this.socket.emit(event, payload);
+
+    if (__DEV__) {
+      console.log(`[ConferBot Socket] Emitted to server: ${event}`);
+    }
+  }
+
+  // Emit event to all local listeners (internal dispatch only — does NOT send to server)
   private emit(event: SocketEvents | string, ...args: any[]): void {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
