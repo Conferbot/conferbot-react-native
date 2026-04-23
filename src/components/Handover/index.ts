@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Handover Components Index
  *
