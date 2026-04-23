@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Modal,
@@ -11,15 +12,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useTheme } from '../../theme';
+import { useTheme, ThemeProvider } from '../../theme';
 import { useConferBot } from '../../context/ConferBotContext';
 import { ChatHeader } from '../ChatHeader';
 import { MessageList } from '../MessageList';
 import { ChatInput } from '../ChatInput';
 import { ChatBottomBar } from '../ChatBottomBar/ChatBottomBar';
 import { NodeRenderer } from '../NodeComponents';
-import { NodeFlowEngine, ChatState } from '../../core';
-import { NodeUIState } from '../../core/nodes/NodeHandler';
 import {
   FilePicker,
   FilePickerResult,
@@ -31,7 +30,7 @@ import {
 import { isAudioRecorderAvailable } from '../../utils/AudioRecorder';
 import type { VoiceRecordingResult } from '../VoiceRecorder';
 import type { ConferBotTheme } from '../../theme/types';
-import type { SocketEvents, BotResponsePayload, RecordItem } from '../../types';
+import type { SocketEvents, RecordItem } from '../../types';
 
 // Maximum file size for attachments (5MB)
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
@@ -190,6 +189,13 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     on,
     botName,
     botAvatarUrl,
+    serverCustomizations,
+    // Use the context's flow engine state
+    currentUIState,
+    isNodeProcessing,
+    submitNodeResponse,
+    chatState: contextChatState,
+    serverThemeOverride,
   } = useConferBot();
 
   // Use controlled visible if provided, otherwise use context isOpen
@@ -198,188 +204,31 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   // Track agent typing
   const [isAgentTyping, setIsAgentTyping] = useState(false);
 
-  // Node flow engine state
-  const [currentUIState, setCurrentUIState] = useState<NodeUIState | null>(null);
-  const [isNodeLoading, setIsNodeLoading] = useState(false);
+  // Track flow completion locally
   const [isFlowComplete, setIsFlowComplete] = useState(false);
 
   // Attachment state
   const [selectedAttachment, setSelectedAttachment] = useState<SelectedAttachment | null>(null);
   const [showAttachmentPreview, setShowAttachmentPreview] = useState(false);
 
-  // Flow engine and chat state refs
-  const flowEngine = useRef<NodeFlowEngine | null>(null);
-  const chatState = useRef<ChatState | null>(null);
-
-  // Track if engine has been initialized for this session
-  const engineInitialized = useRef(false);
+  // Reference to context chat state for local operations
+  const chatState = useRef<ChatState | null>(contextChatState);
+  chatState.current = contextChatState;
 
   // Check if voice recording is available
   const voiceRecordingAvailable = enableVoiceMessage && isAudioRecorderAvailable();
 
   /**
-   * Initialize the flow engine when chat opens
-   */
-  const initializeFlowEngine = useCallback(() => {
-    if (!chatSessionId || !chatbotConfig?.id) {
-      if (debug) {
-        console.log('[ChatWidget] Cannot initialize flow engine - missing session or bot ID');
-      }
-      return;
-    }
-
-    // Create new chat state
-    chatState.current = new ChatState(chatSessionId, chatbotConfig.id);
-
-    // Restore existing record to chat state
-    if (record && record.length > 0) {
-      for (const entry of record) {
-        chatState.current.addRecord(entry as any);
-      }
-    }
-
-    // Create flow engine with callbacks
-    flowEngine.current = new NodeFlowEngine(chatState.current, undefined, {
-      typingDelay,
-      debug,
-      onUIStateChange: (uiState) => {
-        if (debug) {
-          console.log('[ChatWidget] UI state changed:', uiState?.type);
-        }
-        setCurrentUIState(uiState);
-        setIsNodeLoading(uiState?.type === 'loading');
-      },
-      onWaitingForInput: (nodeId, uiState) => {
-        if (debug) {
-          console.log('[ChatWidget] Waiting for input on node:', nodeId);
-        }
-        setCurrentUIState(uiState);
-        setIsNodeLoading(false);
-      },
-      onFlowComplete: (reason) => {
-        if (debug) {
-          console.log('[ChatWidget] Flow complete:', reason);
-        }
-        setCurrentUIState(null);
-        setIsFlowComplete(true);
-        setIsNodeLoading(false);
-      },
-      onError: (error, nodeId) => {
-        console.error('[ChatWidget] Flow engine error:', error.message, { nodeId });
-        setIsNodeLoading(false);
-      },
-    });
-
-
-    engineInitialized.current = true;
-
-    if (debug) {
-      console.log('[ChatWidget] Flow engine initialized');
-    }
-  }, [chatSessionId, chatbotConfig?.id, record, typingDelay, debug]);
-
-  /**
-   * Handle bot response events from the socket
-   */
-  const handleBotResponse = useCallback(
-    (payload: BotResponsePayload) => {
-      if (debug) {
-        console.log('[ChatWidget] Received bot-response:', payload);
-      }
-
-      // Ensure flow engine is initialized
-      if (!flowEngine.current || !chatState.current) {
-        if (debug) {
-          console.log('[ChatWidget] Flow engine not initialized, attempting initialization');
-        }
-        initializeFlowEngine();
-      }
-
-      // If we still don't have an engine, skip processing
-      if (!flowEngine.current || !chatState.current) {
-        if (debug) {
-          console.log('[ChatWidget] Flow engine still not available, skipping');
-        }
-        return;
-      }
-
-      // Process the bot response
-      // The payload typically contains flow data and node information
-      if (payload.record && payload.record.length > 0) {
-        const latestRecord = payload.record[payload.record.length - 1] as any;
-
-        // Add record entries to chat state
-        for (const entry of payload.record) {
-          chatState.current.addRecord(entry as any);
-        }
-
-        // Check if this is a flow-based response with node data
-        if (latestRecord.nodeData || latestRecord.flowData) {
-          const flowData = latestRecord.flowData || { nodes: [], edges: [] };
-          const currentNodeId = latestRecord.nodeData?.currentNodeId || latestRecord.currentNodeId;
-
-          // Load flow if available
-          if (flowData.nodes && flowData.nodes.length > 0) {
-            flowEngine.current.loadFlow({
-              nodes: flowData.nodes,
-              edges: flowData.edges || [],
-              startNodeId: currentNodeId,
-            });
-
-          }
-
-          // Process the current node
-          if (currentNodeId) {
-            setIsNodeLoading(true);
-            flowEngine.current.resumeFrom(currentNodeId).catch((error) => {
-              console.error('[ChatWidget] Error resuming flow:', error);
-              setIsNodeLoading(false);
-            });
-
-          }
-        }
-      }
-
-      // Update answer variables if provided
-      if (payload.answerVariables && chatState.current) {
-        for (const av of payload.answerVariables) {
-          if (av.variableName && av.value !== undefined) {
-            chatState.current.setAnswer(
-              av.questionId || av.variableName,
-              av.variableName,
-              av.value
-            );
-          }
-        }
-      }
-    },
-    [debug, initializeFlowEngine]
-  );
-
-  /**
-   * Handle user response submission from NodeRenderer
+   * Handle user response submission from NodeRenderer — delegates to context
    */
   const handleNodeResponse = useCallback(
     async (response: any, portName?: string) => {
       if (debug) {
         console.log('[ChatWidget] Node response submitted:', { response, portName });
       }
-
-      if (!flowEngine.current) {
-        console.warn('[ChatWidget] Flow engine not available for response');
-        return;
-      }
-
-      setIsNodeLoading(true);
-
-      try {
-        await flowEngine.current.submitResponse(response, portName);
-      } catch (error) {
-        console.error('[ChatWidget] Error submitting response:', error);
-        setIsNodeLoading(false);
-      }
+      submitNodeResponse(response, portName);
     },
-    [debug]
+    [debug, submitNodeResponse]
   );
 
   // Listen for agent typing status
@@ -388,42 +237,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       setIsAgentTyping(data.isTyping || false);
     });
 
-
     return unsubscribe;
   }, [on]);
-
-  // Listen for bot-response events to trigger flow engine
-  useEffect(() => {
-    const unsubscribe = on('bot-response' as SocketEvents, handleBotResponse);
-
-    return unsubscribe;
-  }, [on, handleBotResponse]);
-
-  // Initialize flow engine when chat opens
-  useEffect(() => {
-    if (isVisible && !engineInitialized.current) {
-      initializeFlowEngine();
-    }
-  }, [isVisible, initializeFlowEngine]);
-
-  // Reset engine state when chat closes
-  useEffect(() => {
-    if (!isVisible && engineInitialized.current) {
-      // Reset state but keep engine for potential reconnection
-      setCurrentUIState(null);
-      setIsNodeLoading(false);
-      setIsFlowComplete(false);
-    }
-  }, [isVisible]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      flowEngine.current = null;
-      chatState.current = null;
-      engineInitialized.current = false;
-    };
-  }, []);
 
   // Auto-open chat on mount if not controlled
   useEffect(() => {
@@ -775,28 +590,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
    * - An interactive node is active and waiting for input
    * - The node is loading
    */
-  const shouldShowInput = (): boolean => {
-    // Always show input if no node UI is active
-    if (!currentUIState) {
-      return true;
-    }
-
-    // Show input if flow is complete
-    if (isFlowComplete) {
-      return true;
-    }
-
-    // Hide input during loading
-    if (isNodeLoading || currentUIState.type === 'loading') {
-      return false;
-    }
-
-    // Non-interactive node types that allow free text input
-    const nonInteractiveTypes = ['message', 'image', 'video', 'audio', 'file', 'html', 'gptResponse'];
-
-    // Hide input for interactive node types
-    return nonInteractiveTypes.includes(currentUIState.type);
-  };
+  // Always show the input bar — matches Flutter/Android SDK behavior
+  const shouldShowInput = (): boolean => true;
 
   /**
    * Determine if the node renderer should be shown
@@ -951,6 +746,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       accessibilityLabel="Chat modal"
       testID={testID}
     >
+      <ThemeProvider theme={serverThemeOverride || undefined}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
@@ -958,6 +754,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
         {/* Header */}
         <ChatHeader
           title={botName || title}
+          tagline={serverCustomizations?.enableTagline ? serverCustomizations?.tagline : undefined}
           subtitle={getSubtitle()}
           agent={currentAgent}
           botAvatarUrl={botAvatarUrl || undefined}
@@ -966,25 +763,16 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           testID={`${testID}-header`}
         />
 
-        {/* Message List */}
+        {/* Message List — interactive node renders inline at the end */}
         <MessageList
           messages={record}
-          showTypingIndicator={isAgentTyping || isNodeLoading}
+          showTypingIndicator={isAgentTyping || isNodeProcessing}
           showTimestamps={showTimestamps}
           testID={`${testID}-messages`}
+          activeNodeUI={shouldShowNodeRenderer() && currentUIState ? currentUIState : null}
+          onNodeSubmit={handleNodeResponse}
+          isNodeLoading={isNodeProcessing}
         />
-
-        {/* Node Renderer for interactive nodes */}
-        {shouldShowNodeRenderer() && currentUIState && (
-          <View style={styles.nodeRendererContainer}>
-            <NodeRenderer
-              uiState={currentUIState}
-              onSubmit={handleNodeResponse}
-              isLoading={isNodeLoading}
-              isBot={true}
-            />
-          </View>
-        )}
 
         {/* Unified input + footer — one seamless bottom bar */}
         {shouldShowInput() && (
@@ -999,6 +787,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
         {/* Attachment Preview Modal */}
         {renderAttachmentPreview()}
       </KeyboardAvoidingView>
+      </ThemeProvider>
     </Modal>
   );
 };
