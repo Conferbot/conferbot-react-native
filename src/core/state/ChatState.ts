@@ -870,6 +870,7 @@ export class ChatState {
         key: av.variableName,
         value: av.value,
       })),
+      channel: 'mobile',
     };
   }
 
