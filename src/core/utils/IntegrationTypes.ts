@@ -60,8 +60,8 @@ export interface WebhookAuthentication {
 
 /** Socket client interface for real-time communication */
 export interface SocketClient {
-  /** Emit an event to the server */
-  emit(event: string, payload: unknown): void;
+  /** Emit an event to the server (sends via socket.io connection) */
+  emitToServer(event: string, payload: unknown): void;
   /** Listen for an event */
   on?(event: string, callback: (data: unknown) => void): void;
   /** Remove event listener */
