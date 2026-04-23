@@ -33,6 +33,7 @@ import type { Agent } from '../../types';
  */
 export interface ChatHeaderProps {
   title?: string;
+  tagline?: string;
   subtitle?: string;
   agent?: Agent;
   botAvatarUrl?: string;
@@ -62,6 +63,7 @@ export interface ChatHeaderProps {
  */
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
   title = 'Chat',
+  tagline,
   subtitle,
   agent,
   botAvatarUrl,
@@ -113,6 +115,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         >
           {displayTitle}
         </Text>
+
+        {tagline && (
+          <Text style={styles.tagline} numberOfLines={1}>
+            {tagline}
+          </Text>
+        )}
 
         {displaySubtitle && (
           <Text
@@ -180,6 +188,11 @@ const createStyles = (theme: ConferBotTheme) =>
       fontWeight: theme.typography.fontWeight.semibold,
       color: theme.colors.headerText,
       marginBottom: 1,
+    },
+    tagline: {
+      fontSize: 12,
+      color: theme.colors.headerText,
+      opacity: 0.8,
     },
     subtitle: {
       fontSize: 11,
