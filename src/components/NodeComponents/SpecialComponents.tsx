@@ -23,15 +23,13 @@ import {
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
-import {
-  HandoverView,
-  PreChatForm,
-  HandoverWaiting,
-  HandoverConnected,
-  HandoverError,
-  PostChatSurvey,
-  AgentTyping,
-} from '../Handover';
+import { HandoverView } from '../Handover/HandoverView';
+import { PreChatForm } from '../Handover/PreChatForm';
+import { HandoverWaiting } from '../Handover/HandoverWaiting';
+import { HandoverConnected } from '../Handover/HandoverConnected';
+import { HandoverError } from '../Handover/HandoverError';
+import { PostChatSurvey } from '../Handover/PostChatSurvey';
+import { AgentTyping } from '../Handover/AgentTyping';
 import type {
   HandoverStage,
   PreChatFormConfig,
