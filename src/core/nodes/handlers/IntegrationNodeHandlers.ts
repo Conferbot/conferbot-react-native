@@ -331,7 +331,7 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
     }
 
     try {
-      this.socketClient.emit(event, payload);
+      this.socketClient.emitToServer(event, payload);
       return true;
     } catch {
       return false;
@@ -788,130 +788,62 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
 
     const nodeId = this.getNodeId(node);
 
-    const config: HumanHandoverConfig = {
-      department: this.getString(data, 'department'),
-      priority: this.getString(data, 'priority', 'normal'),
-      showPreChatForm: this.getBoolean(data, 'showPreChatForm', false),
-      preChatFields: this.getArray(data, 'preChatFields') as HumanHandoverConfig['preChatFields'],
-      customQuestions: this.getArray(data, 'customQuestions') as HumanHandoverConfig['customQuestions'],
-      departments: this.getArray(data, 'departments') as HumanHandoverConfig['departments'],
-      waitMessage: this.getString(data, 'waitMessage', 'Please wait while we connect you with an agent...'),
-      connectedMessage: this.getString(data, 'connectedMessage', 'You are now connected with'),
-      noAgentsMessage: this.getString(data, 'noAgentsMessage', 'Sorry, no agents are available at the moment.'),
-      timeoutMessage: this.getString(data, 'timeoutMessage', 'Connection timed out. Please try again later.'),
-      timeoutSeconds: this.getNumber(data, 'timeoutSeconds', 300),
-      showPostChatSurvey: this.getBoolean(data, 'showPostChatSurvey', true),
-      surveyConfig: data.surveyConfig as PostChatSurveyConfig,
-    };
+    // Get handover message (matches web widget's nodeData.handoverMessage)
+    const handoverMessage = this.getString(
+      data,
+      'handoverMessage',
+      this.getString(data, 'waitMessage', 'Please wait while we connect you with an agent...')
+    );
+    const resolvedMessage = state.resolveVariables(handoverMessage);
 
-    const resolvedWaitMessage = state.resolveVariables(config.waitMessage || '');
-    const resolvedConnectedMessage = state.resolveVariables(config.connectedMessage || '');
-    const resolvedNoAgentsMessage = state.resolveVariables(config.noAgentsMessage || '');
-    const resolvedTimeoutMessage = state.resolveVariables(config.timeoutMessage || '');
+    // Show the handover message as a bot message (matches web widget behavior)
+    state.addBotMessage(resolvedMessage, nodeId, 'human-handover-node');
 
-    const preChatConfig: PreChatFormConfig = {
-      title: this.getString(data, 'preChatTitle', 'Before we connect you'),
-      subtitle: this.getString(data, 'preChatSubtitle', 'Please provide the following information'),
-      fields: [
-        ...(config.preChatFields || []).map((field) => ({
-          id: field.id,
-          label: field.label,
-          type: field.type as 'text' | 'email' | 'phone' | 'select',
-          required: field.required,
-          options: field.options?.map((opt) => ({
-            label: opt.label,
-            value: String(opt.value),
-          })),
-        })),
-        ...(config.customQuestions || []).map((q) => ({
-          id: q.id,
-          label: q.question,
-          type: q.type as 'text' | 'email' | 'phone' | 'select',
-          required: q.required,
-          options: q.options,
-        })),
-      ],
-      departments: config.departments,
-      showDepartmentSelector: !!config.departments && config.departments.length > 0,
-      submitButtonText: this.getString(data, 'preChatSubmitText', 'Start Chat'),
-    };
-
-    const surveyConfig: PostChatSurveyConfig = config.surveyConfig || {
-      enabled: config.showPostChatSurvey !== false,
-      title: this.getString(data, 'surveyTitle', 'How was your experience?'),
-      ratingQuestion: this.getString(data, 'surveyRatingQuestion', 'Please rate your conversation'),
-      ratingStyle: (this.getString(data, 'surveyRatingStyle', 'stars') as 'stars' | 'thumbs' | 'numbers' | 'emojis'),
-      maxRating: this.getNumber(data, 'surveyMaxRating', 5),
-      feedbackQuestion: this.getString(data, 'surveyFeedbackQuestion', 'Any additional feedback? (optional)'),
-      submitButtonText: this.getString(data, 'surveySubmitText', 'Submit'),
-      skipButtonText: this.getString(data, 'surveySkipText', 'Skip'),
-      thankYouMessage: this.getString(data, 'surveyThankYouMessage', 'Thank you for your feedback!'),
-    };
-
-    const preChatCompleted = state.getVariable('_preChatFormCompleted');
-    const hasPreChatFields = preChatConfig.fields.length > 0 || (preChatConfig.departments && preChatConfig.departments.length > 0);
-
-    if (config.showPreChatForm && !preChatCompleted && hasPreChatFields) {
-      const uiState: ExtendedHumanHandoverUIState = {
-        type: 'humanHandover',
-        nodeId,
-        stage: 'waiting',
-        extendedStage: 'pre_chat',
-        showPreChatForm: true,
-        preChatFields: config.preChatFields,
-        preChatConfig,
-        customQuestions: config.customQuestions,
-        departments: config.departments,
-        surveyConfig,
-        waitMessage: resolvedWaitMessage,
-        connectedMessage: resolvedConnectedMessage,
-        noAgentsMessage: resolvedNoAgentsMessage,
-        timeoutMessage: resolvedTimeoutMessage,
-      };
-
-      return NodeResult.displayUI(uiState as NodeUIState.HumanHandover);
-    }
-
-    const handoverPayload = {
-      ...this.buildCommonPayload(state),
-      nodeId,
-      department: state.getVariable('_selectedDepartment') || config.department,
-      priority: config.priority,
+    // Build chatMetaData matching the web widget format exactly
+    const workspaceId = state.getVariable('_workspaceId') || '';
+    const chatMetaData = {
+      version: 'v2',
+      workspaceId,
+      chatSessionId: state.sessionId,
+      botId: state.botId,
+      botName: state.getVariable('_botName') || '',
+      chatDate: new Date().toISOString(),
+      deviceInfo: 'ReactNative',
+      location: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      record: state.getRecord(),
+      answerVariables: state.getAnswerVariables(),
       transcript: state.getTranscript(),
-      preChatData: state.getVariable('_preChatFormData'),
     };
 
-    const socketEmitted = this.emitSocketEvent('handover:request', handoverPayload);
-
-    if (!socketEmitted) {
-      const uiState: ExtendedHumanHandoverUIState = {
-        type: 'humanHandover',
-        nodeId,
-        stage: 'noAgents',
-        extendedStage: 'no_agents',
-        noAgentsMessage: resolvedNoAgentsMessage,
-        surveyConfig,
-      };
-
-      return NodeResult.displayUI(uiState as NodeUIState.HumanHandover);
-    }
+    // Emit initiate-handover via socket (matches web widget's socket.emit("initiate-handover", ...))
+    const maxWaitTime = this.getNumber(data, 'maxWaitTime', 2);
+    this.emitSocketEvent('initiate-handover', {
+      workspaceId,
+      chatbotId: state.botId,
+      chatbotName: chatMetaData.botName,
+      chatSessionId: state.sessionId,
+      chatMetaData,
+      metaData: {
+        visitorId: state.sessionId,
+        chatDate: chatMetaData.chatDate,
+        deviceInfo: chatMetaData.deviceInfo,
+        location: chatMetaData.location,
+      },
+      priority: this.getString(data, 'priority', 'normal'),
+      maxWaitTime,
+      assignmentType: this.getString(data, 'assignmentType', 'auto'),
+      assignmentStrategy: this.getString(data, 'agentAssignmentStrategy'),
+      assignedAgents: this.getArray(data, 'assignedAgents'),
+      assignedAIAgents: this.getArray(data, 'assignedAIAgents'),
+    });
 
     state.setVariable('_handoverInitiated', true);
     state.setVariable('_handoverStartTime', new Date().toISOString());
 
-    const uiState: ExtendedHumanHandoverUIState = {
-      type: 'humanHandover',
-      nodeId,
-      stage: 'waiting',
-      extendedStage: 'waiting',
-      waitMessage: resolvedWaitMessage,
-      connectedMessage: resolvedConnectedMessage,
-      noAgentsMessage: resolvedNoAgentsMessage,
-      timeoutMessage: resolvedTimeoutMessage,
-      surveyConfig,
-    };
-
-    return NodeResult.displayUI(uiState as NodeUIState.HumanHandover);
+    // Flow pauses here — agent-accepted/agent-message events are handled by
+    // ConferBotContext socket listeners (already wired up).
+    // The chat input stays active so the user can type messages to the agent.
+    return NodeResult.proceed(null, { flowComplete: true, completionStatus: 'handover' });
   }
 
   /**
