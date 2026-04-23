@@ -467,17 +467,56 @@ export class NodeFlowEngine {
 
     try {
       // Push user response to record (matching web widget format)
+      // Web widget uses different shapes per node type
       const responseText = typeof response === 'string'
         ? response
         : response?.text || response?.selectedChoice || response?.value || String(response);
-      this.chatState.addRecord({
-        _id: node.id,
-        id: node.id,
-        shape: 'user-input-response',
-        type: node.type,
-        text: responseText,
-        time: new Date().toISOString(),
-      });
+
+      const choiceNodeTypes = ['n-choices-node', '2-choice-node', '3-choice-node'];
+      const selectNodeTypes = ['n-select-option-node'];
+      const checkNodeTypes = ['n-check-option-node'];
+
+      if (choiceNodeTypes.includes(node.type)) {
+        // Choice nodes: shape=user-selected-choice, include choices data
+        this.chatState.addRecord({
+          _id: node.id,
+          id: node.id,
+          shape: 'user-selected-choice',
+          choices: node.data,
+          selectedChoice: responseText,
+          time: new Date().toISOString(),
+        });
+      } else if (selectNodeTypes.includes(node.type)) {
+        // Select nodes: shape=user-selected-option, include options data
+        this.chatState.addRecord({
+          _id: node.id,
+          id: node.id,
+          shape: 'user-selected-option',
+          options: node.data,
+          selectedOption: responseText,
+          time: new Date().toISOString(),
+        });
+      } else if (checkNodeTypes.includes(node.type)) {
+        // Check nodes: shape=user-selected-check-options
+        this.chatState.addRecord({
+          _id: node.id,
+          id: node.id,
+          shape: 'user-selected-check-options',
+          options: node.data,
+          selectedOptions: responseText,
+          time: new Date().toISOString(),
+        });
+      } else {
+        // Text input and other nodes: shape=user-input-response
+        this.chatState.addRecord({
+          _id: node.id,
+          id: node.id,
+          shape: 'user-input-response',
+          type: node.data?.type || node.type,
+          text: responseText,
+          time: new Date().toISOString(),
+        });
+      }
 
       // Send response to server after user interaction
       this.sendResponseToServer();
