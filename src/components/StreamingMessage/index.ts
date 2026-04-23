@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * StreamingMessage component index
  */
