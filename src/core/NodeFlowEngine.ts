@@ -331,6 +331,22 @@ export class NodeFlowEngine {
     this._currentUIState = uiState;
     this._isProcessing = false;
 
+    // Push bot message to record (matching web widget format)
+    // Web widget pushes the entire node object {...node, time} into record,
+    // so the admin dashboard expects record entries with data sub-object
+    if (uiState.text) {
+      this.chatState.addRecord({
+        _id: node.id,
+        id: node.id,
+        type: node.type,
+        data: {
+          ...node.data,
+          text: uiState.text,
+        },
+        time: new Date().toISOString(),
+      });
+    }
+
     // Add typing delay if needed
     if (uiState.typing && this.config.typingDelay > 0) {
       this.config.onUIStateChange?.(NodeUIState.loading(node.id, 'Typing...'));
@@ -453,6 +469,19 @@ export class NodeFlowEngine {
     this.notifyStateListeners();
 
     try {
+      // Push user response to record (matching web widget format)
+      const responseText = typeof response === 'string'
+        ? response
+        : response?.text || response?.selectedChoice || response?.value || String(response);
+      this.chatState.addRecord({
+        _id: node.id,
+        id: node.id,
+        shape: 'user-input-response',
+        type: node.type,
+        text: responseText,
+        time: new Date().toISOString(),
+      });
+
       // Send response to server after user interaction
       this.sendResponseToServer();
 
