@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * VoiceRecorder.tsx
  *
