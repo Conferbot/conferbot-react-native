@@ -22,7 +22,7 @@ import type {
 // ========================================
 
 interface SocketClient {
-  emit(event: string, payload: any): void;
+  emitToServer(event: string, payload: any): void;
   on(event: string, callback: (data: any) => void): void;
   off(event: string, callback?: (data: any) => void): void;
 }
@@ -298,7 +298,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
       }, timeout * 1000);
 
       // Emit socket event
-      socketClient?.emit('handover:request', {
+      socketClient?.emitToServer('handover:request', {
         sessionId,
         botId,
         nodeId,
@@ -318,7 +318,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
     }
     isActive.current = false;
 
-    socketClient?.emit('handover:cancel', {
+    socketClient?.emitToServer('handover:cancel', {
       sessionId,
       conversationId: conversationIdRef.current,
     });
@@ -343,7 +343,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
     (message: string, attachments?: any[]) => {
       if (!conversationIdRef.current) return;
 
-      socketClient?.emit('handover:message', {
+      socketClient?.emitToServer('handover:message', {
         sessionId,
         conversationId: conversationIdRef.current,
         message,
@@ -358,7 +358,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
     (isTyping: boolean) => {
       if (!conversationIdRef.current) return;
 
-      socketClient?.emit('handover:typing', {
+      socketClient?.emitToServer('handover:typing', {
         sessionId,
         conversationId: conversationIdRef.current,
         isTyping,
@@ -375,7 +375,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
         timeoutRef.current = null;
       }
 
-      socketClient?.emit('handover:end', {
+      socketClient?.emitToServer('handover:end', {
         sessionId,
         conversationId: conversationIdRef.current,
         reason,
@@ -394,7 +394,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
   // Submit survey
   const submitSurvey = useCallback(
     (response: SurveyResponse) => {
-      socketClient?.emit('handover:survey', {
+      socketClient?.emitToServer('handover:survey', {
         sessionId,
         conversationId: conversationIdRef.current,
         response: {
