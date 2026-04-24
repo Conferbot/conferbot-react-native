@@ -403,6 +403,8 @@ export enum SocketEvents {
   VISITOR_DISCONNECTED = 'visitor-disconnected',
   VISITOR_INPUT_TOGGLED = 'visitor-input-toggled',
   DESTROY_NOTIFICATION = 'destroy-notification',
+  NO_AGENTS_AVAILABLE = 'no-agents-available',
+  AI_AGENT_INACTIVE_CLOSE = 'ai-agent-inactive-close',
 
   // Connection events
   CONNECTION_ERROR = 'connection-error',
