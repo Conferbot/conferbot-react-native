@@ -42,6 +42,10 @@ export function useFlowEngine({
   const [isNodeProcessing, setIsNodeProcessing] = useState(false);
 
   const workspaceIdRef = useRef<string | null>(null);
+  // Track last user choice to filter duplicate bot messages from message-nodes
+  // that just echo ${selection} back. The transcript listener skips bot messages
+  // matching this value.
+  const lastUserChoiceRef = useRef<string | null>(null);
 
   // ********** Node Flow Engine Initialization ********** //
   const initializeFlowEngine = useCallback(
@@ -109,6 +113,7 @@ export function useFlowEngine({
             if (__DEV__) {
               console.log('[ConferBot] Flow complete:', reason);
             }
+            setCurrentUIState(null);
             setIsNodeProcessing(false);
             persistFlowState();
           },
@@ -138,11 +143,12 @@ export function useFlowEngine({
       return;
     }
 
-    // Freeze choice buttons + show user's selection as user bubble
+    // Freeze choice buttons (disabled, selected one highlighted).
+    // Matches web widget exactly: buttons get disabled, NO separate user message bubble.
+    // Web widget's _handleChoiceSelection does NOT call _displayUserInputMessage.
     const currentState = flowEngine.current.getState();
     if (currentState.currentUIState && currentState.currentUIState.type === 'buttons') {
       const choiceUI = currentState.currentUIState as any;
-      const selectedLabel = response?.label || response?.text || response?.value || String(response);
       setRecord((prev) => [
         ...prev,
         {
@@ -155,12 +161,6 @@ export function useFlowEngine({
             selectedButtonId: response?.buttonId,
             selectedButtonIds: response?.buttonIds,
           },
-          time: new Date().toISOString(),
-        } as any,
-        {
-          _id: `user_choice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          type: 'user-message',
-          text: stripHtml(selectedLabel),
           time: new Date().toISOString(),
         } as any,
       ]);
@@ -181,6 +181,7 @@ export function useFlowEngine({
     setIsNodeProcessing,
     // Refs
     workspaceIdRef,
+    lastUserChoiceRef,
     // Actions
     initializeFlowEngine,
     submitNodeResponse,
