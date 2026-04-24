@@ -31,6 +31,8 @@ interface UseSocketListenersParams {
   persistSession: (sessionData: any) => Promise<void>;
   // Flow engine
   initializeFlowEngine: (sessionId: string, persistedState?: any) => void;
+  // Last user choice ref — to skip duplicate bot messages from message-nodes echoing ${selection}
+  lastUserChoiceRef: React.MutableRefObject<string | null>;
 }
 
 export function useSocketListeners({
@@ -54,6 +56,7 @@ export function useSocketListeners({
   persistMessages,
   persistSession,
   initializeFlowEngine,
+  lastUserChoiceRef,
 }: UseSocketListenersParams) {
   const setupSocketListeners = useCallback(() => {
     if (!socketClient.current) return;
