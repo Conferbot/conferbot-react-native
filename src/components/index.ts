@@ -101,6 +101,10 @@ export type { MessageListProps } from './MessageList';
 export { ChatWidget } from './ChatWidget';
 export type { ChatWidgetProps } from './ChatWidget';
 
+// Floating Widget (FAB launcher + chat modal)
+export { ConferBotWidget } from './FloatingWidget';
+export type { ConferBotWidgetProps, WidgetConfig } from './FloatingWidget';
+
 // Node Components - UI components for all node types
 export {
   NodeRenderer,
