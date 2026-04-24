@@ -20,6 +20,7 @@ const CONFERBOT_LOGO_URL =
 
 export interface ChatBottomBarProps {
   onSend: (text: string) => void | Promise<void>;
+  onTyping?: (isTyping: boolean) => void;
   placeholder?: string;
   disabled?: boolean;
   hideBrand?: boolean;
@@ -35,6 +36,7 @@ export interface ChatBottomBarProps {
  */
 export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
   onSend,
+  onTyping,
   placeholder = 'Type a message...',
   disabled = false,
   hideBrand = false,
@@ -46,6 +48,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const typingTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canSend = text.trim().length > 0 && !disabled && !isSending;
 
@@ -77,7 +80,18 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
           <TextInput
             style={styles.textInput}
             value={text}
-            onChangeText={setText}
+            onChangeText={(newText) => {
+              setText(newText);
+              if (onTyping) {
+                if (newText.length > 0) {
+                  onTyping(true);
+                  if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                  typingTimeoutRef.current = setTimeout(() => onTyping(false), 1000);
+                } else {
+                  onTyping(false);
+                }
+              }
+            }}
             placeholder={placeholder}
             placeholderTextColor="#4D4D4D"
             multiline
