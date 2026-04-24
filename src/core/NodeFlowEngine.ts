@@ -389,8 +389,11 @@ export class NodeFlowEngine {
     // Send state to server before proceeding
     this.sendResponseToServer();
 
+    // Support __targetPort from legacy choice nodes (two-choices, three-choices)
+    const effectiveNextNodeId = nextNodeId || (data?.__targetPort ? `__port:${data.__targetPort}` : null);
+
     // Resolve actual next node ID
-    const resolvedNextId = this.resolveNextNode(node.id, nextNodeId);
+    const resolvedNextId = this.resolveNextNode(node.id, effectiveNextNodeId);
 
     if (resolvedNextId) {
       await this.processNode(resolvedNextId);
@@ -470,11 +473,22 @@ export class NodeFlowEngine {
       // Web widget uses different shapes per node type
       const responseText = typeof response === 'string'
         ? response
-        : response?.text || response?.selectedChoice || response?.value || String(response);
+        : response?.text || response?.label || response?.selectedChoice || response?.value || String(response);
 
-      const choiceNodeTypes = ['n-choices-node', '2-choice-node', '3-choice-node'];
-      const selectNodeTypes = ['n-select-option-node'];
-      const checkNodeTypes = ['n-check-option-node'];
+      const choiceNodeTypes = [
+        'n-choices-node', 'two-choices-node', 'three-choices-node',
+        'yes-or-no-choice-node', 'image-choice-node',
+      ];
+      const selectNodeTypes = ['n-select-option-node', 'select-option-node'];
+      const checkNodeTypes = ['n-check-options-node'];
+
+      // Store last choice so message-nodes echoing ${selection} get skipped
+      if (choiceNodeTypes.includes(node.type) || selectNodeTypes.includes(node.type) || checkNodeTypes.includes(node.type)) {
+        this.chatState.setVariable('_lastUserChoice', responseText);
+        this.log('Set _lastUserChoice', { responseText, nodeType: node.type });
+      } else {
+        this.log('NOT setting _lastUserChoice', { nodeType: node.type, notInTypes: true });
+      }
 
       if (choiceNodeTypes.includes(node.type)) {
         // Choice nodes: shape=user-selected-choice, include choices data
