@@ -80,7 +80,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   const {
     currentUIState, setCurrentUIState,
     isNodeProcessing, setIsNodeProcessing,
-    workspaceIdRef,
+    workspaceIdRef, lastUserChoiceRef,
     initializeFlowEngine, submitNodeResponse,
   } = useFlowEngine({
     botId,
@@ -163,6 +163,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     persistMessages,
     persistSession,
     initializeFlowEngine,
+    lastUserChoiceRef,
   });
 
   // ********** Reset Conversation ********** //
