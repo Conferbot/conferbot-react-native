@@ -13,14 +13,6 @@ import { ChatWidget } from '../ChatWidget/ChatWidget';
 import type { ChatWidgetProps } from '../ChatWidget/ChatWidget';
 import { getBubbleIcon, CloseIcon } from './WidgetBubbleIcons';
 
-// Optional: try to import LinearGradient for gradient backgrounds
-let LinearGradient: any = null;
-try {
-  LinearGradient = require('react-native-linear-gradient').default;
-} catch {
-  // Not installed — gradient falls back to solid color
-}
-
 // ========================================
 // TYPES
 // ========================================
@@ -248,9 +240,9 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   // Shadow style
   const shadowStyle = (widgetConfig.showShadow !== false) ? Platform.select({
     ios: {
-      shadowColor: bgColor,
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.35,
+      shadowOpacity: 0.3,
       shadowRadius: 8,
     },
     android: {
@@ -295,25 +287,11 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
       justifyContent: 'center' as const,
     };
 
-    if (themeType === 'gradient') {
-      try {
-        return (
-          <LinearGradient
-            colors={[gradStart, gradEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={buttonStyle}
-          >
-            {innerContent}
-          </LinearGradient>
-        );
-      } catch {
-        // LinearGradient not installed — fall back to solid
-      }
-    }
+    // Gradient support: use gradEnd color as solid fallback
+    const resolvedBg = themeType === 'gradient' ? gradEnd : bgColor;
 
     return (
-      <View style={[buttonStyle, { backgroundColor: bgColor }]}>
+      <View style={[buttonStyle, { backgroundColor: resolvedBg }]}>
         {innerContent}
       </View>
     );
