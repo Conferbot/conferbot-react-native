@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 
 interface BubbleIconProps {
   size?: number;
@@ -7,131 +7,127 @@ interface BubbleIconProps {
 }
 
 /**
- * Default chat bubble icon built with Views (no external dependencies).
- * Renders a speech bubble shape using nested Views.
+ * Clean chat bubble icon built with nested Views.
+ * Speech bubble with a tail — minimal and professional.
  */
 const BubbleIconDefault: React.FC<BubbleIconProps> = ({ size = 24, color = '#ffffff' }) => {
-  const bubbleSize = size * 0.65;
-  const tailSize = size * 0.15;
+  const s = size;
+  const bubbleW = s * 0.58;
+  const bubbleH = s * 0.42;
+  const radius = s * 0.1;
+  const dotSize = s * 0.065;
+  const dotGap = s * 0.065;
+  const tailSize = s * 0.12;
 
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Main bubble */}
-      <View
-        style={{
-          width: bubbleSize,
-          height: bubbleSize * 0.75,
-          borderRadius: bubbleSize * 0.2,
-          backgroundColor: color,
-        }}
-      />
-      {/* Tail */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: size * 0.12,
-          left: size * 0.18,
-          width: 0,
-          height: 0,
-          borderTopWidth: tailSize,
-          borderRightWidth: tailSize,
-          borderTopColor: color,
-          borderRightColor: 'transparent',
-        }}
-      />
-      {/* Three dots */}
-      <View
-        style={{
-          position: 'absolute',
-          flexDirection: 'row',
-          gap: size * 0.05,
-          alignItems: 'center',
-        }}
-      >
-        {[0, 1, 2].map((i) => (
-          <View
-            key={i}
-            style={{
-              width: size * 0.08,
-              height: size * 0.08,
-              borderRadius: size * 0.04,
-              backgroundColor: 'rgba(0,0,0,0.3)',
-            }}
-          />
-        ))}
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Bubble body */}
+      <View style={{
+        width: bubbleW,
+        height: bubbleH,
+        borderRadius: radius,
+        backgroundColor: color,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: dotGap,
+      }}>
+        {/* Three dots */}
+        <View style={{ width: dotSize, height: dotSize, borderRadius: dotSize / 2, backgroundColor: 'rgba(0,0,0,0.25)' }} />
+        <View style={{ width: dotSize, height: dotSize, borderRadius: dotSize / 2, backgroundColor: 'rgba(0,0,0,0.25)' }} />
+        <View style={{ width: dotSize, height: dotSize, borderRadius: dotSize / 2, backgroundColor: 'rgba(0,0,0,0.25)' }} />
       </View>
+      {/* Tail triangle */}
+      <View style={{
+        position: 'absolute',
+        bottom: s * 0.2,
+        left: s * 0.17,
+        width: 0,
+        height: 0,
+        borderTopWidth: tailSize,
+        borderRightWidth: tailSize * 0.8,
+        borderTopColor: color,
+        borderRightColor: 'transparent',
+      }} />
     </View>
   );
 };
 
 /**
- * Close X icon for when widget is open
+ * Close X icon for when widget is open.
+ * Two crossed lines forming an X.
  */
 export const CloseIcon: React.FC<BubbleIconProps> = ({ size = 24, color = '#ffffff' }) => {
-  const lineLength = size * 0.4;
-  const lineWidth = size * 0.08;
+  const lineLen = size * 0.38;
+  const lineW = size * 0.065;
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* First line of X (top-left to bottom-right) */}
-      <View
-        style={{
-          position: 'absolute',
-          width: lineLength,
-          height: lineWidth,
-          backgroundColor: color,
-          borderRadius: lineWidth / 2,
-          transform: [{ rotate: '45deg' }],
-        }}
-      />
-      {/* Second line of X (top-right to bottom-left) */}
-      <View
-        style={{
-          position: 'absolute',
-          width: lineLength,
-          height: lineWidth,
-          backgroundColor: color,
-          borderRadius: lineWidth / 2,
-          transform: [{ rotate: '-45deg' }],
-        }}
-      />
+      <View style={{
+        position: 'absolute',
+        width: lineLen,
+        height: lineW,
+        backgroundColor: color,
+        borderRadius: lineW,
+        transform: [{ rotate: '45deg' }],
+      }} />
+      <View style={{
+        position: 'absolute',
+        width: lineLen,
+        height: lineW,
+        backgroundColor: color,
+        borderRadius: lineW,
+        transform: [{ rotate: '-45deg' }],
+      }} />
     </View>
   );
 };
 
 /**
- * Emoji-based bubble icons matching web widget names.
- * These use Text rendering which works without any extra dependencies.
+ * Simple message icon — just a rounded rectangle chat bubble.
  */
-const EmojiIcon: React.FC<BubbleIconProps & { emoji: string }> = ({ size = 24, emoji }) => (
-  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <Text style={{ fontSize: size * 0.6, lineHeight: size * 0.75 }}>{emoji}</Text>
-  </View>
-);
+const MessageIcon: React.FC<BubbleIconProps> = ({ size = 24, color = '#ffffff' }) => {
+  const s = size;
+  return (
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{
+        width: s * 0.55,
+        height: s * 0.4,
+        borderRadius: s * 0.08,
+        backgroundColor: color,
+      }} />
+      <View style={{
+        position: 'absolute',
+        bottom: s * 0.22,
+        left: s * 0.19,
+        width: 0,
+        height: 0,
+        borderTopWidth: s * 0.1,
+        borderRightWidth: s * 0.08,
+        borderTopColor: color,
+        borderRightColor: 'transparent',
+      }} />
+    </View>
+  );
+};
 
-// Chat bubble emoji variants
-const BubbleIcon1: React.FC<BubbleIconProps> = (props) => <EmojiIcon {...props} emoji="💬" />;
-const BubbleIcon2: React.FC<BubbleIconProps> = (props) => <EmojiIcon {...props} emoji="🤖" />;
-const BubbleIcon3: React.FC<BubbleIconProps> = (props) => <EmojiIcon {...props} emoji="🗨️" />;
-const BubbleIcon4: React.FC<BubbleIconProps> = (props) => <EmojiIcon {...props} emoji="💭" />;
-
-// Map of icon name -> component (matching web widget's WidgetBubbleIcon names)
+// Map web widget icon names to components
 const BUBBLE_ICONS: Record<string, React.FC<BubbleIconProps>> = {
-  WidgetBubbleIcon1: BubbleIcon1,
-  WidgetBubbleIcon2: BubbleIcon2,
-  WidgetBubbleIcon3: BubbleIcon3,
-  WidgetBubbleIcon4: BubbleIcon4,
-  WidgetBubbleIcon5: BubbleIcon1,
-  WidgetBubbleIcon6: BubbleIcon2,
-  WidgetBubbleIcon7: BubbleIconDefault,
+  WidgetBubbleIcon1: BubbleIconDefault,
+  WidgetBubbleIcon2: BubbleIconDefault,
+  WidgetBubbleIcon3: MessageIcon,
+  WidgetBubbleIcon4: MessageIcon,
+  WidgetBubbleIcon5: BubbleIconDefault,
+  WidgetBubbleIcon6: BubbleIconDefault,
+  WidgetBubbleIcon7: MessageIcon,
   WidgetBubbleIcon8: BubbleIconDefault,
   WidgetBubbleIcon9: BubbleIconDefault,
   WidgetBubbleIcon10: BubbleIconDefault,
-  WidgetBubbleIcon11: BubbleIconDefault,
-  WidgetBubbleIcon12: BubbleIconDefault,
+  WidgetBubbleIcon11: MessageIcon,
+  WidgetBubbleIcon12: MessageIcon,
   WidgetBubbleIcon13: BubbleIconDefault,
-  WidgetBubbleIcon14: BubbleIconDefault,
-  WidgetBubbleIcon15: BubbleIconDefault,
+  WidgetBubbleIcon14: MessageIcon,
+  WidgetBubbleIcon15: MessageIcon,
 };
 
 export const getBubbleIcon = (iconName?: string): React.FC<BubbleIconProps> => {
@@ -139,4 +135,4 @@ export const getBubbleIcon = (iconName?: string): React.FC<BubbleIconProps> => {
   return BUBBLE_ICONS[iconName] || BubbleIconDefault;
 };
 
-export { BubbleIconDefault };
+export { BubbleIconDefault, MessageIcon };
