@@ -15,6 +15,8 @@ import {
 import { useTheme, ThemeProvider } from '../../theme';
 import { useConferBot } from '../../context/ConferBotContext';
 import { ChatHeader } from '../ChatHeader';
+import { HeaderMenu } from '../ChatHeader/HeaderMenu';
+import type { HeaderMenuItem } from '../ChatHeader/HeaderMenu';
 import { MessageList } from '../MessageList';
 import { ChatInput } from '../ChatInput';
 import { ChatBottomBar } from '../ChatBottomBar/ChatBottomBar';
@@ -200,6 +202,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     isLiveChatMode,
     agentTyping,
     sendVisitorTyping,
+    // Actions
+    resetConversation,
   } = useConferBot();
 
   // Use controlled visible if provided, otherwise use context isOpen
@@ -250,6 +254,71 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       openChat();
     }
   }, [controlledVisible, isOpen, openChat]);
+
+  // ---- Header Menu Actions ---- //
+  const handleRestartChat = useCallback(() => {
+    Alert.alert(
+      'Restart Chat',
+      'This will clear the current conversation and start fresh. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restart',
+          style: 'destructive',
+          onPress: () => resetConversation(),
+        },
+      ]
+    );
+  }, [resetConversation]);
+
+  const handleDownloadTranscript = useCallback(() => {
+    if (!record || record.length === 0) {
+      Alert.alert('No Messages', 'There are no messages to share.');
+      return;
+    }
+
+    const lines: string[] = [];
+    for (const msg of record) {
+      const time = msg.time ? new Date(msg.time).toLocaleTimeString() : '';
+      if (msg.type === 'user-message' || msg.type === 'user-live-message') {
+        lines.push(`[${time}] You: ${msg.text || ''}`);
+      } else if (
+        msg.type === 'bot-message' ||
+        msg.type === 'agent-message'
+      ) {
+        const sender =
+          msg.type === 'agent-message'
+            ? msg.agentDetails?.name || 'Agent'
+            : botName || 'Bot';
+        lines.push(`[${time}] ${sender}: ${msg.text || ''}`);
+      } else if (msg.type === 'agent-joined-message' || msg.type === 'agent-left-chat') {
+        lines.push(`[${time}] --- ${msg.text || ''} ---`);
+      }
+    }
+
+    const transcript = lines.join('\n');
+
+    Share.share({
+      message: transcript,
+      title: `Chat Transcript — ${botName || 'Conferbot'}`,
+    }).catch(() => {});
+  }, [record, botName]);
+
+  const headerMenuItems: HeaderMenuItem[] = [
+    {
+      id: 'restart',
+      label: 'Restart Chat',
+      icon: '↻',
+      onPress: handleRestartChat,
+      destructive: true,
+    },
+    {
+      id: 'transcript',
+      label: 'Share Transcript',
+      icon: '↗',
+      onPress: handleDownloadTranscript,
+    },
+  ];
 
   const handleClose = () => {
     // Clear any selected attachment
@@ -765,6 +834,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           botAvatarUrl={botAvatarUrl || undefined}
           onClose={handleClose}
           showConnectionStatus={true}
+          rightActions={<HeaderMenu items={headerMenuItems} testID={`${testID}-header-menu`} />}
           testID={`${testID}-header`}
         />
 
