@@ -207,8 +207,9 @@ export class ButtonsHandler extends BaseNodeHandler {
     // Store answer
     state.setAnswer(nodeId, variableName, finalValue, nodeId);
 
-    // Add to transcript (HTML-stripped label)
-    state.addUserMessage(labels.join(', '), nodeId);
+    // User selection is shown via frozen choice buttons in the UI
+    // and captured in the server record via submitResponse's addRecord.
+    // Do NOT add to transcript here — it would create a duplicate user bubble.
 
     // Check for specific next node from button
     const selectedButton = selectedButtons[0];
@@ -335,7 +336,6 @@ export class CardsHandler extends BaseNodeHandler {
 
     // Store answer
     state.setAnswer(nodeId, variableName, selectedValue, nodeId);
-    state.addUserMessage(selectedLabel, nodeId);
 
     if (nextNodeId) {
       return NodeResult.jumpTo(nextNodeId, { [variableName]: selectedValue });
@@ -444,7 +444,6 @@ export class CarouselHandler extends BaseNodeHandler {
     }
 
     state.setAnswer(nodeId, variableName, selectedValue, nodeId);
-    state.addUserMessage(selectedLabel, nodeId);
 
     return this.proceed(node, { [variableName]: selectedValue });
   }
@@ -558,7 +557,6 @@ export class PictureChoiceHandler extends BaseNodeHandler {
     const finalValue = Array.isArray(response) ? values : values[0];
 
     state.setAnswer(nodeId, variableName, finalValue, nodeId);
-    state.addUserMessage(labels.join(', ') || '[Image selected]', nodeId);
 
     // Check for specific routing
     const firstChoice = selectedChoices[0];
@@ -688,7 +686,6 @@ export class DropdownHandler extends BaseNodeHandler {
     const finalValue = Array.isArray(response) ? values : values[0];
 
     state.setAnswer(nodeId, variableName, finalValue, nodeId);
-    state.addUserMessage(labels.join(', '), nodeId);
 
     return this.proceed(node, { [variableName]: finalValue });
   }
@@ -787,7 +784,6 @@ export class RatingHandler extends BaseNodeHandler {
     }
 
     state.setAnswer(nodeId, variableName, rating, nodeId);
-    state.addUserMessage(`${rating} / ${maxRating}`, nodeId);
 
     return this.proceed(node, { [variableName]: rating });
   }
@@ -886,7 +882,6 @@ export class OpinionScaleHandler extends BaseNodeHandler {
     }
 
     state.setAnswer(nodeId, variableName, value, nodeId);
-    state.addUserMessage(String(value), nodeId);
 
     return this.proceed(node, { [variableName]: value });
   }
@@ -973,7 +968,6 @@ export class YesOrNoChoiceHandler extends BaseNodeHandler {
     }
 
     state.setAnswer(nodeId, variableName, label, nodeId);
-    state.addUserMessage(label, nodeId);
 
     // Port-based routing: source-yes / source-no or source-{id}
     const targetPort = `source-${optionId}`;
@@ -1067,7 +1061,6 @@ export class NCheckOptionsHandler extends BaseNodeHandler {
     const combinedText = selectedOptions.join(', ');
 
     state.setAnswer(nodeId, variableName, combinedText, nodeId);
-    state.addUserMessage(combinedText, nodeId);
 
     return this.proceed(node, {
       [variableName]: combinedText,
