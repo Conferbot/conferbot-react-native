@@ -45,6 +45,21 @@ export class MessageHandler extends BaseNodeHandler {
     // Resolve variables in the message text
     text = this.resolveText(text, state);
 
+    // Skip message-nodes that just echo the user's choice (e.g. ${selection} → "A").
+    // Returns proceed instead of displayUI so handleDisplayUI is never called →
+    // no chatState._record push, no addBotMessage, no UI bubble, no admin entry.
+    const lastChoice = state.getVariable('_lastUserChoice');
+    if (__DEV__) {
+      console.log('[ConferBot] MessageHandler: text=', JSON.stringify(text), 'lastChoice=', JSON.stringify(lastChoice));
+    }
+    if (lastChoice && text.trim() === String(lastChoice).trim()) {
+      state.setVariable('_lastUserChoice', null);
+      if (__DEV__) {
+        console.log('[ConferBot] MessageHandler: SKIPPING echo message');
+      }
+      return this.proceed(node);
+    }
+
     // Check for typing indicator delay
     const typingDelay = this.getNumber(data, 'typingDelay', 0);
     const showTyping = this.getBoolean(data, 'showTyping', true);
