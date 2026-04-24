@@ -127,8 +127,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   // Determine message type
   const isUser = message.type === 'user-message' || message.type === 'user-input-response';
-  const isAgent = message.type === 'agent-message';
-  const isSystem = message.type === 'system-message';
+  const isAgent = message.type === 'agent-message' || message.type === 'agent-message-file' || message.type === 'agent-message-audio';
+  const isSystem = message.type === 'system-message' || message.type === 'agent-joined-message' || message.type === 'agent-left-chat' || message.type === 'agent-chat-ended';
 
   // Asymmetric bubble radius matching Android SDK
   const r = theme.borderRadius.bubble;
@@ -345,8 +345,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Message bubble */}
         <View ref={bubbleRef} style={[styles.bubble, getBubbleStyle()]}>
           {/* Agent name for agent messages */}
-          {isAgent && agent && (
-            <Text style={[styles.agentName, { color: textColor }]}>{agent.name}</Text>
+          {isAgent && agentDetails && (
+            <Text style={[styles.agentName, { color: textColor }]}>{agentDetails.name}</Text>
           )}
 
           {/* Message text with links */}
