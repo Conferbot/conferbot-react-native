@@ -1000,13 +1000,15 @@ export class ChatState {
   // ========================================
 
   /**
-   * Resolves variables in a text string
-   * Supports {{variableName}} syntax
+   * Resolves variables in a text string.
+   * Supports ${variableName}, {variableName}, and {{variableName}} syntax
+   * (matching the web widget's parsedHtmlElement replaceVariables).
    */
   resolveVariables(text: string): string {
     if (!text) return text;
 
-    return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+    // Resolve function shared across patterns
+    const resolve = (match: string, varName: string): string => {
       const trimmedName = varName.trim();
 
       // Check answer variables first
@@ -1029,7 +1031,15 @@ export class ChatState {
 
       // Return original if not found
       return match;
-    });
+    };
+
+    // First pass: {{variable}} (double-brace, legacy SDK format)
+    let result = text.replace(/\{\{([^}]+)\}\}/g, resolve);
+
+    // Second pass: ${variable} and {variable} (matching web widget exactly)
+    result = result.replace(/\$?\{(\w+)\}/g, resolve);
+
+    return result;
   }
 
   // ========================================
