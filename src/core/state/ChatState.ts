@@ -830,9 +830,33 @@ export class ChatState {
   // ========================================
 
   /**
-   * Adds a record entry in server-compatible format
+   * Adds a record entry in server-compatible format.
+   * Matches web widget behavior: if a record with the same id already exists,
+   * merge the new data into the existing entry instead of adding a duplicate.
+   * This is critical for choice nodes where the bot node is pushed first,
+   * then the user selection merges into the same entry.
    */
   addRecord(entry: RecordEntry): void {
+    const entryId = (entry as any).id || (entry as any)._id;
+    if (entryId) {
+      const existingIndex = this._record.findIndex(
+        (r: any) => (r.id || r._id) === entryId
+      );
+      if (existingIndex !== -1) {
+        // Merge into existing record (same as web widget's _pushDataToRecord)
+        const existing = this._record[existingIndex] as any;
+        this._record[existingIndex] = {
+          ...existing,
+          ...entry,
+          data: {
+            ...(existing.data || {}),
+            ...((entry as any).data || {}),
+          },
+        } as RecordEntry;
+        this.notifyListeners();
+        return;
+      }
+    }
     this._record.push(entry);
     this.notifyListeners();
   }
@@ -860,6 +884,7 @@ export class ChatState {
     return {
       version: 'v2',
       chatSessionId: this._sessionId,
+      visitorId: this.getVariable('_visitorId') || this._sessionId,
       botId: this._botId,
       chatDate: new Date().toISOString(),
       deviceInfo: `ReactNative/${Platform.OS}`,
@@ -870,6 +895,7 @@ export class ChatState {
         key: av.variableName,
         value: av.value,
       })),
+      workspaceId: this.getVariable('_workspaceId') || '',
       channel: 'mobile',
     };
   }
