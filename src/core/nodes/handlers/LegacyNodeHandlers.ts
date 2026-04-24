@@ -505,7 +505,6 @@ export class QuizNodeHandler extends BaseNodeHandler {
     };
 
     state.setAnswer(nodeId, variableName, answerData, nodeId);
-    state.addUserMessage(selectedLabel, nodeId);
 
     // Store correctness as separate variable
     state.setVariable(`${variableName}_correct`, isCorrect);
@@ -614,7 +613,6 @@ export class TwoChoicesNodeHandler extends BaseNodeHandler {
     }
 
     state.setAnswer(nodeId, variableName, choiceText, nodeId);
-    state.addUserMessage(choiceText, nodeId);
 
     // Port-based routing: source-1 for choice 0, source-2 for choice 1
     const portIndex = (parseInt(choiceId, 10) || 0) + 1;
@@ -701,7 +699,6 @@ export class ThreeChoicesNodeHandler extends BaseNodeHandler {
     }
 
     state.setAnswer(nodeId, variableName, choiceText, nodeId);
-    state.addUserMessage(choiceText, nodeId);
 
     const portIndex = (parseInt(choiceId, 10) || 0) + 1;
     const targetPort = `source-${portIndex}`;
@@ -793,7 +790,6 @@ export class SelectOptionNodeHandler extends BaseNodeHandler {
     }
 
     state.setAnswer(nodeId, variableName, optionText, nodeId);
-    state.addUserMessage(optionText, nodeId);
 
     return NodeResult.delayedProceed(this.getNextNodeId(node), 600, {
       [variableName]: optionText,
@@ -853,7 +849,6 @@ export class UserRatingNodeHandler extends BaseNodeHandler {
     const rating = typeof response === 'number' ? response : parseInt(String(response), 10) || 0;
 
     state.setAnswer(nodeId, variableName, rating, nodeId);
-    state.addUserMessage(String(rating), nodeId);
 
     return this.proceed(node, { [variableName]: rating });
   }
