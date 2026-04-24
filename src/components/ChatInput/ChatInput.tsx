@@ -67,6 +67,7 @@ export interface ChatInputProps {
   sendIcon?: React.ReactNode;
   attachmentIcon?: React.ReactNode;
   microphoneIcon?: React.ReactNode;
+  onTyping?: (isTyping: boolean) => void;
   enableAnalytics?: boolean;
   voiceMaxDuration?: number;
   voiceMinDuration?: number;
@@ -112,6 +113,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   sendIcon,
   attachmentIcon,
   microphoneIcon,
+  onTyping,
   enableAnalytics = true,
   voiceMaxDuration = 300000, // 5 minutes
   voiceMinDuration = 1000, // 1 second
@@ -178,16 +180,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       handleTypingEnd(false);
     }
 
-    // Set timeout to track idle (stopped typing)
+    // Emit visitor typing status (for live chat)
     if (newText.length > 0) {
+      onTyping?.(true);
       typingTimeoutRef.current = setTimeout(() => {
-        // User stopped typing for 3 seconds
-      }, 3000);
+        onTyping?.(false);
+      }, 1000); // Stop typing after 1 second of inactivity (matches web widget)
+    } else {
+      onTyping?.(false);
     }
 
     previousTextLengthRef.current = newText.length;
     setText(newText);
-  }, [analytics, handleTypingStart, handleTypingEnd]);
+  }, [analytics, handleTypingStart, handleTypingEnd, onTyping]);
 
   // Track cursor position
   const handleSelectionChange = useCallback((event: any) => {
