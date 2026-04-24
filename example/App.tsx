@@ -8,7 +8,7 @@ import {
   ScrollView,
   StatusBar,
 } from 'react-native';
-import { ConferBotProvider, ChatWidget, ConferBotEndpoints } from '@conferbot/react-native';
+import { ConferBotProvider, ConferBotWidget, ConferBotEndpoints } from '@conferbot/react-native';
 import { HeadlessExample } from './src/HeadlessExample';
 import { CustomExample } from './src/CustomExample';
 
@@ -28,7 +28,6 @@ const TABS: { key: Tab; label: string }[] = [
 
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('widget');
-  const [widgetVisible, setWidgetVisible] = useState(false);
 
   // Replace with your actual API key and bot ID
   const API_KEY = 'test_key';
@@ -67,19 +66,12 @@ function App(): React.JSX.Element {
         </View>
 
         {/* Tab Content */}
-        {activeTab === 'widget' && (
-          <WidgetExample
-            widgetVisible={widgetVisible}
-            setWidgetVisible={setWidgetVisible}
-          />
-        )}
+        {activeTab === 'widget' && <WidgetExample />}
         {activeTab === 'headless' && <HeadlessExample />}
         {activeTab === 'custom' && <CustomExample />}
 
-        {/* The chat widget modal (rendered regardless of tab so it overlays properly) */}
-        <ChatWidget
-          visible={widgetVisible}
-          onClose={() => setWidgetVisible(false)}
+        {/* Floating chat widget — FAB in bottom-right, opens chat modal on tap */}
+        <ConferBotWidget
           title="Support Chat"
           placeholder="Type your message..."
           showTimestamps={true}
@@ -90,13 +82,7 @@ function App(): React.JSX.Element {
 }
 
 /** Drop-in Widget tab content */
-function WidgetExample({
-  widgetVisible: _,
-  setWidgetVisible,
-}: {
-  widgetVisible: boolean;
-  setWidgetVisible: (v: boolean) => void;
-}) {
+function WidgetExample() {
   return (
     <ScrollView contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
@@ -107,17 +93,12 @@ function WidgetExample({
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Drop-in Widget</Text>
+        <Text style={styles.sectionTitle}>Floating Widget</Text>
         <Text style={styles.sectionDesc}>
-          Full-featured chat in a modal. Easiest integration -- just wrap your
-          app in ConferBotProvider and render ChatWidget.
+          Tap the chat icon in the bottom-right corner to open the chat widget.
+          It reads all customizations (color, position, icon) from your bot's
+          server settings automatically.
         </Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setWidgetVisible(true)}
-        >
-          <Text style={styles.buttonText}>Open Chat Widget</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
