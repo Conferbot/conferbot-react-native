@@ -611,6 +611,14 @@ export class NodeFlowEngine {
     if (!this.config.socketClient) return;
 
     const responseData = this.chatState.buildResponseData();
+
+    if (__DEV__) {
+      console.log('[ConferBot] Sending record to server, entries:', responseData.record?.length);
+      for (const r of (responseData.record || [])) {
+        console.log('[ConferBot]   record:', r.id || r._id, 'type:', r.type, 'shape:', r.shape);
+      }
+    }
+
     this.config.socketClient.sendResponseRecord(responseData);
   }
 
