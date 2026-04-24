@@ -196,13 +196,17 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     submitNodeResponse,
     chatState: contextChatState,
     serverThemeOverride,
+    // Live chat state
+    isLiveChatMode,
+    agentTyping,
+    sendVisitorTyping,
   } = useConferBot();
 
   // Use controlled visible if provided, otherwise use context isOpen
   const isVisible = controlledVisible !== undefined ? controlledVisible : isOpen;
 
-  // Track agent typing
-  const [isAgentTyping, setIsAgentTyping] = useState(false);
+  // Agent typing indicator — from context (live chat) or local state
+  const isAgentTyping = agentTyping;
 
   // Track flow completion locally
   const [isFlowComplete, setIsFlowComplete] = useState(false);
@@ -260,8 +264,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   };
 
   const handleSendMessage = async (text: string) => {
-    // Add user message to chat state if available
-    if (chatState.current) {
+    // During live chat, sendMessage handles everything (record + socket)
+    // Don't add to chatState transcript to avoid duplicate user messages
+    if (!isLiveChatMode && chatState.current) {
       chatState.current.addUserMessage(text);
     }
 
@@ -778,6 +783,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
         {shouldShowInput() && (
           <ChatBottomBar
             onSend={handleSendMessage}
+            onTyping={sendVisitorTyping}
             placeholder={placeholder}
             disabled={!isConnected}
             testID={`${testID}-input`}
