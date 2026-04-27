@@ -42,7 +42,7 @@ export interface WidgetConfig {
   iconImageUrl?: string;
   /** Icon color inside the button (default: '#ffffff') */
   iconColor?: string;
-  /** Icon size relative to button (default: 0.5) */
+  /** Icon size relative to button (default: 0.6 — matches web widget's 60% width) */
   iconScale?: number;
   /** CTA tooltip text (shown above/beside the button) */
   ctaText?: string;
@@ -100,7 +100,7 @@ const CtaTooltip: React.FC<{
         onPress={onDismiss}
         style={[ctaStyles.bubble, { backgroundColor, borderRadius }]}
       >
-        <Text style={ctaStyles.text} numberOfLines={1}>{text}</Text>
+        <Text style={ctaStyles.text}>{text}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -112,9 +112,15 @@ const ctaStyles = StyleSheet.create({
   bubble: {
     paddingHorizontal: 8,
     paddingVertical: 6,
+    maxWidth: 212,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6 },
-      android: { elevation: 4 },
+      ios: {
+        shadowColor: 'rgba(50,50,93,1)',
+        shadowOffset: { width: 0, height: 13 },
+        shadowOpacity: 0.25,
+        shadowRadius: 27,
+      },
+      android: { elevation: 8 },
     }),
   },
   text: {
@@ -155,7 +161,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   const size = widgetConfig.size ?? sc.widgetSize ?? 50;
   const borderRadius = widgetConfig.borderRadius ?? sc.widgetBorderRadius ?? size / 2;
   const iconColor = widgetConfig.iconColor ?? '#ffffff';
-  const iconScale = widgetConfig.iconScale ?? 0.5;
+  // Web widget uses `width: 60%` for SVG inside FAB — match that proportion
+  const iconScale = widgetConfig.iconScale ?? 0.6;
   const iconSize = Math.round(size * iconScale);
 
   // Background
@@ -305,7 +312,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
           style={[
             styles.ctaWrapper,
             position === 'right' ? { right: ctaEdgeOffset } : { left: ctaEdgeOffset },
-            { bottom: offsetBottom + Math.round((size - 30) / 2) },
+            { bottom: offsetBottom },
           ]}
           pointerEvents="box-none"
         >
