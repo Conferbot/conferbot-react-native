@@ -46,7 +46,8 @@ class ConferBotSocket {
   private socketUrl: string;
   private listeners: EventListenersMap = new Map();
   private isInitialized: boolean = false;
-  private chatSessionId?: string;
+  /** Current chat session ID — set by joinChatRoomVisitor, used for reconnect room-join */
+  chatSessionId?: string;
 
   constructor(options: SocketOptions) {
     this.apiKey = options.apiKey;
@@ -166,6 +167,14 @@ class ConferBotSocket {
         console.log('[ConferBot Socket] Reconnected');
       }
       this.sendInitPayload();
+
+      // Re-join chat room after reconnect (socket.io drops room memberships on disconnect)
+      if (this.chatSessionId) {
+        this.socket?.emit(SocketEvents.JOIN_CHAT_ROOM_VISITOR, { chatSessionId: this.chatSessionId });
+        if (__DEV__) {
+          console.log('[ConferBot Socket] Re-joined chat room:', this.chatSessionId);
+        }
+      }
     });
   }
 
