@@ -367,6 +367,33 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
   }
 
   /**
+   * Emits the standardized 'execute-integration' socket event that the
+   * embed-server expects.  The server dispatches based on `nodeType`.
+   *
+   * @param nodeType  - e.g. 'email-node', 'slack-node', 'gmail-node'
+   * @param nodeId    - unique node identifier
+   * @param nodeData  - the full node data object (inputs / config)
+   * @param state     - current ChatState (provides session, bot, workspace, answers)
+   * @returns true if the event was emitted
+   */
+  protected emitIntegrationEvent(
+    nodeType: string,
+    nodeId: string,
+    nodeData: Record<string, unknown>,
+    state: ChatState,
+  ): boolean {
+    return this.emitSocketEvent('execute-integration', {
+      nodeType,
+      nodeId,
+      nodeData,
+      chatSessionId: state.sessionId,
+      chatbotId: state.botId,
+      workspaceId: state.getVariable('_workspaceId') || '',
+      answerVariables: state.getAnswerVariables?.() ?? state.getAllAnswers?.() ?? [],
+    });
+  }
+
+  /**
    * Stores the integration result in state and emits tracking event
    * @param state - Chat state
    * @param prefix - Variable name prefix
@@ -690,7 +717,9 @@ export class GPTHandler extends BaseIntegrationHandler {
       streaming: config.streaming,
     };
 
-    const socketEmitted = this.emitSocketEvent('gpt:request', gptPayload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'gpt-node', nodeId, gptPayload as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       const apiResponse = await this.makeGPTApiCall(config, resolvedPrompt, resolvedSystemPrompt, state);
@@ -1172,17 +1201,20 @@ export class EmailHandler extends BaseIntegrationHandler {
     }
 
     // Build email payload
+    const nodeId = this.getNodeId(node);
     const emailPayload: EmailPayload = {
       ...resolvedConfig,
       sessionId: state.sessionId,
       botId: state.botId,
       timestamp: new Date().toISOString(),
-      nodeId: this.getNodeId(node),
+      nodeId,
       userMetadata: state.getUserMetadata(),
     };
 
-    // Try socket first
-    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.EMAIL_SEND, emailPayload);
+    // Try socket first — emit the standardised 'execute-integration' event
+    const socketEmitted = this.emitIntegrationEvent(
+      'email-node', nodeId, emailPayload as unknown as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       // Fallback to API
@@ -1270,17 +1302,20 @@ export class GmailHandler extends BaseIntegrationHandler {
     const toResult = validateEmailList(resolvedConfig.to);
     resolvedConfig.to = toResult.formatted;
 
+    const nodeId = this.getNodeId(node);
     const gmailPayload = {
       ...resolvedConfig,
       sessionId: state.sessionId,
       botId: state.botId,
       timestamp: new Date().toISOString(),
-      nodeId: this.getNodeId(node),
+      nodeId,
       userMetadata: state.getUserMetadata(),
       answers: state.getAllAnswers(),
     };
 
-    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.GMAIL_SEND, gmailPayload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'gmail-node', nodeId, gmailPayload as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -1342,9 +1377,10 @@ abstract class BaseCommunicationHandler extends BaseIntegrationHandler {
     const resolvedChannel = config.channel ? state.resolveVariables(config.channel) : undefined;
     const resolvedWebhook = config.webhookUrl ? state.resolveVariables(config.webhookUrl) : undefined;
 
+    const nodeId = this.getNodeId(node);
     const payload = {
       ...this.buildCommonPayload(state),
-      nodeId: this.getNodeId(node),
+      nodeId,
       platform: this.platformName.toLowerCase(),
       message: resolvedMessage,
       channel: resolvedChannel,
@@ -1354,7 +1390,9 @@ abstract class BaseCommunicationHandler extends BaseIntegrationHandler {
         : undefined,
     };
 
-    const socketEmitted = this.emitSocketEvent(this.socketEvent, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      this.nodeType, nodeId, payload as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted && resolvedWebhook) {
       const response = await this.makeApiCall(resolvedWebhook, 'POST', {
@@ -1433,9 +1471,10 @@ export class SlackHandler extends BaseCommunicationHandler {
       attachments = [createSlackAttachment(state.getAllAnswers())];
     }
 
+    const nodeId = this.getNodeId(node);
     const payload = {
       ...this.buildCommonPayload(state),
-      nodeId: this.getNodeId(node),
+      nodeId,
       platform: 'slack',
       text: formattedMessage,
       channel: resolvedChannel,
@@ -1447,7 +1486,9 @@ export class SlackHandler extends BaseCommunicationHandler {
       thread_ts: config.threadTs,
     };
 
-    const socketEmitted = this.emitSocketEvent(this.socketEvent, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'slack-node', nodeId, payload as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted && resolvedWebhook) {
       const webhookPayload = {
@@ -1520,9 +1561,10 @@ export class DiscordHandler extends BaseCommunicationHandler {
       embeds = [createDiscordEmbed(embedTitle, undefined, state.getAllAnswers())];
     }
 
+    const nodeId = this.getNodeId(node);
     const payload = {
       ...this.buildCommonPayload(state),
-      nodeId: this.getNodeId(node),
+      nodeId,
       platform: 'discord',
       content: formattedMessage,
       channel: resolvedChannel,
@@ -1533,7 +1575,9 @@ export class DiscordHandler extends BaseCommunicationHandler {
       tts: config.tts,
     };
 
-    const socketEmitted = this.emitSocketEvent(this.socketEvent, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'discord-node', nodeId, payload as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted && resolvedWebhook) {
       const webhookPayload = {
@@ -1659,6 +1703,7 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
     };
 
 
+    const nodeId = this.getNodeId(node);
     const payload: GoogleSheetsPayload = {
       spreadsheetId: config.spreadsheetId,
       sheetName: config.sheetName,
@@ -1669,10 +1714,12 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
       sessionId: state.sessionId,
       botId: state.botId,
       timestamp: new Date().toISOString(),
-      nodeId: this.getNodeId(node),
+      nodeId,
     };
 
-    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.GOOGLE_SHEETS_EXECUTE, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'google-sheets-node', nodeId, payload as unknown as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -1749,7 +1796,9 @@ export class GoogleCalendarHandler extends BaseIntegrationHandler {
       timezone: config.timezone,
     };
 
-    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.GOOGLE_CALENDAR_EXECUTE, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'google-calendar-node', this.getNodeId(node), payload as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -1827,7 +1876,9 @@ export class GoogleAnalyticsHandler extends BaseIntegrationHandler {
       ...resolvedConfig,
     };
 
-    this.emitSocketEvent(IntegrationSocketEvents.ANALYTICS_TRACK, payload);
+    this.emitIntegrationEvent(
+      'google-analytics-node', this.getNodeId(node), payload as Record<string, unknown>, state,
+    );
 
     state.setVariable('_analyticsTracked', true);
     return this.proceed(node, { analyticsTracked: true });
@@ -1873,9 +1924,10 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
     // Format contact data for the specific CRM
     const formattedData = this.formatContactData(contactData as ContactData, config.action);
 
+    const nodeId = this.getNodeId(node);
     const payload = {
       ...this.buildCommonPayload(state),
-      nodeId: this.getNodeId(node),
+      nodeId,
       crm: this.crmName.toLowerCase(),
       action: config.action,
       properties: formattedData,
@@ -1884,7 +1936,9 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
       dealData: config.dealData ? this.resolveObjectVariables(config.dealData, state) : undefined,
     };
 
-    const socketEmitted = this.emitSocketEvent(this.socketEvent, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      this.nodeType, nodeId, payload as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       if (config.webhookUrl) {
@@ -2014,7 +2068,9 @@ export class ZohoCRMHandler extends BaseIntegrationHandler {
       nodeId: this.getNodeId(node),
     };
 
-    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.ZOHO_CRM_EXECUTE, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'zohocrm-node', this.getNodeId(node), payload as unknown as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -2167,8 +2223,8 @@ export class ZapierHandler extends BaseIntegrationHandler {
 
     this.storeIntegrationResult(state, 'zapier', true, response.data);
 
-    // Emit tracking event
-    this.emitSocketEvent(IntegrationSocketEvents.ZAPIER_TRIGGER, {
+    // Emit legacy zapier-node-trigger event (server has a dedicated handler for it)
+    this.emitSocketEvent('zapier-node-trigger', {
       sessionId: state.sessionId,
       nodeId: this.getNodeId(node),
       success: true,
@@ -2246,7 +2302,9 @@ export class AirtableHandler extends BaseIntegrationHandler {
       nodeId: this.getNodeId(node),
     };
 
-    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.AIRTABLE_EXECUTE, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'airtable-node', this.getNodeId(node), payload as unknown as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -2345,7 +2403,9 @@ export class NotionHandler extends BaseIntegrationHandler {
       nodeId: this.getNodeId(node),
     };
 
-    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.NOTION_EXECUTE, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'notion-node', this.getNodeId(node), payload as unknown as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -2473,7 +2533,9 @@ export class StripeHandler extends BaseIntegrationHandler {
       answers: state.getAllAnswers(),
     };
 
-    const socketEmitted = this.emitSocketEvent(IntegrationSocketEvents.STRIPE_EXECUTE, payload);
+    const socketEmitted = this.emitIntegrationEvent(
+      'stripe-node', this.getNodeId(node), payload as unknown as Record<string, unknown>, state,
+    );
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -2571,7 +2633,7 @@ export class GoogleMeetHandler extends BaseIntegrationHandler {
       operation,
     };
 
-    this.emitSocketEvent('google-meet:execute', payload);
+    this.emitIntegrationEvent('google-meet-node', nodeId, payload as Record<string, unknown>, state);
     this.storeIntegrationResult(state, 'googleMeet', true);
 
     return this.proceed(node, { googleMeetSuccess: true });
@@ -2599,7 +2661,7 @@ export class GoogleMeetHandler extends BaseIntegrationHandler {
       bookingData: response,
     };
 
-    this.emitSocketEvent('google-meet:execute', payload);
+    this.emitIntegrationEvent('google-meet-node', nodeId, payload as Record<string, unknown>, state);
     this.storeIntegrationResult(state, 'googleMeet', true);
 
     return this.proceed(node, { googleMeetSuccess: true });
@@ -2634,7 +2696,7 @@ export class GoogleDocsHandler extends BaseIntegrationHandler {
       title: title ? state.resolveVariables(title) : undefined,
     };
 
-    this.emitSocketEvent('google-docs:execute', payload);
+    this.emitIntegrationEvent('google-docs-node', nodeId, payload as Record<string, unknown>, state);
     this.storeIntegrationResult(state, 'googleDocs', true);
 
     return this.proceed(node, { googleDocsSuccess: true, operation });
@@ -2667,7 +2729,7 @@ export class GoogleDriveHandler extends BaseIntegrationHandler {
       operation,
     };
 
-    this.emitSocketEvent('google-drive:execute', payload);
+    this.emitIntegrationEvent('google-drive-node', nodeId, payload as Record<string, unknown>, state);
     this.storeIntegrationResult(state, 'googleDrive', true);
 
     return this.proceed(node, { googleDriveSuccess: true, operation });
