@@ -758,14 +758,23 @@ export class StorageService {
     if (!this.isReady()) return;
 
     try {
+      // Preserve visitor ID across resets — same device = same visitor
+      const existingSession = await this.loadSession();
+      const preservedVisitorId = existingSession?.visitorId;
+
       await Promise.all([
         this.clearSession(),
         this.clearMessages(),
         this.clearAnswerVariables(),
       ]);
 
+      // Re-save the visitor ID so it persists across conversations
+      if (preservedVisitorId) {
+        await this.saveSession({ visitorId: preservedVisitorId });
+      }
+
       if (__DEV__) {
-        console.log('[StorageService] Conversation reset (user data preserved)');
+        console.log('[StorageService] Conversation reset (visitor ID preserved:', preservedVisitorId, ')');
       }
     } catch (error) {
       this.handleError('resetConversation', error);
