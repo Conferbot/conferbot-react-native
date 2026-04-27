@@ -29,14 +29,20 @@ export function useLiveChat({
 
   // Send visitor typing status during live chat
   const sendVisitorTyping = useCallback((isTyping: boolean) => {
-    if (!isLiveChatMode || !chatSessionId || !socketClient.current?.isConnected()) return;
-    socketClient.current.sendVisitorTyping(chatSessionId, isTyping);
+    if (!isLiveChatMode || !socketClient.current?.isConnected()) return;
+    const sid = chatSessionId || socketClient.current?.chatSessionId || chatStateRef.current?.sessionId;
+    if (!sid) return;
+    socketClient.current.sendVisitorTyping(sid, isTyping);
   }, [isLiveChatMode, chatSessionId]);
 
   // Send message -- handles both bot flow and live chat modes
   const sendMessage = useCallback(
     async (text: string, _attachments?: MessageAttachment[]): Promise<void> => {
-      if (!chatSessionId) {
+      // Resolve session ID: React state first, then socket's stored ID, then chatState
+      const resolvedSessionId = chatSessionId
+        || socketClient.current?.chatSessionId
+        || chatStateRef.current?.sessionId;
+      if (!resolvedSessionId) {
         console.warn('[ConferBot] Cannot send message: no active session');
         return;
       }
@@ -72,7 +78,7 @@ export function useLiveChat({
 
           // Stop visitor typing indicator
           if (socketClient.current?.isConnected()) {
-            socketClient.current.sendVisitorTyping(chatSessionId, false);
+            socketClient.current.sendVisitorTyping(resolvedSessionId, false);
           }
 
           if (__DEV__) {
