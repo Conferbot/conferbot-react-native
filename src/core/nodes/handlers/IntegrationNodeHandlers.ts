@@ -825,10 +825,6 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
       const responseData = state.buildResponseData();
       this.socketClient.sendResponseRecord(responseData);
 
-      if (__DEV__) {
-        console.log('[ConferBot Handover] Joined room chat-' + state.sessionId);
-        console.log('[ConferBot Handover] Sent response-record before handover');
-      }
     }
 
     // Small delay to ensure response-record is processed before handover ticket creation
