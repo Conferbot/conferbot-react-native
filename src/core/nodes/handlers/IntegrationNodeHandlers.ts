@@ -815,6 +815,12 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
       transcript: state.getTranscript(),
     };
 
+    // Ensure visitor socket is in the chat room before handover
+    // (covers edge cases: restart, reconnect, or late room join)
+    if (this.socketClient) {
+      this.socketClient.joinChatRoomVisitor(state.sessionId);
+    }
+
     // Emit initiate-handover via socket (matches web widget's socket.emit("initiate-handover", ...))
     const maxWaitTime = this.getNumber(data, 'maxWaitTime', 2);
     this.emitSocketEvent('initiate-handover', {
