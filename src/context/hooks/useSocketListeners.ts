@@ -84,9 +84,6 @@ export function useSocketListeners({
         setServerCustomizations(customizations);
         if (__DEV__) {
           console.log('[ConferBot] Server customizations loaded:', Object.keys(customizations).length, 'keys');
-          console.log('[ConferBot] botName/logoText:', customizations.botName || customizations.logoText);
-          console.log('[ConferBot] avatar:', customizations.avatar);
-          console.log('[ConferBot] enableTagline:', customizations.enableTagline, 'tagline:', customizations.tagline);
         }
       }
 
