@@ -84,7 +84,30 @@ export default function App() {
 }
 ```
 
-### 2. Headless (useConferBot Hook)
+### 2. Floating Widget (FAB)
+
+A floating action button that overlays on top of your app. Tapping it opens the chat in a bottom sheet. Supports server-driven customization (colors, icon, CTA tooltip, position).
+
+```tsx
+import React from 'react';
+import { View, Text } from 'react-native';
+import { ConferBotProvider, ConferBotWidget } from '@conferbot/react-native';
+
+export default function App() {
+  return (
+    <ConferBotProvider apiKey="YOUR_API_KEY" botId="YOUR_BOT_ID">
+      <View style={{ flex: 1 }}>
+        <Text>Your App Content</Text>
+        <ConferBotWidget />
+      </View>
+    </ConferBotProvider>
+  );
+}
+```
+
+The widget reads server customizations automatically -- FAB color, icon, size, position, CTA text, and border radius are all configurable from the Conferbot dashboard.
+
+### 3. Headless (useConferBot Hook)
 
 Full control over the UI -- the hook manages connection state, messages, and actions.
 
