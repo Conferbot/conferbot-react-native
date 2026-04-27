@@ -99,12 +99,14 @@ export function useSocketListeners({
         }
 
         if (nodes.length > 0) {
+          // Use socket's stored chatSessionId (always current) instead of stale closure value
+          const currentSessionId = socketClient.current?.chatSessionId || chatSessionId;
           if (__DEV__) {
-            console.log('[ConferBot] flowEngine.current:', !!flowEngine.current, 'chatSessionId:', chatSessionId);
+            console.log('[ConferBot] flowEngine.current:', !!flowEngine.current, 'chatSessionId:', currentSessionId);
           }
           if (!flowEngine.current) {
-            const sessionId = chatSessionId || Math.random().toString(36).substring(2, 15);
-            if (!chatSessionId) {
+            const sessionId = currentSessionId || Math.random().toString(36).substring(2, 15);
+            if (!currentSessionId) {
               setChatSessionId(sessionId);
             }
             if (__DEV__) {
@@ -112,9 +114,16 @@ export function useSocketListeners({
             }
             initializeFlowEngine(sessionId);
 
-            // Join chat room with new session
+            // Join chat room with new session — also re-join after a brief delay
+            // to handle any race conditions with server-side room setup
             if (socketClient.current?.isConnected()) {
               socketClient.current.joinChatRoomVisitor(sessionId);
+              // Safety re-join: ensures room membership even if first join was lost
+              setTimeout(() => {
+                if (socketClient.current?.isConnected()) {
+                  socketClient.current.joinChatRoomVisitor(sessionId);
+                }
+              }, 1000);
             }
 
             // Add a ChatState listener to sync bot messages to UI record
