@@ -155,12 +155,13 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   // Resolve config: prop > server > default
   const sc = serverCustomizations || {};
   const position = widgetConfig.position || (sc.widgetPosition === 'left' ? 'left' : 'right');
-  const offsetX = widgetConfig.offsetX ?? sc.widgetOffsetRight ?? sc.widgetOffsetLeft ?? 16;
-  const offsetBottom = widgetConfig.offsetBottom ?? sc.widgetOffsetBottom ?? 16;
-  const size = widgetConfig.size ?? sc.widgetSize ?? 56;
+  // Defaults match web widget: 55px size, right 26px, bottom 20px, icon 60%
+  const offsetX = widgetConfig.offsetX ?? sc.widgetOffsetRight ?? sc.widgetOffsetLeft ?? 26;
+  const offsetBottom = widgetConfig.offsetBottom ?? sc.widgetOffsetBottom ?? 20;
+  const size = widgetConfig.size ?? sc.widgetSize ?? 55;
   const borderRadius = widgetConfig.borderRadius ?? sc.widgetBorderRadius ?? size / 2;
   const iconColor = widgetConfig.iconColor ?? '#ffffff';
-  const iconScale = widgetConfig.iconScale ?? 0.55;
+  const iconScale = widgetConfig.iconScale ?? 0.6;
   const iconSize = Math.round(size * iconScale);
 
   // Background
@@ -237,16 +238,16 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   // Resolve icon component
   const IconComponent = getBubbleIcon(iconName);
 
-  // Shadow style
+  // Shadow — matches web widget's deep luxurious shadow
   const shadowStyle = (widgetConfig.showShadow !== false) ? Platform.select({
     ios: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
+      shadowColor: 'rgb(50, 50, 93)',
+      shadowOffset: { width: 0, height: 13 },
+      shadowOpacity: 0.25,
+      shadowRadius: 27,
     },
     android: {
-      elevation: 8,
+      elevation: 12,
     },
   }) : undefined;
 
