@@ -215,6 +215,12 @@ export function useSocketListeners({
 
     // *** AGENT ACCEPTED *** //
     socketClient.current.on(SocketEvents.AGENT_ACCEPTED, (data: any) => {
+      if (__DEV__) {
+        console.log('[ConferBot] *** AGENT_ACCEPTED event received ***', JSON.stringify(data?.agentDetails?.name));
+        console.log('[ConferBot] Socket chatSessionId:', socketClient.current?.chatSessionId);
+        console.log('[ConferBot] flowEngine.current:', !!flowEngine.current);
+        console.log('[ConferBot] chatStateRef.current:', !!chatStateRef.current);
+      }
       if (data.agentDetails) {
         const agentName = data.agentDetails.name || 'Agent';
 

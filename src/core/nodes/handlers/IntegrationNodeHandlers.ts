@@ -819,6 +819,10 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
     // (covers edge cases: restart, reconnect, or late room join)
     if (this.socketClient) {
       this.socketClient.joinChatRoomVisitor(state.sessionId);
+      if (__DEV__) {
+        console.log('[ConferBot Handover] Joined room chat-' + state.sessionId);
+        console.log('[ConferBot Handover] Socket chatSessionId:', this.socketClient.chatSessionId);
+      }
     }
 
     // Emit initiate-handover via socket (matches web widget's socket.emit("initiate-handover", ...))

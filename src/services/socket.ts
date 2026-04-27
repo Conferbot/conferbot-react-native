@@ -209,7 +209,10 @@ class ConferBotSocket {
     // Agent accepted (server to client)
     this.socket.on(SocketEvents.AGENT_ACCEPTED, (data: any) => {
       if (__DEV__) {
-        console.log('[ConferBot Socket] Agent accepted:', data);
+        console.log('[ConferBot Socket] *** RAW agent-accepted from server ***');
+        console.log('[ConferBot Socket] Current chatSessionId:', this.chatSessionId);
+        console.log('[ConferBot Socket] Socket connected:', this.socket?.connected);
+        console.log('[ConferBot Socket] Socket id:', this.socket?.id);
       }
       this.emit(SocketEvents.AGENT_ACCEPTED, data);
     });
