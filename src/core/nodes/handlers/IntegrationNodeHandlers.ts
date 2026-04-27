@@ -819,11 +819,20 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
     // (covers edge cases: restart, reconnect, or late room join)
     if (this.socketClient) {
       this.socketClient.joinChatRoomVisitor(state.sessionId);
+
+      // Send response-record BEFORE initiate-handover so the server
+      // has the Response document when creating the ticket/notification
+      const responseData = state.buildResponseData();
+      this.socketClient.sendResponseRecord(responseData);
+
       if (__DEV__) {
         console.log('[ConferBot Handover] Joined room chat-' + state.sessionId);
-        console.log('[ConferBot Handover] Socket chatSessionId:', this.socketClient.chatSessionId);
+        console.log('[ConferBot Handover] Sent response-record before handover');
       }
     }
+
+    // Small delay to ensure response-record is processed before handover ticket creation
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     // Emit initiate-handover via socket (matches web widget's socket.emit("initiate-handover", ...))
     const maxWaitTime = this.getNumber(data, 'maxWaitTime', 2);
