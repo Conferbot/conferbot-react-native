@@ -181,6 +181,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     flowEngineRef.current = null;
     chatStateRef.current = null;
 
+    // Clear socket's stored session so FETCHED_CHATBOT_DATA generates a fresh one
+    if (socketClient.current) {
+      socketClient.current.chatSessionId = undefined;
+    }
+
     if (storageService.current?.isReady()) {
       await storageService.current.resetConversation();
       setHasPersistedSession(false);
