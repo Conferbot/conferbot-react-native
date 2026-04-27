@@ -54,7 +54,8 @@
   "peerDependencies": {
     "react": ">=17.0.0",
     "react-native": ">=0.70.0",
-    "@react-native-async-storage/async-storage": ">=1.17.0"
+    "@react-native-async-storage/async-storage": ">=1.17.0",
+    "react-native-svg": ">=12.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -64,6 +65,9 @@
       "optional": false
     },
     "@react-native-async-storage/async-storage": {
+      "optional": true
+    },
+    "react-native-svg": {
       "optional": true
     }
   },
