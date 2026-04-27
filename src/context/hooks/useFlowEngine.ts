@@ -88,9 +88,19 @@ export function useFlowEngine({
         chatStateRef.current = new ChatState(sessionId, botId);
       }
 
-      // Set visitorId on chat state
-      const visitorId = user?.id || socketClient.current?.getUserId() || sessionId;
-      chatStateRef.current.setVariable('_visitorId', visitorId);
+      // Set visitorId on chat state — use persisted visitor ID (survives restarts).
+      // Load async from storage, then update chatState when available.
+      const syncVisitorId = user?.id || socketClient.current?.getUserId();
+      chatStateRef.current.setVariable('_visitorId', syncVisitorId || sessionId);
+
+      // Async: replace with persisted visitor ID from device storage
+      if (!syncVisitorId && storageService.current?.isReady()) {
+        storageService.current.getOrCreateVisitorId().then((persistedId) => {
+          if (chatStateRef.current && persistedId) {
+            chatStateRef.current.setVariable('_visitorId', persistedId);
+          }
+        });
+      }
 
       // Add listener to persist state changes
       chatStateRef.current.addListener(() => {
@@ -143,14 +153,16 @@ export function useFlowEngine({
       return;
     }
 
-    // Freeze choice buttons (disabled, selected one highlighted).
-    // Matches web widget exactly: buttons get disabled, NO separate user message bubble.
-    // Web widget's _handleChoiceSelection does NOT call _displayUserInputMessage.
+    // Freeze choice buttons (disabled, selected one highlighted)
+    // Then add the user's selection as a user message bubble
+    // (matches web widget's _handleChoiceSelection → _displayUserInputMessage)
     const currentState = flowEngine.current.getState();
     if (currentState.currentUIState && currentState.currentUIState.type === 'buttons') {
       const choiceUI = currentState.currentUIState as any;
+      const selectedLabel = response?.label || response?.text || response?.value || String(response);
       setRecord((prev) => [
         ...prev,
+        // Frozen choice buttons
         {
           _id: `choice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           type: 'bot-message',
@@ -161,6 +173,13 @@ export function useFlowEngine({
             selectedButtonId: response?.buttonId,
             selectedButtonIds: response?.buttonIds,
           },
+          time: new Date().toISOString(),
+        } as any,
+        // User's selection shown as a right-aligned user bubble
+        {
+          _id: `user_choice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: 'user-message',
+          text: selectedLabel,
           time: new Date().toISOString(),
         } as any,
       ]);
