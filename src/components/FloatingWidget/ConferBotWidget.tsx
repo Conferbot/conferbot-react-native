@@ -42,7 +42,7 @@ export interface WidgetConfig {
   iconImageUrl?: string;
   /** Icon color inside the button (default: '#ffffff') */
   iconColor?: string;
-  /** Icon size relative to button (default: 0.55) */
+  /** Icon size relative to button (default: 0.5) */
   iconScale?: number;
   /** CTA tooltip text (shown above/beside the button) */
   ctaText?: string;
@@ -65,9 +65,10 @@ const CtaTooltip: React.FC<{
   text: string;
   position: 'left' | 'right';
   backgroundColor: string;
+  borderRadius: number;
   visible: boolean;
   onDismiss: () => void;
-}> = ({ text, position, backgroundColor, visible, onDismiss }) => {
+}> = ({ text, position, backgroundColor, borderRadius, visible, onDismiss }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(10)).current;
 
@@ -91,16 +92,15 @@ const CtaTooltip: React.FC<{
     <Animated.View
       style={[
         ctaStyles.container,
-        position === 'right' ? ctaStyles.right : ctaStyles.left,
         { opacity, transform: [{ translateY }] },
       ]}
     >
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={onDismiss}
-        style={[ctaStyles.bubble, { backgroundColor }]}
+        style={[ctaStyles.bubble, { backgroundColor, borderRadius }]}
       >
-        <Text style={ctaStyles.text}>{text}</Text>
+        <Text style={ctaStyles.text} numberOfLines={1}>{text}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -108,16 +108,10 @@ const CtaTooltip: React.FC<{
 
 const ctaStyles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    bottom: 4,
-    maxWidth: 220,
   },
-  right: { right: 64 },
-  left: { left: 64 },
   bubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6 },
       android: { elevation: 4 },
@@ -125,7 +119,7 @@ const ctaStyles = StyleSheet.create({
   },
   text: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
   },
 });
@@ -156,12 +150,12 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   const sc = serverCustomizations || {};
   const position = widgetConfig.position || (sc.widgetPosition === 'left' ? 'left' : 'right');
   // Defaults match web widget: 55px size, right 26px, bottom 20px, icon 60%
-  const offsetX = widgetConfig.offsetX ?? sc.widgetOffsetRight ?? sc.widgetOffsetLeft ?? 26;
-  const offsetBottom = widgetConfig.offsetBottom ?? sc.widgetOffsetBottom ?? 20;
-  const size = widgetConfig.size ?? sc.widgetSize ?? 55;
+  const offsetX = widgetConfig.offsetX ?? (position === 'left' ? (sc.widgetOffsetLeft ?? 10) : (sc.widgetOffsetRight ?? 10));
+  const offsetBottom = widgetConfig.offsetBottom ?? sc.widgetOffsetBottom ?? 10;
+  const size = widgetConfig.size ?? sc.widgetSize ?? 50;
   const borderRadius = widgetConfig.borderRadius ?? sc.widgetBorderRadius ?? size / 2;
   const iconColor = widgetConfig.iconColor ?? '#ffffff';
-  const iconScale = widgetConfig.iconScale ?? 0.6;
+  const iconScale = widgetConfig.iconScale ?? 0.5;
   const iconSize = Math.round(size * iconScale);
 
   // Background
@@ -170,12 +164,14 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   const gradStart = widgetConfig.gradientColorStart || sc.widgetGradientBgOne || '#fffcf1';
   const gradEnd = widgetConfig.gradientColorEnd || sc.widgetGradientBgTwo || '#1b55f3';
 
-  // Icon
+  // Icon — web widget uses widgetIconType to switch between SVG icon and custom image
   const iconName = widgetConfig.iconName || sc.widgetIconSVG;
-  const iconImageUrl = widgetConfig.iconImageUrl || sc.widgetIconImage;
+  const iconType = sc.widgetIconType || 'Icon';
+  const iconImageUrl = widgetConfig.iconImageUrl || (iconType === 'Image' ? sc.widgetIconImage : undefined);
 
-  // CTA
+  // CTA — border radius capped at 20 (matches web widget)
   const ctaText = widgetConfig.ctaText || sc.chatIconCtaText || '';
+  const ctaBorderRadius = Math.min(sc.widgetBorderRadius ?? 50, 20);
 
   // Show CTA after a short delay
   useEffect(() => {
@@ -288,8 +284,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
       justifyContent: 'center' as const,
     };
 
-    // Gradient support: use gradEnd color as solid fallback
-    const resolvedBg = themeType === 'gradient' ? gradEnd : bgColor;
+    // Gradient support: RN can't do CSS gradients natively, use widgetIconBgColor as solid fallback
+    const resolvedBg = bgColor;
 
     return (
       <View style={[buttonStyle, { backgroundColor: resolvedBg }]}>
@@ -298,8 +294,32 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     );
   };
 
+  // CTA offset from edge: FAB offset + FAB size + gap
+  const ctaEdgeOffset = offsetX + size + 10;
+
   return (
     <>
+      {/* CTA Tooltip — positioned independently so it can size freely */}
+      {ctaText ? (
+        <View
+          style={[
+            styles.ctaWrapper,
+            position === 'right' ? { right: ctaEdgeOffset } : { left: ctaEdgeOffset },
+            { bottom: offsetBottom + Math.round((size - 30) / 2) },
+          ]}
+          pointerEvents="box-none"
+        >
+          <CtaTooltip
+            text={ctaText}
+            position={position}
+            backgroundColor={bgColor}
+            borderRadius={ctaBorderRadius}
+            visible={showCta && !isChatOpen}
+            onDismiss={() => setShowCta(false)}
+          />
+        </View>
+      ) : null}
+
       {/* Floating FAB */}
       <View
         style={[
@@ -309,17 +329,6 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         ]}
         pointerEvents="box-none"
       >
-        {/* CTA Tooltip */}
-        {ctaText ? (
-          <CtaTooltip
-            text={ctaText}
-            position={position}
-            backgroundColor={bgColor}
-            visible={showCta && !isChatOpen}
-            onDismiss={() => setShowCta(false)}
-          />
-        ) : null}
-
         {/* FAB Button */}
         <Animated.View style={[{ transform: [{ scale: scaleAnim }, { rotate }] }, shadowStyle]}>
           <TouchableOpacity
@@ -346,6 +355,10 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
 };
 
 const styles = StyleSheet.create({
+  ctaWrapper: {
+    position: 'absolute',
+    zIndex: 9998,
+  },
   fabContainer: {
     position: 'absolute',
     zIndex: 9999,
