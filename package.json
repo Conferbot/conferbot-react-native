@@ -2,14 +2,14 @@
   "name": "@conferbot/react-native",
   "version": "1.1.0",
   "description": "Official React Native SDK for Conferbot - Native mobile chat widget for iOS and Android",
-  "main": "src/index.ts",
+  "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "react-native": "src/index.ts",
   "scripts": {
-    "build": "tsc --noEmit false",
+    "build": "npm run clean && tsc -p tsconfig.json",
     "watch": "tsc --watch --noEmit false",
     "clean": "rm -rf lib",
-    "prepare": "echo 'Skipping build - using pre-built lib/'",
+    "prepare": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -52,9 +52,9 @@
   },
   "homepage": "https://docs.conferbot.com/mobile/react-native",
   "peerDependencies": {
+    "@react-native-async-storage/async-storage": ">=1.17.0",
     "react": ">=17.0.0",
     "react-native": ">=0.70.0",
-    "@react-native-async-storage/async-storage": ">=1.17.0",
     "react-native-svg": ">=12.0.0"
   },
   "peerDependenciesMeta": {
@@ -72,8 +72,8 @@
     }
   },
   "dependencies": {
-    "socket.io-client": "^4.8.0",
-    "axios": "^1.7.0"
+    "axios": "^1.7.0",
+    "socket.io-client": "^4.8.0"
   },
   "devDependencies": {
     "@testing-library/jest-native": "^5.4.3",
@@ -93,6 +93,7 @@
     "prettier": "^3.3.0",
     "react": "^18.3.0",
     "react-native": "^0.74.0",
+    "react-native-svg": "^15.15.5",
     "react-test-renderer": "^18.3.0",
     "ts-jest": "^29.2.0",
     "typescript": "^5.5.0"
