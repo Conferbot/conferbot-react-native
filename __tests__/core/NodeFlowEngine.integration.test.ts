@@ -1019,10 +1019,13 @@ describe('NodeFlowEngine Integration with ChatState', () => {
       expect(chatState.isFlowComplete).toBe(false);
     });
 
-    it('should preserve session and bot IDs after reset', () => {
+    it('should regenerate session ID and preserve bot ID after reset', () => {
       chatState.reset();
 
-      expect(chatState.sessionId).toBe('test-session');
+      // A reset starts a fresh chat session (matches web widget restart),
+      // so the session ID is regenerated while the bot ID is preserved.
+      expect(chatState.sessionId).toBeTruthy();
+      expect(chatState.sessionId).not.toBe('test-session');
       expect(chatState.botId).toBe('test-bot');
     });
   });

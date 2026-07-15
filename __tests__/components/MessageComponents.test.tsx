@@ -1,18 +1,24 @@
 /**
  * MessageComponents.test.tsx
  *
- * Tests for the message display components (TextMessage, ImageMessage, etc.)
+ * Tests for message display components (MessageBubble, ImageDisplay,
+ * VideoPlayer, AudioPlayer, FileDownload, HTMLView).
+ *
+ * Rewritten against the real component API: these components take NodeUIState
+ * props (nodeId, text/url/content, ...). The previous tests imported
+ * TextMessage/ImageMessage/... which never existed in this SDK.
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 import {
-  TextMessage,
-  ImageMessage,
-  VideoMessage,
-  AudioMessage,
-  FileMessage,
-  HtmlMessage,
+  MessageBubble,
+  ImageDisplay,
+  VideoPlayer,
+  AudioPlayer,
+  FileDownload,
+  HTMLView,
 } from '../../src/components/NodeComponents/MessageComponents';
 import { createMockTheme } from '../testUtils';
 
@@ -21,676 +27,358 @@ jest.mock('../../src/theme', () => ({
   useTheme: () => createMockTheme(),
 }));
 
-// Mock media components
-jest.mock('react-native-video', () => 'Video');
-jest.mock('react-native-webview', () => ({
-  WebView: 'WebView',
-}));
-
 describe('MessageComponents', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   // ========================================
-  // TEXT MESSAGE TESTS
+  // MESSAGE BUBBLE
   // ========================================
 
-  describe('TextMessage', () => {
+  describe('MessageBubble', () => {
     const defaultProps = {
-      content: 'Hello, this is a test message',
+      type: 'message' as const,
+      nodeId: 'node-1',
+      text: 'Hello world',
     };
 
     describe('Rendering', () => {
-      it('renders the text message', () => {
-        const { getByText } = render(
-          <TextMessage {...defaultProps} />
-        );
+      it('renders the message text', () => {
+        const { getByText } = render(<MessageBubble {...defaultProps} />);
 
-        expect(getByText('Hello, this is a test message')).toBeTruthy();
+        expect(getByText('Hello world')).toBeTruthy();
       });
 
       it('renders with custom testID', () => {
         const { getByTestId } = render(
-          <TextMessage {...defaultProps} testID="text-msg" />
+          <MessageBubble {...defaultProps} testID="text-message" />
         );
 
-        expect(getByTestId('text-msg')).toBeTruthy();
+        expect(getByTestId('text-message')).toBeTruthy();
       });
 
-      it('renders markdown content when enabled', () => {
-        const { getByTestId } = render(
-          <TextMessage
-            content="**Bold** and *italic*"
-            renderMarkdown={true}
-            testID="text-msg"
-          />
+      it('labels bot messages for accessibility', () => {
+        const { getByLabelText } = render(
+          <MessageBubble {...defaultProps} isBot={true} />
         );
 
-        expect(getByTestId('text-msg')).toBeTruthy();
+        expect(getByLabelText('Bot message: Hello world')).toBeTruthy();
       });
 
-      it('renders links as clickable', () => {
-        const { getByTestId } = render(
-          <TextMessage
-            content="Check out https://example.com"
-            linkify={true}
-            testID="text-msg"
-          />
+      it('labels user messages for accessibility', () => {
+        const { getByLabelText } = render(
+          <MessageBubble {...defaultProps} isBot={false} />
         );
 
-        expect(getByTestId('text-msg')).toBeTruthy();
+        expect(getByLabelText('Your message: Hello world')).toBeTruthy();
       });
 
-      it('renders timestamp when provided', () => {
-        const { getByTestId } = render(
-          <TextMessage
-            {...defaultProps}
-            timestamp="10:30 AM"
-            showTimestamp={true}
-            testID="text-msg"
-          />
+      it('shows the bot avatar by default', () => {
+        const { getByLabelText } = render(
+          <MessageBubble {...defaultProps} isBot={true} />
         );
 
-        expect(getByTestId('text-msg')).toBeTruthy();
+        expect(getByLabelText('Bot avatar')).toBeTruthy();
       });
 
-      it('renders sender name when provided', () => {
-        const { getByText } = render(
-          <TextMessage
-            {...defaultProps}
-            senderName="Bot"
-            showSenderName={true}
-          />
+      it('hides the avatar when showAvatar is false', () => {
+        const { queryByLabelText } = render(
+          <MessageBubble {...defaultProps} showAvatar={false} />
         );
 
-        expect(getByText('Bot')).toBeTruthy();
-      });
-    });
-
-    describe('Interactions', () => {
-      it('calls onLongPress when long pressed', () => {
-        const onLongPress = jest.fn();
-        const { getByTestId } = render(
-          <TextMessage {...defaultProps} onLongPress={onLongPress} testID="text-msg" />
-        );
-
-        fireEvent(getByTestId('text-msg'), 'longPress');
-
-        expect(onLongPress).toHaveBeenCalled();
+        expect(queryByLabelText('Bot avatar')).toBeNull();
       });
 
-      it('calls onLinkPress when link is pressed', () => {
-        const onLinkPress = jest.fn();
-        const { getByTestId } = render(
-          <TextMessage
-            content="Visit https://example.com"
-            onLinkPress={onLinkPress}
-            linkify={true}
-            testID="text-msg"
-          />
+      it('shows typing dots instead of text while typing', () => {
+        const { queryByText } = render(
+          <MessageBubble {...defaultProps} typing={true} />
         );
 
-        expect(getByTestId('text-msg')).toBeTruthy();
+        expect(queryByText('Hello world')).toBeNull();
       });
     });
 
     describe('Edge Cases', () => {
-      it('handles empty content', () => {
+      it('handles empty text', () => {
         const { getByTestId } = render(
-          <TextMessage content="" testID="text-msg" />
+          <MessageBubble {...defaultProps} text="" testID="text-message" />
         );
 
-        expect(getByTestId('text-msg')).toBeTruthy();
+        expect(getByTestId('text-message')).toBeTruthy();
       });
 
-      it('handles very long content', () => {
-        const { getByTestId } = render(
-          <TextMessage content={'A'.repeat(10000)} testID="text-msg" />
-        );
-
-        expect(getByTestId('text-msg')).toBeTruthy();
-      });
-
-      it('handles special characters', () => {
+      it('handles very long text', () => {
+        const longText = 'Lorem ipsum '.repeat(500);
         const { getByText } = render(
-          <TextMessage content="<>&\"'special chars" />
+          <MessageBubble {...defaultProps} text={longText} />
         );
 
-        expect(getByText("<>&\"'special chars")).toBeTruthy();
+        expect(getByText(longText)).toBeTruthy();
       });
 
       it('handles unicode and emojis', () => {
         const { getByText } = render(
-          <TextMessage content="Hello \u4e16\u754c \ud83d\udc4b" />
+          <MessageBubble {...defaultProps} text="Hi 👋 你好 مرحبا" />
         );
 
-        expect(getByText('Hello \u4e16\u754c \ud83d\udc4b')).toBeTruthy();
+        expect(getByText('Hi 👋 你好 مرحبا')).toBeTruthy();
       });
     });
   });
 
   // ========================================
-  // IMAGE MESSAGE TESTS
+  // IMAGE DISPLAY
   // ========================================
 
-  describe('ImageMessage', () => {
+  describe('ImageDisplay', () => {
     const defaultProps = {
+      type: 'image' as const,
+      nodeId: 'node-2',
       url: 'https://example.com/image.png',
     };
 
     describe('Rendering', () => {
-      it('renders the image message', () => {
+      it('renders the image container', () => {
         const { getByTestId } = render(
-          <ImageMessage {...defaultProps} testID="image-msg" />
+          <ImageDisplay {...defaultProps} testID="image-message" />
         );
 
-        expect(getByTestId('image-msg')).toBeTruthy();
+        expect(getByTestId('image-message')).toBeTruthy();
       });
 
-      it('renders with alt text', () => {
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} alt="Test image" testID="image-msg" />
+      it('uses alt text as the accessibility label', () => {
+        const { getByLabelText } = render(
+          <ImageDisplay {...defaultProps} alt="A cute cat" />
         );
 
-        expect(getByTestId('image-msg')).toBeTruthy();
+        expect(getByLabelText('A cute cat')).toBeTruthy();
       });
 
-      it('renders caption when provided', () => {
+      it('falls back to a generic label without alt or caption', () => {
+        const { getByLabelText } = render(<ImageDisplay {...defaultProps} />);
+
+        expect(getByLabelText('Image')).toBeTruthy();
+      });
+
+      it('renders the caption when provided', () => {
         const { getByText } = render(
-          <ImageMessage {...defaultProps} caption="Image caption" />
+          <ImageDisplay {...defaultProps} caption="Team photo" />
         );
 
-        expect(getByText('Image caption')).toBeTruthy();
-      });
-
-      it('renders loading placeholder while loading', () => {
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} testID="image-msg" />
-        );
-
-        expect(getByTestId('image-msg')).toBeTruthy();
-      });
-
-      it('renders thumbnail size', () => {
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} size="thumbnail" testID="image-msg" />
-        );
-
-        expect(getByTestId('image-msg')).toBeTruthy();
-      });
-
-      it('renders full size', () => {
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} size="full" testID="image-msg" />
-        );
-
-        expect(getByTestId('image-msg')).toBeTruthy();
-      });
-    });
-
-    describe('Interactions', () => {
-      it('calls onPress when image is pressed', () => {
-        const onPress = jest.fn();
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} onPress={onPress} testID="image-msg" />
-        );
-
-        fireEvent.press(getByTestId('image-msg'));
-
-        expect(onPress).toHaveBeenCalled();
-      });
-
-      it('calls onLongPress when long pressed', () => {
-        const onLongPress = jest.fn();
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} onLongPress={onLongPress} testID="image-msg" />
-        );
-
-        fireEvent(getByTestId('image-msg'), 'longPress');
-
-        expect(onLongPress).toHaveBeenCalled();
-      });
-
-      it('opens fullscreen viewer when viewable is true', () => {
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} viewable={true} testID="image-msg" />
-        );
-
-        expect(getByTestId('image-msg')).toBeTruthy();
+        expect(getByText('Team photo')).toBeTruthy();
       });
     });
 
     describe('Error Handling', () => {
-      it('shows error state on load failure', () => {
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} testID="image-msg" />
+      it('shows an error message when the image fails to load', () => {
+        const { getByTestId, getByText, UNSAFE_getByType } = render(
+          <ImageDisplay {...defaultProps} testID="image-message" />
         );
 
-        expect(getByTestId('image-msg')).toBeTruthy();
-      });
+        const { Image } = require('react-native');
+        fireEvent(UNSAFE_getByType(Image), 'error');
 
-      it('calls onError when image fails to load', () => {
-        const onError = jest.fn();
-        const { getByTestId } = render(
-          <ImageMessage {...defaultProps} onError={onError} testID="image-msg" />
-        );
-
-        expect(getByTestId('image-msg')).toBeTruthy();
-      });
-    });
-
-    describe('Edge Cases', () => {
-      it('handles empty URL', () => {
-        const { getByTestId } = render(
-          <ImageMessage url="" testID="image-msg" />
-        );
-
-        expect(getByTestId('image-msg')).toBeTruthy();
-      });
-
-      it('handles invalid URL', () => {
-        const { getByTestId } = render(
-          <ImageMessage url="not-a-url" testID="image-msg" />
-        );
-
-        expect(getByTestId('image-msg')).toBeTruthy();
+        expect(getByTestId('image-message')).toBeTruthy();
+        expect(getByText('Failed to load image')).toBeTruthy();
       });
     });
   });
 
   // ========================================
-  // VIDEO MESSAGE TESTS
+  // VIDEO PLAYER
   // ========================================
 
-  describe('VideoMessage', () => {
+  describe('VideoPlayer', () => {
     const defaultProps = {
+      type: 'video' as const,
+      nodeId: 'node-3',
       url: 'https://example.com/video.mp4',
     };
 
     describe('Rendering', () => {
-      it('renders the video message', () => {
+      it('renders the video player container', () => {
         const { getByTestId } = render(
-          <VideoMessage {...defaultProps} testID="video-msg" />
+          <VideoPlayer {...defaultProps} testID="video-message" />
         );
 
-        expect(getByTestId('video-msg')).toBeTruthy();
+        expect(getByTestId('video-message')).toBeTruthy();
       });
 
-      it('renders video poster when provided', () => {
-        const { getByTestId } = render(
-          <VideoMessage {...defaultProps} poster="https://example.com/poster.png" testID="video-msg" />
-        );
+      it('renders a play button', () => {
+        const { getByLabelText } = render(<VideoPlayer {...defaultProps} />);
 
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-
-      it('renders video controls', () => {
-        const { getByTestId } = render(
-          <VideoMessage {...defaultProps} showControls={true} testID="video-msg" />
-        );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-
-      it('renders without controls when disabled', () => {
-        const { getByTestId } = render(
-          <VideoMessage {...defaultProps} showControls={false} testID="video-msg" />
-        );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-
-      it('renders caption when provided', () => {
-        const { getByText } = render(
-          <VideoMessage {...defaultProps} caption="Video caption" />
-        );
-
-        expect(getByText('Video caption')).toBeTruthy();
+        expect(getByLabelText('Play video')).toBeTruthy();
       });
     });
 
     describe('Interactions', () => {
-      it('starts playback on press when autoPlay is false', () => {
-        const { getByTestId } = render(
-          <VideoMessage {...defaultProps} autoPlay={false} testID="video-msg" />
+      it('opens the video URL when play is pressed', () => {
+        const { getByLabelText } = render(<VideoPlayer {...defaultProps} />);
+
+        fireEvent.press(getByLabelText('Play video'));
+
+        expect(Linking.openURL).toHaveBeenCalledWith(
+          'https://example.com/video.mp4'
         );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-
-      it('auto-plays when autoPlay is true', () => {
-        const { getByTestId } = render(
-          <VideoMessage {...defaultProps} autoPlay={true} testID="video-msg" />
-        );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-
-      it('calls onPlay when video starts', () => {
-        const onPlay = jest.fn();
-        const { getByTestId } = render(
-          <VideoMessage {...defaultProps} onPlay={onPlay} testID="video-msg" />
-        );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-
-      it('calls onEnd when video ends', () => {
-        const onEnd = jest.fn();
-        const { getByTestId } = render(
-          <VideoMessage {...defaultProps} onEnd={onEnd} testID="video-msg" />
-        );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-    });
-
-    describe('Edge Cases', () => {
-      it('handles empty URL', () => {
-        const { getByTestId } = render(
-          <VideoMessage url="" testID="video-msg" />
-        );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-
-      it('handles YouTube URLs', () => {
-        const { getByTestId } = render(
-          <VideoMessage url="https://www.youtube.com/watch?v=dQw4w9WgXcQ" testID="video-msg" />
-        );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
-      });
-
-      it('handles Vimeo URLs', () => {
-        const { getByTestId } = render(
-          <VideoMessage url="https://vimeo.com/123456789" testID="video-msg" />
-        );
-
-        expect(getByTestId('video-msg')).toBeTruthy();
       });
     });
   });
 
   // ========================================
-  // AUDIO MESSAGE TESTS
+  // AUDIO PLAYER
   // ========================================
 
-  describe('AudioMessage', () => {
+  describe('AudioPlayer', () => {
     const defaultProps = {
+      type: 'audio' as const,
+      nodeId: 'node-4',
       url: 'https://example.com/audio.mp3',
     };
 
     describe('Rendering', () => {
-      it('renders the audio message', () => {
+      it('renders the audio player container', () => {
         const { getByTestId } = render(
-          <AudioMessage {...defaultProps} testID="audio-msg" />
+          <AudioPlayer {...defaultProps} testID="audio-message" />
         );
 
-        expect(getByTestId('audio-msg')).toBeTruthy();
+        expect(getByTestId('audio-message')).toBeTruthy();
       });
 
-      it('renders play/pause button', () => {
-        const { getByTestId } = render(
-          <AudioMessage {...defaultProps} testID="audio-msg" />
-        );
+      it('starts in the paused state', () => {
+        const { getByLabelText } = render(<AudioPlayer {...defaultProps} />);
 
-        expect(getByTestId('audio-msg')).toBeTruthy();
-      });
-
-      it('renders duration when available', () => {
-        const { getByTestId } = render(
-          <AudioMessage {...defaultProps} duration={180} testID="audio-msg" />
-        );
-
-        expect(getByTestId('audio-msg')).toBeTruthy();
-      });
-
-      it('renders progress bar', () => {
-        const { getByTestId } = render(
-          <AudioMessage {...defaultProps} showProgress={true} testID="audio-msg" />
-        );
-
-        expect(getByTestId('audio-msg')).toBeTruthy();
-      });
-
-      it('renders waveform when provided', () => {
-        const { getByTestId } = render(
-          <AudioMessage
-            {...defaultProps}
-            waveform={[0.1, 0.5, 0.8, 0.3]}
-            showWaveform={true}
-            testID="audio-msg"
-          />
-        );
-
-        expect(getByTestId('audio-msg')).toBeTruthy();
+        expect(getByLabelText('Play audio')).toBeTruthy();
       });
     });
 
     describe('Interactions', () => {
-      it('toggles playback on button press', () => {
-        const { getByTestId } = render(
-          <AudioMessage {...defaultProps} testID="audio-msg" />
-        );
+      it('toggles between play and pause', () => {
+        const { getByLabelText } = render(<AudioPlayer {...defaultProps} />);
 
-        expect(getByTestId('audio-msg')).toBeTruthy();
-      });
+        fireEvent.press(getByLabelText('Play audio'));
+        expect(getByLabelText('Pause audio')).toBeTruthy();
 
-      it('calls onPlay when audio starts', () => {
-        const onPlay = jest.fn();
-        const { getByTestId } = render(
-          <AudioMessage {...defaultProps} onPlay={onPlay} testID="audio-msg" />
-        );
-
-        expect(getByTestId('audio-msg')).toBeTruthy();
-      });
-
-      it('calls onEnd when audio ends', () => {
-        const onEnd = jest.fn();
-        const { getByTestId } = render(
-          <AudioMessage {...defaultProps} onEnd={onEnd} testID="audio-msg" />
-        );
-
-        expect(getByTestId('audio-msg')).toBeTruthy();
-      });
-
-      it('allows seeking when seekable is true', () => {
-        const { getByTestId } = render(
-          <AudioMessage {...defaultProps} seekable={true} testID="audio-msg" />
-        );
-
-        expect(getByTestId('audio-msg')).toBeTruthy();
-      });
-    });
-
-    describe('Edge Cases', () => {
-      it('handles empty URL', () => {
-        const { getByTestId } = render(
-          <AudioMessage url="" testID="audio-msg" />
-        );
-
-        expect(getByTestId('audio-msg')).toBeTruthy();
+        fireEvent.press(getByLabelText('Pause audio'));
+        expect(getByLabelText('Play audio')).toBeTruthy();
       });
     });
   });
 
   // ========================================
-  // FILE MESSAGE TESTS
+  // FILE DOWNLOAD
   // ========================================
 
-  describe('FileMessage', () => {
+  describe('FileDownload', () => {
     const defaultProps = {
-      url: 'https://example.com/document.pdf',
-      filename: 'document.pdf',
+      type: 'file' as const,
+      nodeId: 'node-5',
+      url: 'https://example.com/report.pdf',
+      filename: 'report.pdf',
     };
 
     describe('Rendering', () => {
-      it('renders the file message', () => {
+      it('renders the filename', () => {
+        const { getByText } = render(<FileDownload {...defaultProps} />);
+
+        expect(getByText('report.pdf')).toBeTruthy();
+      });
+
+      it('renders with custom testID', () => {
+        const { getByTestId } = render(
+          <FileDownload {...defaultProps} testID="file-message" />
+        );
+
+        expect(getByTestId('file-message')).toBeTruthy();
+      });
+
+      it('formats the file size in KB', () => {
         const { getByText } = render(
-          <FileMessage {...defaultProps} />
+          <FileDownload {...defaultProps} size={2048} />
         );
 
-        expect(getByText('document.pdf')).toBeTruthy();
+        expect(getByText('2.0 KB')).toBeTruthy();
       });
 
-      it('renders file icon based on type', () => {
-        const { getByTestId } = render(
-          <FileMessage {...defaultProps} testID="file-msg" />
+      it('formats the file size in MB', () => {
+        const { getByText } = render(
+          <FileDownload {...defaultProps} size={3 * 1024 * 1024} />
         );
 
-        expect(getByTestId('file-msg')).toBeTruthy();
+        expect(getByText('3.0 MB')).toBeTruthy();
       });
 
-      it('renders file size when provided', () => {
-        const { getByTestId } = render(
-          <FileMessage {...defaultProps} fileSize={1024000} testID="file-msg" />
-        );
+      it('omits the size when not provided', () => {
+        const { queryByText } = render(<FileDownload {...defaultProps} />);
 
-        expect(getByTestId('file-msg')).toBeTruthy();
-      });
-
-      it('renders download progress', () => {
-        const { getByTestId } = render(
-          <FileMessage {...defaultProps} downloadProgress={50} testID="file-msg" />
-        );
-
-        expect(getByTestId('file-msg')).toBeTruthy();
-      });
-
-      it('renders different icons for different file types', () => {
-        const fileTypes = ['document.pdf', 'image.png', 'video.mp4', 'audio.mp3', 'data.zip'];
-
-        fileTypes.forEach((filename) => {
-          const { getByTestId, unmount } = render(
-            <FileMessage url="https://example.com/file" filename={filename} testID="file-msg" />
-          );
-          expect(getByTestId('file-msg')).toBeTruthy();
-          unmount();
-        });
+        expect(queryByText(/KB|MB/)).toBeNull();
       });
     });
 
     describe('Interactions', () => {
-      it('calls onDownload when download button is pressed', () => {
-        const onDownload = jest.fn();
-        const { getByTestId } = render(
-          <FileMessage {...defaultProps} onDownload={onDownload} testID="file-msg" />
+      it('opens the file URL on press', () => {
+        const { getByLabelText } = render(<FileDownload {...defaultProps} />);
+
+        fireEvent.press(getByLabelText('Download file: report.pdf'));
+
+        expect(Linking.openURL).toHaveBeenCalledWith(
+          'https://example.com/report.pdf'
         );
-
-        fireEvent.press(getByTestId('file-msg'));
-
-        expect(onDownload).toHaveBeenCalled();
-      });
-
-      it('calls onOpen when file is pressed after download', () => {
-        const onOpen = jest.fn();
-        const { getByTestId } = render(
-          <FileMessage {...defaultProps} onOpen={onOpen} downloaded={true} testID="file-msg" />
-        );
-
-        fireEvent.press(getByTestId('file-msg'));
-
-        expect(onOpen).toHaveBeenCalled();
-      });
-    });
-
-    describe('Edge Cases', () => {
-      it('handles missing filename', () => {
-        const { getByTestId } = render(
-          <FileMessage url="https://example.com/file" testID="file-msg" />
-        );
-
-        expect(getByTestId('file-msg')).toBeTruthy();
-      });
-
-      it('handles very long filename', () => {
-        const { getByTestId } = render(
-          <FileMessage url="https://example.com/file" filename={'A'.repeat(200) + '.pdf'} testID="file-msg" />
-        );
-
-        expect(getByTestId('file-msg')).toBeTruthy();
       });
     });
   });
 
   // ========================================
-  // HTML MESSAGE TESTS
+  // HTML VIEW
   // ========================================
 
-  describe('HtmlMessage', () => {
+  describe('HTMLView', () => {
     const defaultProps = {
-      content: '<p>This is HTML content</p>',
+      type: 'html' as const,
+      nodeId: 'node-6',
+      content: '<p>Hello <b>world</b></p>',
     };
 
     describe('Rendering', () => {
-      it('renders the HTML message', () => {
-        const { getByTestId } = render(
-          <HtmlMessage {...defaultProps} testID="html-msg" />
-        );
+      it('renders stripped HTML content as text', () => {
+        const { getByText } = render(<HTMLView {...defaultProps} />);
 
-        expect(getByTestId('html-msg')).toBeTruthy();
+        expect(getByText('Hello world')).toBeTruthy();
       });
 
-      it('renders complex HTML', () => {
+      it('renders with custom testID', () => {
         const { getByTestId } = render(
-          <HtmlMessage
-            content="<h1>Title</h1><p>Paragraph with <a href='#'>link</a></p><ul><li>Item 1</li></ul>"
-            testID="html-msg"
-          />
+          <HTMLView {...defaultProps} testID="html-message" />
         );
 
-        expect(getByTestId('html-msg')).toBeTruthy();
+        expect(getByTestId('html-message')).toBeTruthy();
       });
 
-      it('renders with custom styles', () => {
-        const { getByTestId } = render(
-          <HtmlMessage
-            {...defaultProps}
-            customStyles={{ p: { color: 'red' } }}
-            testID="html-msg"
-          />
+      it('decodes HTML entities', () => {
+        // Pass as a JS string so JSX does not pre-decode the entities
+        const { getByText } = render(
+          <HTMLView {...defaultProps} content={'Fish &amp; Chips &quot;tasty&quot;'} />
         );
 
-        expect(getByTestId('html-msg')).toBeTruthy();
-      });
-    });
-
-    describe('Interactions', () => {
-      it('calls onLinkPress when link is pressed', () => {
-        const onLinkPress = jest.fn();
-        const { getByTestId } = render(
-          <HtmlMessage
-            content="<a href='https://example.com'>Link</a>"
-            onLinkPress={onLinkPress}
-            testID="html-msg"
-          />
-        );
-
-        expect(getByTestId('html-msg')).toBeTruthy();
+        expect(getByText('Fish & Chips "tasty"')).toBeTruthy();
       });
     });
 
     describe('Edge Cases', () => {
       it('handles empty content', () => {
         const { getByTestId } = render(
-          <HtmlMessage content="" testID="html-msg" />
+          <HTMLView {...defaultProps} content="" testID="html-message" />
         );
 
-        expect(getByTestId('html-msg')).toBeTruthy();
+        expect(getByTestId('html-message')).toBeTruthy();
       });
 
-      it('handles malformed HTML', () => {
-        const { getByTestId } = render(
-          <HtmlMessage content="<p>Unclosed tag" testID="html-msg" />
+      it('handles plain text without tags', () => {
+        const { getByText } = render(
+          <HTMLView {...defaultProps} content="Just plain text" />
         );
 
-        expect(getByTestId('html-msg')).toBeTruthy();
-      });
-
-      it('sanitizes script tags', () => {
-        const { getByTestId } = render(
-          <HtmlMessage content="<script>alert('xss')</script><p>Safe content</p>" testID="html-msg" />
-        );
-
-        expect(getByTestId('html-msg')).toBeTruthy();
+        expect(getByText('Just plain text')).toBeTruthy();
       });
     });
   });

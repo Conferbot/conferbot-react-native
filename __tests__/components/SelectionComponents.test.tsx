@@ -1,17 +1,23 @@
 /**
  * SelectionComponents.test.tsx
  *
- * Tests for the selection components (Buttons, Cards, Carousel, etc.)
+ * Tests for selection components (ButtonGroup, CardGrid, CarouselView,
+ * PictureChoiceGrid, DropdownPicker).
+ *
+ * Rewritten against the real component API: these components take NodeUIState
+ * props plus an onSubmit callback, as wired by NodeRenderer. The previous
+ * tests imported ButtonsSelection/CardsSelection/... which never existed.
  */
 
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 import {
-  ButtonsSelection,
-  CardsSelection,
-  CarouselSelection,
-  PictureChoiceSelection,
-  DropdownSelection,
+  ButtonGroup,
+  CardGrid,
+  CarouselView,
+  PictureChoiceGrid,
+  DropdownPicker,
 } from '../../src/components/NodeComponents/SelectionComponents';
 import { createMockTheme } from '../testUtils';
 
@@ -22,19 +28,21 @@ jest.mock('../../src/theme', () => ({
 
 describe('SelectionComponents', () => {
   // ========================================
-  // BUTTONS SELECTION TESTS
+  // BUTTON GROUP TESTS
   // ========================================
 
-  describe('ButtonsSelection', () => {
-    const mockOptions = [
-      { id: 'opt-1', text: 'Option 1', value: 'value1' },
-      { id: 'opt-2', text: 'Option 2', value: 'value2' },
-      { id: 'opt-3', text: 'Option 3', value: 'value3' },
-    ];
-
+  describe('ButtonGroup', () => {
     const defaultProps = {
-      options: mockOptions,
-      onSelect: jest.fn(),
+      type: 'buttons' as const,
+      nodeId: 'node-1',
+      question: 'Pick an option',
+      buttons: [
+        { id: 'b1', label: 'Option 1' },
+        { id: 'b2', label: 'Option 2', value: 'two' },
+        { id: 'b3', label: 'Option 3' },
+      ],
+      variableName: 'choice',
+      onSubmit: jest.fn(),
     };
 
     beforeEach(() => {
@@ -43,9 +51,7 @@ describe('SelectionComponents', () => {
 
     describe('Rendering', () => {
       it('renders all button options', () => {
-        const { getByText } = render(
-          <ButtonsSelection {...defaultProps} />
-        );
+        const { getByText } = render(<ButtonGroup {...defaultProps} />);
 
         expect(getByText('Option 1')).toBeTruthy();
         expect(getByText('Option 2')).toBeTruthy();
@@ -54,501 +60,373 @@ describe('SelectionComponents', () => {
 
       it('renders with custom testID', () => {
         const { getByTestId } = render(
-          <ButtonsSelection {...defaultProps} testID="buttons" />
+          <ButtonGroup {...defaultProps} testID="buttons-selection" />
         );
 
-        expect(getByTestId('buttons')).toBeTruthy();
-      });
-
-      it('renders in horizontal layout', () => {
-        const { getByTestId } = render(
-          <ButtonsSelection {...defaultProps} layout="horizontal" testID="buttons" />
-        );
-
-        expect(getByTestId('buttons')).toBeTruthy();
-      });
-
-      it('renders in vertical layout', () => {
-        const { getByTestId } = render(
-          <ButtonsSelection {...defaultProps} layout="vertical" testID="buttons" />
-        );
-
-        expect(getByTestId('buttons')).toBeTruthy();
+        expect(getByTestId('buttons-selection')).toBeTruthy();
       });
 
       it('renders button icons when provided', () => {
-        const optionsWithIcons = mockOptions.map((opt, i) => ({
-          ...opt,
-          icon: `icon-${i}`,
-        }));
-
-        const { getByTestId } = render(
-          <ButtonsSelection options={optionsWithIcons} onSelect={jest.fn()} testID="buttons" />
-        );
-
-        expect(getByTestId('buttons')).toBeTruthy();
-      });
-
-      it('renders disabled buttons', () => {
-        const optionsWithDisabled = [
-          { ...mockOptions[0], disabled: true },
-          ...mockOptions.slice(1),
-        ];
-
         const { getByText } = render(
-          <ButtonsSelection options={optionsWithDisabled} onSelect={jest.fn()} />
+          <ButtonGroup
+            {...defaultProps}
+            buttons={[{ id: 'b1', label: 'Home', icon: '🏠' }]}
+          />
         );
 
-        expect(getByText('Option 1')).toBeTruthy();
+        expect(getByText('🏠')).toBeTruthy();
       });
 
-      it('renders multi-select mode', () => {
-        const { getByTestId } = render(
-          <ButtonsSelection {...defaultProps} multiSelect={true} testID="buttons" />
-        );
-
-        expect(getByTestId('buttons')).toBeTruthy();
-      });
-
-      it('shows selected state', () => {
+      it('renders a submit button in multi-select mode', () => {
         const { getByText } = render(
-          <ButtonsSelection {...defaultProps} selectedIds={['opt-1']} />
+          <ButtonGroup {...defaultProps} multiSelect={true} />
         );
 
-        expect(getByText('Option 1')).toBeTruthy();
+        expect(getByText('Submit (0)')).toBeTruthy();
       });
     });
 
     describe('Interactions', () => {
-      it('calls onSelect when button is pressed', () => {
-        const onSelect = jest.fn();
+      it('submits immediately on press in single-select mode', () => {
+        const onSubmit = jest.fn();
         const { getByText } = render(
-          <ButtonsSelection {...defaultProps} onSelect={onSelect} />
+          <ButtonGroup {...defaultProps} onSubmit={onSubmit} />
+        );
+
+        fireEvent.press(getByText('Option 2'));
+
+        expect(onSubmit).toHaveBeenCalledWith({
+          buttonId: 'b2',
+          value: 'two',
+          label: 'Option 2',
+          variableName: 'choice',
+        });
+      });
+
+      it('uses the label as value when no value is set', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <ButtonGroup {...defaultProps} onSubmit={onSubmit} />
         );
 
         fireEvent.press(getByText('Option 1'));
 
-        expect(onSelect).toHaveBeenCalledWith(mockOptions[0]);
-      });
-
-      it('does not call onSelect for disabled button', () => {
-        const onSelect = jest.fn();
-        const optionsWithDisabled = [
-          { ...mockOptions[0], disabled: true },
-          ...mockOptions.slice(1),
-        ];
-
-        const { getByText } = render(
-          <ButtonsSelection options={optionsWithDisabled} onSelect={onSelect} />
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ value: 'Option 1' })
         );
-
-        fireEvent.press(getByText('Option 1'));
-
-        expect(onSelect).not.toHaveBeenCalled();
       });
 
-      it('allows multiple selections in multiSelect mode', () => {
-        const onSelect = jest.fn();
+      it('ignores further presses after a single-select submission', () => {
+        const onSubmit = jest.fn();
         const { getByText } = render(
-          <ButtonsSelection {...defaultProps} onSelect={onSelect} multiSelect={true} />
+          <ButtonGroup {...defaultProps} onSubmit={onSubmit} />
         );
 
         fireEvent.press(getByText('Option 1'));
         fireEvent.press(getByText('Option 2'));
 
-        expect(onSelect).toHaveBeenCalledTimes(2);
+        expect(onSubmit).toHaveBeenCalledTimes(1);
       });
 
-      it('disables all buttons after selection when singleUse is true', () => {
-        const { getByText, rerender } = render(
-          <ButtonsSelection {...defaultProps} singleUse={true} />
+      it('collects multiple selections and submits them together', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <ButtonGroup {...defaultProps} multiSelect={true} onSubmit={onSubmit} />
         );
 
         fireEvent.press(getByText('Option 1'));
+        fireEvent.press(getByText('Option 3'));
+        fireEvent.press(getByText('Submit (2)'));
 
-        rerender(
-          <ButtonsSelection {...defaultProps} singleUse={true} disabled={true} />
+        expect(onSubmit).toHaveBeenCalledWith({
+          buttonIds: ['b1', 'b3'],
+          values: ['Option 1', 'Option 3'],
+          labels: ['Option 1', 'Option 3'],
+          variableName: 'choice',
+        });
+      });
+
+      it('toggles a selection off in multi-select mode', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <ButtonGroup {...defaultProps} multiSelect={true} onSubmit={onSubmit} />
         );
 
-        expect(getByText('Option 1')).toBeTruthy();
+        fireEvent.press(getByText('Option 1'));
+        fireEvent.press(getByText('Option 1'));
+
+        expect(getByText('Submit (0)')).toBeTruthy();
+      });
+
+      it('does not submit in multi-select mode with nothing selected', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <ButtonGroup {...defaultProps} multiSelect={true} onSubmit={onSubmit} />
+        );
+
+        fireEvent.press(getByText('Submit (0)'));
+
+        expect(onSubmit).not.toHaveBeenCalled();
       });
     });
 
     describe('Edge Cases', () => {
-      it('handles empty options array', () => {
+      it('handles an empty buttons array', () => {
         const { getByTestId } = render(
-          <ButtonsSelection options={[]} onSelect={jest.fn()} testID="buttons" />
+          <ButtonGroup {...defaultProps} buttons={[]} testID="buttons-selection" />
         );
 
-        expect(getByTestId('buttons')).toBeTruthy();
+        expect(getByTestId('buttons-selection')).toBeTruthy();
       });
 
-      it('handles single option', () => {
+      it('handles very long labels', () => {
+        const longLabel = 'A'.repeat(300);
         const { getByText } = render(
-          <ButtonsSelection options={[mockOptions[0]]} onSelect={jest.fn()} />
-        );
-
-        expect(getByText('Option 1')).toBeTruthy();
-      });
-
-      it('handles many options', () => {
-        const manyOptions = Array.from({ length: 20 }, (_, i) => ({
-          id: `opt-${i}`,
-          text: `Option ${i}`,
-          value: `value${i}`,
-        }));
-
-        const { getByTestId } = render(
-          <ButtonsSelection options={manyOptions} onSelect={jest.fn()} testID="buttons" />
-        );
-
-        expect(getByTestId('buttons')).toBeTruthy();
-      });
-
-      it('handles options with very long text', () => {
-        const longOptions = [
-          { id: 'opt-1', text: 'A'.repeat(200), value: 'long' },
-        ];
-
-        const { getByTestId } = render(
-          <ButtonsSelection options={longOptions} onSelect={jest.fn()} testID="buttons" />
-        );
-
-        expect(getByTestId('buttons')).toBeTruthy();
-      });
-    });
-  });
-
-  // ========================================
-  // CARDS SELECTION TESTS
-  // ========================================
-
-  describe('CardsSelection', () => {
-    const mockCards = [
-      {
-        id: 'card-1',
-        title: 'Card 1',
-        description: 'Description 1',
-        image: 'https://example.com/img1.png',
-      },
-      {
-        id: 'card-2',
-        title: 'Card 2',
-        description: 'Description 2',
-        image: 'https://example.com/img2.png',
-      },
-    ];
-
-    const defaultProps = {
-      cards: mockCards,
-      onSelect: jest.fn(),
-    };
-
-    describe('Rendering', () => {
-      it('renders all cards', () => {
-        const { getByText } = render(
-          <CardsSelection {...defaultProps} />
-        );
-
-        expect(getByText('Card 1')).toBeTruthy();
-        expect(getByText('Card 2')).toBeTruthy();
-      });
-
-      it('renders card descriptions', () => {
-        const { getByText } = render(
-          <CardsSelection {...defaultProps} showDescription={true} />
-        );
-
-        expect(getByText('Description 1')).toBeTruthy();
-      });
-
-      it('renders card images', () => {
-        const { getByTestId } = render(
-          <CardsSelection {...defaultProps} showImage={true} testID="cards" />
-        );
-
-        expect(getByTestId('cards')).toBeTruthy();
-      });
-
-      it('renders card buttons when provided', () => {
-        const cardsWithButtons = mockCards.map((card) => ({
-          ...card,
-          buttons: [{ id: 'btn-1', text: 'Action' }],
-        }));
-
-        const { getByText } = render(
-          <CardsSelection cards={cardsWithButtons} onSelect={jest.fn()} />
-        );
-
-        expect(getByText('Action')).toBeTruthy();
-      });
-
-      it('renders in grid layout', () => {
-        const { getByTestId } = render(
-          <CardsSelection {...defaultProps} layout="grid" testID="cards" />
-        );
-
-        expect(getByTestId('cards')).toBeTruthy();
-      });
-
-      it('renders in list layout', () => {
-        const { getByTestId } = render(
-          <CardsSelection {...defaultProps} layout="list" testID="cards" />
-        );
-
-        expect(getByTestId('cards')).toBeTruthy();
-      });
-    });
-
-    describe('Interactions', () => {
-      it('calls onSelect when card is pressed', () => {
-        const onSelect = jest.fn();
-        const { getByText } = render(
-          <CardsSelection {...defaultProps} onSelect={onSelect} />
-        );
-
-        fireEvent.press(getByText('Card 1'));
-
-        expect(onSelect).toHaveBeenCalledWith(mockCards[0]);
-      });
-
-      it('calls onButtonPress when card button is pressed', () => {
-        const onButtonPress = jest.fn();
-        const cardsWithButtons = mockCards.map((card) => ({
-          ...card,
-          buttons: [{ id: 'btn-1', text: 'Action' }],
-        }));
-
-        const { getByText } = render(
-          <CardsSelection
-            cards={cardsWithButtons}
-            onSelect={jest.fn()}
-            onButtonPress={onButtonPress}
+          <ButtonGroup
+            {...defaultProps}
+            buttons={[{ id: 'b1', label: longLabel }]}
           />
         );
 
-        fireEvent.press(getByText('Action'));
-
-        expect(onButtonPress).toHaveBeenCalled();
-      });
-    });
-
-    describe('Edge Cases', () => {
-      it('handles empty cards array', () => {
-        const { getByTestId } = render(
-          <CardsSelection cards={[]} onSelect={jest.fn()} testID="cards" />
-        );
-
-        expect(getByTestId('cards')).toBeTruthy();
-      });
-
-      it('handles cards without images', () => {
-        const cardsNoImage = mockCards.map(({ image, ...rest }) => rest);
-
-        const { getByText } = render(
-          <CardsSelection cards={cardsNoImage} onSelect={jest.fn()} />
-        );
-
-        expect(getByText('Card 1')).toBeTruthy();
-      });
-
-      it('handles cards without descriptions', () => {
-        const cardsNoDesc = mockCards.map(({ description, ...rest }) => rest);
-
-        const { getByText } = render(
-          <CardsSelection cards={cardsNoDesc} onSelect={jest.fn()} />
-        );
-
-        expect(getByText('Card 1')).toBeTruthy();
+        expect(getByText(longLabel)).toBeTruthy();
       });
     });
   });
 
   // ========================================
-  // CAROUSEL SELECTION TESTS
+  // CARD GRID TESTS
   // ========================================
 
-  describe('CarouselSelection', () => {
-    const mockItems = [
-      { id: 'item-1', image: 'https://example.com/img1.png', title: 'Item 1' },
-      { id: 'item-2', image: 'https://example.com/img2.png', title: 'Item 2' },
-      { id: 'item-3', image: 'https://example.com/img3.png', title: 'Item 3' },
-    ];
-
+  describe('CardGrid', () => {
     const defaultProps = {
-      items: mockItems,
-      onSelect: jest.fn(),
+      type: 'cards' as const,
+      nodeId: 'node-2',
+      question: 'Choose a plan',
+      cards: [
+        {
+          id: 'c1',
+          title: 'Starter',
+          description: 'For individuals',
+          buttons: [{ id: 'cb1', label: 'Choose Starter' }],
+        },
+        {
+          id: 'c2',
+          title: 'Pro',
+          description: 'For teams',
+          imageUrl: 'https://example.com/pro.png',
+          buttons: [{ id: 'cb2', label: 'Choose Pro', value: 'pro' }],
+        },
+      ],
+      variableName: 'plan',
+      onSubmit: jest.fn(),
     };
 
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
     describe('Rendering', () => {
-      it('renders the carousel', () => {
-        const { getByTestId } = render(
-          <CarouselSelection {...defaultProps} testID="carousel" />
-        );
+      it('renders all card titles', () => {
+        const { getByText } = render(<CardGrid {...defaultProps} />);
 
-        expect(getByTestId('carousel')).toBeTruthy();
+        expect(getByText('Starter')).toBeTruthy();
+        expect(getByText('Pro')).toBeTruthy();
       });
 
-      it('renders all items', () => {
-        const { getByText } = render(
-          <CarouselSelection {...defaultProps} />
-        );
+      it('renders card descriptions', () => {
+        const { getByText } = render(<CardGrid {...defaultProps} />);
 
-        expect(getByText('Item 1')).toBeTruthy();
+        expect(getByText('For individuals')).toBeTruthy();
+        expect(getByText('For teams')).toBeTruthy();
       });
 
-      it('renders pagination dots', () => {
-        const { getByTestId } = render(
-          <CarouselSelection {...defaultProps} showPagination={true} testID="carousel" />
-        );
+      it('renders the question when provided', () => {
+        const { getByText } = render(<CardGrid {...defaultProps} />);
 
-        expect(getByTestId('carousel')).toBeTruthy();
+        expect(getByText('Choose a plan')).toBeTruthy();
       });
 
-      it('renders navigation arrows', () => {
-        const { getByTestId } = render(
-          <CarouselSelection {...defaultProps} showArrows={true} testID="carousel" />
-        );
+      it('renders card buttons', () => {
+        const { getByText } = render(<CardGrid {...defaultProps} />);
 
-        expect(getByTestId('carousel')).toBeTruthy();
+        expect(getByText('Choose Starter')).toBeTruthy();
+        expect(getByText('Choose Pro')).toBeTruthy();
       });
 
-      it('auto-plays when autoPlay is true', () => {
+      it('renders with custom testID', () => {
         const { getByTestId } = render(
-          <CarouselSelection {...defaultProps} autoPlay={true} testID="carousel" />
+          <CardGrid {...defaultProps} testID="cards-selection" />
         );
 
-        expect(getByTestId('carousel')).toBeTruthy();
+        expect(getByTestId('cards-selection')).toBeTruthy();
       });
     });
 
     describe('Interactions', () => {
-      it('calls onSelect when item is pressed', () => {
-        const onSelect = jest.fn();
+      it('submits when a card button is pressed', () => {
+        const onSubmit = jest.fn();
         const { getByText } = render(
-          <CarouselSelection {...defaultProps} onSelect={onSelect} />
+          <CardGrid {...defaultProps} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByText('Item 1'));
+        fireEvent.press(getByText('Choose Pro'));
 
-        expect(onSelect).toHaveBeenCalledWith(mockItems[0]);
-      });
-
-      it('navigates on swipe', () => {
-        const { getByTestId } = render(
-          <CarouselSelection {...defaultProps} testID="carousel" />
-        );
-
-        const carousel = getByTestId('carousel');
-        fireEvent.scroll(carousel, {
-          nativeEvent: { contentOffset: { x: 300 } },
+        expect(onSubmit).toHaveBeenCalledWith({
+          cardId: 'c2',
+          buttonId: 'cb2',
+          value: 'pro',
+          label: 'Choose Pro',
+          variableName: 'plan',
         });
-
-        expect(carousel).toBeTruthy();
       });
 
-      it('navigates on arrow press', () => {
-        const { getByTestId } = render(
-          <CarouselSelection {...defaultProps} showArrows={true} testID="carousel" />
+      it('opens URL buttons via Linking instead of submitting', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <CardGrid
+            {...defaultProps}
+            cards={[
+              {
+                id: 'c1',
+                title: 'Docs',
+                buttons: [
+                  { id: 'cb1', label: 'Open Docs', url: 'https://docs.example.com' },
+                ],
+              },
+            ]}
+            onSubmit={onSubmit}
+          />
         );
 
-        expect(getByTestId('carousel')).toBeTruthy();
+        fireEvent.press(getByText('Open Docs'));
+
+        expect(Linking.openURL).toHaveBeenCalledWith('https://docs.example.com');
+        expect(onSubmit).not.toHaveBeenCalled();
+      });
+
+      it('ignores further presses after submission', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <CardGrid {...defaultProps} onSubmit={onSubmit} />
+        );
+
+        fireEvent.press(getByText('Choose Starter'));
+        fireEvent.press(getByText('Choose Pro'));
+
+        expect(onSubmit).toHaveBeenCalledTimes(1);
       });
     });
 
     describe('Edge Cases', () => {
-      it('handles empty items array', () => {
+      it('handles an empty cards array', () => {
         const { getByTestId } = render(
-          <CarouselSelection items={[]} onSelect={jest.fn()} testID="carousel" />
+          <CardGrid {...defaultProps} cards={[]} testID="cards-selection" />
         );
 
-        expect(getByTestId('carousel')).toBeTruthy();
+        expect(getByTestId('cards-selection')).toBeTruthy();
       });
 
-      it('handles single item', () => {
+      it('handles cards without buttons', () => {
         const { getByText } = render(
-          <CarouselSelection items={[mockItems[0]]} onSelect={jest.fn()} />
+          <CardGrid
+            {...defaultProps}
+            cards={[{ id: 'c1', title: 'Info only' }]}
+          />
         );
 
-        expect(getByText('Item 1')).toBeTruthy();
-      });
-
-      it('handles many items', () => {
-        const manyItems = Array.from({ length: 20 }, (_, i) => ({
-          id: `item-${i}`,
-          image: `https://example.com/img${i}.png`,
-          title: `Item ${i}`,
-        }));
-
-        const { getByTestId } = render(
-          <CarouselSelection items={manyItems} onSelect={jest.fn()} testID="carousel" />
-        );
-
-        expect(getByTestId('carousel')).toBeTruthy();
+        expect(getByText('Info only')).toBeTruthy();
       });
     });
   });
 
   // ========================================
-  // PICTURE CHOICE SELECTION TESTS
+  // CAROUSEL VIEW TESTS
   // ========================================
 
-  describe('PictureChoiceSelection', () => {
-    const mockChoices = [
-      { id: 'choice-1', image: 'https://example.com/img1.png', label: 'Choice 1' },
-      { id: 'choice-2', image: 'https://example.com/img2.png', label: 'Choice 2' },
-    ];
-
+  describe('CarouselView', () => {
     const defaultProps = {
-      choices: mockChoices,
-      onSelect: jest.fn(),
+      type: 'carousel' as const,
+      nodeId: 'node-3',
+      cards: [
+        { id: 'c1', title: 'Slide 1' },
+        { id: 'c2', title: 'Slide 2' },
+      ],
+      variableName: 'slide',
+      onSubmit: jest.fn(),
     };
 
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('renders the carousel container', () => {
+      const { getByTestId } = render(
+        <CarouselView {...defaultProps} testID="carousel-selection" />
+      );
+
+      expect(getByTestId('carousel-selection')).toBeTruthy();
+    });
+
+    it('exposes an accessible card list', () => {
+      const { getByLabelText } = render(<CarouselView {...defaultProps} />);
+
+      expect(getByLabelText('Card carousel')).toBeTruthy();
+    });
+
+    it('passes all cards to the list', () => {
+      const { getByLabelText } = render(<CarouselView {...defaultProps} />);
+
+      const list = getByLabelText('Card carousel');
+      expect(list.props.data).toHaveLength(2);
+    });
+
+    it('handles an empty cards array', () => {
+      const { getByLabelText } = render(
+        <CarouselView {...defaultProps} cards={[]} />
+      );
+
+      expect(getByLabelText('Card carousel').props.data).toHaveLength(0);
+    });
+  });
+
+  // ========================================
+  // PICTURE CHOICE GRID TESTS
+  // ========================================
+
+  describe('PictureChoiceGrid', () => {
+    const defaultProps = {
+      type: 'pictureChoice' as const,
+      nodeId: 'node-4',
+      question: 'Pick a picture',
+      choices: [
+        { id: 'p1', imageUrl: 'https://example.com/1.png', label: 'Cat' },
+        { id: 'p2', imageUrl: 'https://example.com/2.png', label: 'Dog', value: 'dog' },
+      ],
+      variableName: 'animal',
+      onSubmit: jest.fn(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
     describe('Rendering', () => {
-      it('renders all choices', () => {
-        const { getByText } = render(
-          <PictureChoiceSelection {...defaultProps} />
-        );
+      it('renders the question', () => {
+        const { getByText } = render(<PictureChoiceGrid {...defaultProps} />);
 
-        expect(getByText('Choice 1')).toBeTruthy();
-        expect(getByText('Choice 2')).toBeTruthy();
+        expect(getByText('Pick a picture')).toBeTruthy();
       });
 
-      it('renders choice images', () => {
+      it('renders all choice labels', () => {
+        const { getByText } = render(<PictureChoiceGrid {...defaultProps} />);
+
+        expect(getByText('Cat')).toBeTruthy();
+        expect(getByText('Dog')).toBeTruthy();
+      });
+
+      it('renders with custom testID', () => {
         const { getByTestId } = render(
-          <PictureChoiceSelection {...defaultProps} testID="picture-choice" />
-        );
-
-        expect(getByTestId('picture-choice')).toBeTruthy();
-      });
-
-      it('renders in grid layout', () => {
-        const { getByTestId } = render(
-          <PictureChoiceSelection {...defaultProps} columns={2} testID="picture-choice" />
-        );
-
-        expect(getByTestId('picture-choice')).toBeTruthy();
-      });
-
-      it('shows labels when showLabels is true', () => {
-        const { getByText } = render(
-          <PictureChoiceSelection {...defaultProps} showLabels={true} />
-        );
-
-        expect(getByText('Choice 1')).toBeTruthy();
-      });
-
-      it('hides labels when showLabels is false', () => {
-        const { queryByText } = render(
-          <PictureChoiceSelection {...defaultProps} showLabels={false} />
-        );
-
-        expect(queryByText('Choice 1')).toBeFalsy();
-      });
-
-      it('shows selection indicator', () => {
-        const { getByTestId } = render(
-          <PictureChoiceSelection {...defaultProps} selectedIds={['choice-1']} testID="picture-choice" />
+          <PictureChoiceGrid {...defaultProps} testID="picture-choice" />
         );
 
         expect(getByTestId('picture-choice')).toBeTruthy();
@@ -556,44 +434,65 @@ describe('SelectionComponents', () => {
     });
 
     describe('Interactions', () => {
-      it('calls onSelect when choice is pressed', () => {
-        const onSelect = jest.fn();
+      it('submits immediately on press in single-select mode', () => {
+        const onSubmit = jest.fn();
         const { getByText } = render(
-          <PictureChoiceSelection {...defaultProps} onSelect={onSelect} />
+          <PictureChoiceGrid {...defaultProps} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByText('Choice 1'));
+        fireEvent.press(getByText('Dog'));
 
-        expect(onSelect).toHaveBeenCalledWith(mockChoices[0]);
+        expect(onSubmit).toHaveBeenCalledWith({
+          choiceId: 'p2',
+          value: 'dog',
+          label: 'Dog',
+          variableName: 'animal',
+        });
       });
 
-      it('allows multiple selections in multiSelect mode', () => {
-        const onSelect = jest.fn();
+      it('collects selections in multi-select mode and submits together', () => {
+        const onSubmit = jest.fn();
         const { getByText } = render(
-          <PictureChoiceSelection {...defaultProps} onSelect={onSelect} multiSelect={true} />
+          <PictureChoiceGrid
+            {...defaultProps}
+            multiSelect={true}
+            onSubmit={onSubmit}
+          />
         );
 
-        fireEvent.press(getByText('Choice 1'));
-        fireEvent.press(getByText('Choice 2'));
+        fireEvent.press(getByText('Cat'));
+        fireEvent.press(getByText('Dog'));
+        fireEvent.press(getByText('Submit (2)'));
 
-        expect(onSelect).toHaveBeenCalledTimes(2);
+        expect(onSubmit).toHaveBeenCalledWith({
+          choiceIds: ['p1', 'p2'],
+          values: ['Cat', 'dog'],
+          labels: ['Cat', 'Dog'],
+          variableName: 'animal',
+        });
+      });
+
+      it('ignores further presses after submission', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <PictureChoiceGrid {...defaultProps} onSubmit={onSubmit} />
+        );
+
+        fireEvent.press(getByText('Cat'));
+        fireEvent.press(getByText('Dog'));
+
+        expect(onSubmit).toHaveBeenCalledTimes(1);
       });
     });
 
     describe('Edge Cases', () => {
-      it('handles empty choices array', () => {
+      it('handles an empty choices array', () => {
         const { getByTestId } = render(
-          <PictureChoiceSelection choices={[]} onSelect={jest.fn()} testID="picture-choice" />
-        );
-
-        expect(getByTestId('picture-choice')).toBeTruthy();
-      });
-
-      it('handles choices without labels', () => {
-        const noLabelChoices = mockChoices.map(({ label, ...rest }) => rest);
-
-        const { getByTestId } = render(
-          <PictureChoiceSelection choices={noLabelChoices} onSelect={jest.fn()} testID="picture-choice" />
+          <PictureChoiceGrid
+            {...defaultProps}
+            choices={[]}
+            testID="picture-choice"
+          />
         );
 
         expect(getByTestId('picture-choice')).toBeTruthy();
@@ -602,171 +501,145 @@ describe('SelectionComponents', () => {
   });
 
   // ========================================
-  // DROPDOWN SELECTION TESTS
+  // DROPDOWN PICKER TESTS
   // ========================================
 
-  describe('DropdownSelection', () => {
-    const mockOptions = [
-      { id: 'opt-1', text: 'Option 1', value: 'value1' },
-      { id: 'opt-2', text: 'Option 2', value: 'value2' },
-      { id: 'opt-3', text: 'Option 3', value: 'value3' },
-    ];
-
+  describe('DropdownPicker', () => {
     const defaultProps = {
-      options: mockOptions,
-      onSelect: jest.fn(),
+      type: 'dropdown' as const,
+      nodeId: 'node-5',
+      question: 'Select a country',
+      options: [
+        { id: 'o1', label: 'Argentina' },
+        { id: 'o2', label: 'Brazil', value: 'BR' },
+        { id: 'o3', label: 'Canada' },
+      ],
+      variableName: 'country',
+      onSubmit: jest.fn(),
     };
 
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
     describe('Rendering', () => {
-      it('renders the dropdown', () => {
-        const { getByTestId } = render(
-          <DropdownSelection {...defaultProps} testID="dropdown" />
-        );
+      it('renders the question', () => {
+        const { getAllByText } = render(<DropdownPicker {...defaultProps} />);
 
-        expect(getByTestId('dropdown')).toBeTruthy();
+        // Question appears on the container and inside the modal header
+        expect(getAllByText('Select a country').length).toBeGreaterThan(0);
       });
 
-      it('renders placeholder when no selection', () => {
+      it('renders the placeholder when nothing is selected', () => {
         const { getByText } = render(
-          <DropdownSelection {...defaultProps} placeholder="Select an option" />
+          <DropdownPicker {...defaultProps} placeholder="Pick one..." />
         );
 
-        expect(getByText('Select an option')).toBeTruthy();
+        expect(getByText('Pick one...')).toBeTruthy();
       });
 
-      it('renders selected value', () => {
-        const { getByText } = render(
-          <DropdownSelection {...defaultProps} selectedId="opt-1" />
-        );
+      it('renders all options', () => {
+        const { getByText } = render(<DropdownPicker {...defaultProps} />);
 
-        expect(getByText('Option 1')).toBeTruthy();
+        expect(getByText('Argentina')).toBeTruthy();
+        expect(getByText('Brazil')).toBeTruthy();
+        expect(getByText('Canada')).toBeTruthy();
       });
 
-      it('renders in disabled state', () => {
+      it('renders with custom testID', () => {
         const { getByTestId } = render(
-          <DropdownSelection {...defaultProps} disabled={true} testID="dropdown" />
+          <DropdownPicker {...defaultProps} testID="dropdown-selection" />
         );
 
-        expect(getByTestId('dropdown')).toBeTruthy();
-      });
-
-      it('renders dropdown arrow icon', () => {
-        const { getByTestId } = render(
-          <DropdownSelection {...defaultProps} testID="dropdown" />
-        );
-
-        expect(getByTestId('dropdown')).toBeTruthy();
+        expect(getByTestId('dropdown-selection')).toBeTruthy();
       });
     });
 
     describe('Interactions', () => {
-      it('opens dropdown on press', () => {
-        const { getByTestId } = render(
-          <DropdownSelection {...defaultProps} testID="dropdown" />
+      it('submits the pressed option in single-select mode', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <DropdownPicker {...defaultProps} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByTestId('dropdown'));
+        fireEvent.press(getByText('Brazil'));
 
-        expect(getByTestId('dropdown')).toBeTruthy();
+        expect(onSubmit).toHaveBeenCalledWith({
+          optionId: 'o2',
+          value: 'BR',
+          label: 'Brazil',
+          variableName: 'country',
+        });
       });
 
-      it('calls onSelect when option is selected', () => {
-        const onSelect = jest.fn();
-        const { getByTestId, getByText } = render(
-          <DropdownSelection {...defaultProps} onSelect={onSelect} testID="dropdown" />
+      it('collects selections in multi-select mode and submits with Done', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <DropdownPicker {...defaultProps} multiSelect={true} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByTestId('dropdown'));
-        fireEvent.press(getByText('Option 1'));
+        fireEvent.press(getByText('Argentina'));
+        fireEvent.press(getByText('Canada'));
+        fireEvent.press(getByText('Done (2)'));
 
-        expect(onSelect).toHaveBeenCalledWith(mockOptions[0]);
+        expect(onSubmit).toHaveBeenCalledWith({
+          optionIds: ['o1', 'o3'],
+          values: ['Argentina', 'Canada'],
+          labels: ['Argentina', 'Canada'],
+          variableName: 'country',
+        });
       });
 
-      it('closes dropdown after selection', () => {
-        const { getByTestId, getByText } = render(
-          <DropdownSelection {...defaultProps} testID="dropdown" />
+      it('ignores further presses after submission', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <DropdownPicker {...defaultProps} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByTestId('dropdown'));
-        fireEvent.press(getByText('Option 1'));
+        fireEvent.press(getByText('Argentina'));
+        fireEvent.press(getByText('Brazil'));
 
-        expect(getByTestId('dropdown')).toBeTruthy();
-      });
-
-      it('does not open when disabled', () => {
-        const { getByTestId } = render(
-          <DropdownSelection {...defaultProps} disabled={true} testID="dropdown" />
-        );
-
-        fireEvent.press(getByTestId('dropdown'));
-
-        expect(getByTestId('dropdown')).toBeTruthy();
+        expect(onSubmit).toHaveBeenCalledTimes(1);
       });
     });
 
     describe('Search Functionality', () => {
-      it('renders search input when searchable is true', () => {
-        const { getByTestId } = render(
-          <DropdownSelection {...defaultProps} searchable={true} testID="dropdown" />
+      it('filters options by search text', () => {
+        const { getByPlaceholderText, queryByText } = render(
+          <DropdownPicker {...defaultProps} searchable={true} />
         );
 
-        fireEvent.press(getByTestId('dropdown'));
+        fireEvent.changeText(getByPlaceholderText('Search...'), 'bra');
 
-        expect(getByTestId('dropdown')).toBeTruthy();
+        expect(queryByText('Brazil')).toBeTruthy();
+        expect(queryByText('Canada')).toBeNull();
       });
 
-      it('filters options based on search', () => {
-        const { getByTestId, getByPlaceholderText } = render(
-          <DropdownSelection
-            {...defaultProps}
-            searchable={true}
-            searchPlaceholder="Search..."
-            testID="dropdown"
-          />
+      it('shows all options when search is cleared', () => {
+        const { getByPlaceholderText, queryByText } = render(
+          <DropdownPicker {...defaultProps} searchable={true} />
         );
 
-        fireEvent.press(getByTestId('dropdown'));
+        const search = getByPlaceholderText('Search...');
+        fireEvent.changeText(search, 'bra');
+        fireEvent.changeText(search, '');
 
-        const searchInput = getByPlaceholderText('Search...');
-        fireEvent.changeText(searchInput, 'Option 1');
-
-        expect(getByTestId('dropdown')).toBeTruthy();
+        expect(queryByText('Argentina')).toBeTruthy();
+        expect(queryByText('Canada')).toBeTruthy();
       });
     });
 
     describe('Edge Cases', () => {
-      it('handles empty options array', () => {
+      it('handles an empty options array', () => {
         const { getByTestId } = render(
-          <DropdownSelection options={[]} onSelect={jest.fn()} testID="dropdown" />
+          <DropdownPicker
+            {...defaultProps}
+            options={[]}
+            testID="dropdown-selection"
+          />
         );
 
-        expect(getByTestId('dropdown')).toBeTruthy();
-      });
-
-      it('handles many options', () => {
-        const manyOptions = Array.from({ length: 100 }, (_, i) => ({
-          id: `opt-${i}`,
-          text: `Option ${i}`,
-          value: `value${i}`,
-        }));
-
-        const { getByTestId } = render(
-          <DropdownSelection options={manyOptions} onSelect={jest.fn()} testID="dropdown" />
-        );
-
-        expect(getByTestId('dropdown')).toBeTruthy();
-      });
-
-      it('handles options with very long text', () => {
-        const longOptions = [
-          { id: 'opt-1', text: 'A'.repeat(200), value: 'long' },
-        ];
-
-        const { getByTestId } = render(
-          <DropdownSelection options={longOptions} onSelect={jest.fn()} testID="dropdown" />
-        );
-
-        expect(getByTestId('dropdown')).toBeTruthy();
+        expect(getByTestId('dropdown-selection')).toBeTruthy();
       });
     });
   });

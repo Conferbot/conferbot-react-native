@@ -944,10 +944,15 @@ describe('Legacy Node Handlers', () => {
 
   describe('Legacy Handlers Collection', () => {
     it('should export all legacy handlers', () => {
-      expect(legacyHandlers).toHaveLength(3);
+      // All 7 legacy (v1) node types from the web widget's DISPLAY_NODE_TYPES
+      expect(legacyHandlers).toHaveLength(7);
       expect(legacyHandlers.map(h => h.nodeType)).toContain('user-input-node');
       expect(legacyHandlers.map(h => h.nodeType)).toContain('user-range-node');
       expect(legacyHandlers.map(h => h.nodeType)).toContain('quiz-node');
+      expect(legacyHandlers.map(h => h.nodeType)).toContain('two-choices-node');
+      expect(legacyHandlers.map(h => h.nodeType)).toContain('three-choices-node');
+      expect(legacyHandlers.map(h => h.nodeType)).toContain('select-option-node');
+      expect(legacyHandlers.map(h => h.nodeType)).toContain('user-rating-node');
     });
 
     it('should register handlers with registry', () => {

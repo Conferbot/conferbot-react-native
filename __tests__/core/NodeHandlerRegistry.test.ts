@@ -419,12 +419,11 @@ describe('NodeHandlerRegistry', () => {
         expect(registry.hasHandler(DisplayNodes.ASK_URL)).toBe(true);
       });
 
-      it('should have handler for ask-date node', () => {
-        expect(registry.hasHandler(DisplayNodes.ASK_DATE)).toBe(true);
-      });
-
-      it('should have handler for ask-address node', () => {
-        expect(registry.hasHandler(DisplayNodes.ASK_ADDRESS)).toBe(true);
+      // Note: there is no ask-date-node or ask-address-node in the platform.
+      // Dates use calendar-node, addresses use ask-custom-question-node
+      // (matches the web widget's DISPLAY_NODE_TYPES).
+      it('should have handler for ask-custom-question node', () => {
+        expect(registry.hasHandler(DisplayNodes.ASK_CUSTOM_QUESTION)).toBe(true);
       });
 
       it('should have handler for ask-file node', () => {
@@ -437,32 +436,35 @@ describe('NodeHandlerRegistry', () => {
     });
 
     describe('Choice Nodes', () => {
-      it('should have handler for buttons node', () => {
-        expect(registry.hasHandler(DisplayNodes.BUTTONS)).toBe(true);
+      // Node type names match the web widget / embed-server exactly:
+      // n-choices-node, image-choice-node, n-select-option-node,
+      // rating-choice-node, opinion-scale-choice-node, etc.
+      it('should have handler for n-choices node', () => {
+        expect(registry.hasHandler(DisplayNodes.N_CHOICES)).toBe(true);
       });
 
-      it('should have handler for cards node', () => {
-        expect(registry.hasHandler(DisplayNodes.CARDS)).toBe(true);
+      it('should have handler for image-choice node', () => {
+        expect(registry.hasHandler(DisplayNodes.IMAGE_CHOICE)).toBe(true);
       });
 
-      it('should have handler for carousel node', () => {
-        expect(registry.hasHandler(DisplayNodes.CAROUSEL)).toBe(true);
+      it('should have handler for yes-or-no-choice node', () => {
+        expect(registry.hasHandler(DisplayNodes.YES_OR_NO_CHOICE)).toBe(true);
       });
 
-      it('should have handler for picturechoice node', () => {
-        expect(registry.hasHandler(DisplayNodes.PICTURE_CHOICE)).toBe(true);
+      it('should have handler for n-select-option node', () => {
+        expect(registry.hasHandler(DisplayNodes.N_SELECT_OPTION)).toBe(true);
       });
 
-      it('should have handler for dropdown node', () => {
-        expect(registry.hasHandler(DisplayNodes.DROPDOWN)).toBe(true);
+      it('should have handler for n-check-options node', () => {
+        expect(registry.hasHandler(DisplayNodes.N_CHECK_OPTIONS)).toBe(true);
       });
 
-      it('should have handler for rating node', () => {
-        expect(registry.hasHandler(DisplayNodes.RATING)).toBe(true);
+      it('should have handler for rating-choice node', () => {
+        expect(registry.hasHandler(DisplayNodes.RATING_CHOICE)).toBe(true);
       });
 
-      it('should have handler for opinionscale node', () => {
-        expect(registry.hasHandler(DisplayNodes.OPINON_SCALE)).toBe(true);
+      it('should have handler for opinion-scale-choice node', () => {
+        expect(registry.hasHandler(DisplayNodes.OPINION_SCALE_CHOICE)).toBe(true);
       });
     });
 
@@ -471,8 +473,8 @@ describe('NodeHandlerRegistry', () => {
         expect(registry.hasHandler(DisplayNodes.CALENDAR)).toBe(true);
       });
 
-      it('should have handler for multiplequestions node', () => {
-        expect(registry.hasHandler(DisplayNodes.MULTIPLE_QUESTIONS)).toBe(true);
+      it('should have handler for ask-multiple-questions node', () => {
+        expect(registry.hasHandler(DisplayNodes.ASK_MULTIPLE_QUESTIONS)).toBe(true);
       });
     });
 

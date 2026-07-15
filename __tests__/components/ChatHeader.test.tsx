@@ -14,6 +14,15 @@ jest.mock('../../src/theme', () => ({
   useTheme: () => createMockTheme(),
 }));
 
+// ChatHeader embeds ConnectionStatus, which reads the ConferBot context
+jest.mock('../../src/context/ConferBotContext', () => {
+  const actual = jest.requireActual('../../src/context/ConferBotContext');
+  return {
+    ...actual,
+    useConferBot: () => ({ isConnected: true }),
+  };
+});
+
 describe('ChatHeader', () => {
   const mockConfig = createChatbotConfig();
   const mockAgent = createAgent();

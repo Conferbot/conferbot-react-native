@@ -10,9 +10,10 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { ChatWidget } from '../../src/components/ChatWidget/ChatWidget';
 import { createMockTheme, createChatbotConfig, createBotMessage } from '../testUtils';
 
-// Mock the theme hook
+// Mock the theme hook (ChatWidget also renders ThemeProvider inside its Modal)
 jest.mock('../../src/theme', () => ({
   useTheme: () => createMockTheme(),
+  ThemeProvider: ({ children }: any) => children,
 }));
 
 // Mock the ConferBot context

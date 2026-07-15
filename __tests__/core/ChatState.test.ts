@@ -806,8 +806,10 @@ describe('ChatState', () => {
       expect(chatState.getAllMessageStatuses().size).toBe(0);
       expect(chatState.getAllReactions().size).toBe(0);
 
-      // Session and bot ID should remain
-      expect(chatState.sessionId).toBe(sessionId);
+      // Bot ID should remain; session ID is regenerated on reset
+      // (matches the web widget, which starts a fresh chatSessionId on restart)
+      expect(chatState.sessionId).toBeTruthy();
+      expect(chatState.sessionId).not.toBe(sessionId);
       expect(chatState.botId).toBe(botId);
     });
 

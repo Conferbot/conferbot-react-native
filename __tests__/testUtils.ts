@@ -269,6 +269,12 @@ export function createMockSocket() {
     connect: jest.fn(),
     disconnect: jest.fn(),
 
+    // Matches SocketClient.emitToServer (used by node handlers).
+    // Delegates to emit so tests can assert on either spy.
+    emitToServer: jest.fn(function (this: any, event: string, payload: any) {
+      this.emit(event, payload);
+    }),
+
     // Helper to simulate receiving an event
     simulateEvent: (event: string, ...args: any[]) => {
       listeners.get(event)?.forEach((callback) => callback(...args));
@@ -435,74 +441,13 @@ export function createTestWrapper(options: {
 }
 
 /**
- * Create mock theme for testing
+ * Create mock theme for testing.
+ * Uses the real default theme so every theme key components read
+ * (colors, typography, spacing, shadows, animations, layout) is present.
  */
 export function createMockTheme() {
-  return {
-    colors: {
-      primary: '#007AFF',
-      background: '#FFFFFF',
-      surface: '#F8F8F8',
-      text: '#000000',
-      textSecondary: '#666666',
-      textInverse: '#FFFFFF',
-      textDisabled: '#CCCCCC',
-      border: '#E0E0E0',
-      borderLight: '#F0F0F0',
-      error: '#FF3B30',
-      success: '#34C759',
-      warning: '#FF9500',
-      link: '#007AFF',
-      userBubble: '#007AFF',
-      userBubbleText: '#FFFFFF',
-      botBubble: '#E9E9EB',
-      botBubbleText: '#000000',
-      agentBubble: '#DCF8C6',
-      agentBubbleText: '#000000',
-      systemBubble: '#F0F0F0',
-      systemBubbleText: '#666666',
-    },
-    spacing: {
-      xs: 4,
-      sm: 8,
-      md: 16,
-      lg: 24,
-      xl: 32,
-    },
-    borderRadius: {
-      sm: 4,
-      md: 8,
-      lg: 16,
-      full: 9999,
-    },
-    typography: {
-      fontSize: {
-        xs: 10,
-        sm: 12,
-        md: 14,
-        lg: 18,
-        xl: 24,
-      },
-      fontWeight: {
-        normal: '400',
-        medium: '500',
-        semibold: '600',
-        bold: '700',
-      },
-      lineHeight: {
-        tight: 1.25,
-        normal: 1.5,
-        relaxed: 1.75,
-      },
-    },
-    layout: {
-      maxBubbleWidth: 280,
-      avatarSize: 36,
-      inputHeight: 56,
-    },
-    shadows: {
-      sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-      md: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4 },
-    },
-  };
+  // Lazy require to avoid circular imports in some test setups
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { defaultTheme } = require('../src/theme/defaultTheme');
+  return JSON.parse(JSON.stringify(defaultTheme));
 }

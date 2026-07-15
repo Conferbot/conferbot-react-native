@@ -1,15 +1,20 @@
 /**
  * RatingComponents.test.tsx
  *
- * Tests for rating components (StarRating, OpinionScale, Slider)
+ * Tests for rating components (StarRating, OpinionScaleSelector, SliderInput).
+ *
+ * Rewritten against the real component API: these components take NodeUIState
+ * props (nodeId, question, variableName, ...) plus an onSubmit callback, as
+ * wired by NodeRenderer. The previous tests targeted a StarRating/OpinionScale/
+ * SliderRating API that never existed in this SDK.
  */
 
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import {
   StarRating,
-  OpinionScale,
-  SliderRating,
+  OpinionScaleSelector,
+  SliderInput,
 } from '../../src/components/NodeComponents/RatingComponents';
 import { createMockTheme } from '../testUtils';
 
@@ -25,7 +30,13 @@ describe('RatingComponents', () => {
 
   describe('StarRating', () => {
     const defaultProps = {
-      onRate: jest.fn(),
+      type: 'rating' as const,
+      nodeId: 'node-1',
+      question: 'Rate your experience',
+      maxRating: 5,
+      variableName: 'rating',
+      style: 'stars' as const,
+      onSubmit: jest.fn(),
     };
 
     beforeEach(() => {
@@ -41,186 +52,149 @@ describe('RatingComponents', () => {
         expect(getByTestId('star-rating')).toBeTruthy();
       });
 
-      it('renders default 5 stars', () => {
-        const { getByTestId } = render(
-          <StarRating {...defaultProps} maxRating={5} testID="star-rating" />
+      it('renders the question text', () => {
+        const { getByText } = render(<StarRating {...defaultProps} />);
+
+        expect(getByText('Rate your experience')).toBeTruthy();
+      });
+
+      it('renders one option per rating value', () => {
+        const { getByLabelText } = render(
+          <StarRating {...defaultProps} maxRating={5} />
         );
 
-        expect(getByTestId('star-rating')).toBeTruthy();
+        expect(getByLabelText('Rate 1 out of 5')).toBeTruthy();
+        expect(getByLabelText('Rate 5 out of 5')).toBeTruthy();
       });
 
       it('renders custom number of stars', () => {
-        const { getByTestId } = render(
-          <StarRating {...defaultProps} maxRating={10} testID="star-rating" />
+        const { getByLabelText, queryByLabelText } = render(
+          <StarRating {...defaultProps} maxRating={10} />
         );
 
-        expect(getByTestId('star-rating')).toBeTruthy();
+        expect(getByLabelText('Rate 10 out of 10')).toBeTruthy();
+        expect(queryByLabelText('Rate 11 out of 10')).toBeNull();
       });
 
-      it('renders with initial rating', () => {
-        const { getByTestId } = render(
-          <StarRating {...defaultProps} rating={3} testID="star-rating" />
-        );
-
-        expect(getByTestId('star-rating')).toBeTruthy();
-      });
-
-      it('renders half stars when allowHalf is true', () => {
-        const { getByTestId } = render(
-          <StarRating {...defaultProps} allowHalf={true} rating={3.5} testID="star-rating" />
-        );
-
-        expect(getByTestId('star-rating')).toBeTruthy();
-      });
-
-      it('renders custom star icons', () => {
-        const { getByTestId } = render(
-          <StarRating
-            {...defaultProps}
-            filledIcon="heart-filled"
-            emptyIcon="heart-empty"
-            testID="star-rating"
-          />
-        );
-
-        expect(getByTestId('star-rating')).toBeTruthy();
-      });
-
-      it('renders rating labels', () => {
+      it('renders numeric values in numbers style', () => {
         const { getByText } = render(
-          <StarRating
-            {...defaultProps}
-            showLabels={true}
-            labels={['Poor', 'Fair', 'Good', 'Very Good', 'Excellent']}
-          />
+          <StarRating {...defaultProps} style="numbers" maxRating={3} />
         );
 
-        expect(getByText('Excellent')).toBeTruthy();
+        expect(getByText('1')).toBeTruthy();
+        expect(getByText('3')).toBeTruthy();
       });
 
-      it('renders in read-only mode', () => {
-        const { getByTestId } = render(
-          <StarRating {...defaultProps} readOnly={true} testID="star-rating" />
+      it('renders the submit button', () => {
+        const { getByText } = render(<StarRating {...defaultProps} />);
+
+        expect(getByText('Submit')).toBeTruthy();
+      });
+
+      it('shows the selected rating value after selection', () => {
+        const { getByLabelText, getByText } = render(
+          <StarRating {...defaultProps} />
         );
 
-        expect(getByTestId('star-rating')).toBeTruthy();
-      });
+        fireEvent.press(getByLabelText('Rate 3 out of 5'));
 
-      it('renders different sizes', () => {
-        const sizes = ['small', 'medium', 'large'] as const;
-
-        sizes.forEach((size) => {
-          const { getByTestId, unmount } = render(
-            <StarRating {...defaultProps} size={size} testID="star-rating" />
-          );
-          expect(getByTestId('star-rating')).toBeTruthy();
-          unmount();
-        });
+        expect(getByText('3 / 5')).toBeTruthy();
       });
     });
 
     describe('Interactions', () => {
-      it('calls onRate when star is pressed', () => {
-        const onRate = jest.fn();
-        const { getByTestId } = render(
-          <StarRating onRate={onRate} testID="star-rating" />
+      it('calls onSubmit with the selected rating', () => {
+        const onSubmit = jest.fn();
+        const { getByLabelText, getByText } = render(
+          <StarRating {...defaultProps} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByTestId('star-rating'));
+        fireEvent.press(getByLabelText('Rate 4 out of 5'));
+        fireEvent.press(getByText('Submit'));
 
-        // Depending on implementation, may need to press specific star
-        expect(getByTestId('star-rating')).toBeTruthy();
+        expect(onSubmit).toHaveBeenCalledWith({
+          rating: 4,
+          maxRating: 5,
+          variableName: 'rating',
+        });
       });
 
-      it('allows changing rating', () => {
-        const onRate = jest.fn();
-        const { getByTestId, rerender } = render(
-          <StarRating onRate={onRate} rating={2} testID="star-rating" />
+      it('allows changing rating before submitting', () => {
+        const onSubmit = jest.fn();
+        const { getByLabelText, getByText } = render(
+          <StarRating {...defaultProps} onSubmit={onSubmit} />
         );
 
-        expect(getByTestId('star-rating')).toBeTruthy();
+        fireEvent.press(getByLabelText('Rate 2 out of 5'));
+        fireEvent.press(getByLabelText('Rate 5 out of 5'));
+        fireEvent.press(getByText('Submit'));
 
-        rerender(
-          <StarRating onRate={onRate} rating={4} testID="star-rating" />
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ rating: 5 })
         );
-
-        expect(getByTestId('star-rating')).toBeTruthy();
       });
 
-      it('does not allow rating in read-only mode', () => {
-        const onRate = jest.fn();
-        const { getByTestId } = render(
-          <StarRating onRate={onRate} readOnly={true} testID="star-rating" />
+      it('does not submit when no rating is selected', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <StarRating {...defaultProps} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByTestId('star-rating'));
+        fireEvent.press(getByText('Submit'));
 
-        expect(onRate).not.toHaveBeenCalled();
+        expect(onSubmit).not.toHaveBeenCalled();
       });
 
-      it('does not allow rating when disabled', () => {
-        const onRate = jest.fn();
-        const { getByTestId } = render(
-          <StarRating onRate={onRate} disabled={true} testID="star-rating" />
-        );
+      it('marks the submit button disabled while no rating is selected', () => {
+        const { getByLabelText } = render(<StarRating {...defaultProps} />);
 
-        fireEvent.press(getByTestId('star-rating'));
-
-        expect(onRate).not.toHaveBeenCalled();
+        const submit = getByLabelText('Submit rating');
+        expect(submit.props.accessibilityState.disabled).toBe(true);
       });
     });
 
     describe('Accessibility', () => {
-      it('has accessible container', () => {
+      it('exposes the question as the radiogroup label', () => {
         const { getByTestId } = render(
           <StarRating {...defaultProps} testID="star-rating" />
         );
 
-        expect(getByTestId('star-rating')).toBeTruthy();
+        const container = getByTestId('star-rating');
+        expect(container.props.accessibilityRole).toBe('radiogroup');
+        expect(container.props.accessibilityLabel).toBe('Rate your experience');
       });
 
-      it('supports custom accessibility label', () => {
-        const { getByTestId } = render(
-          <StarRating
-            {...defaultProps}
-            testID="star-rating"
-            accessibilityLabel="Rate your experience"
-          />
-        );
+      it('marks the selected star as checked', () => {
+        const { getByLabelText } = render(<StarRating {...defaultProps} />);
 
-        const component = getByTestId('star-rating');
-        expect(component.props.accessibilityLabel).toBe('Rate your experience');
+        fireEvent.press(getByLabelText('Rate 3 out of 5'));
+
+        expect(
+          getByLabelText('Rate 3 out of 5').props.accessibilityState.checked
+        ).toBe(true);
       });
     });
 
     describe('Edge Cases', () => {
-      it('handles rating of 0', () => {
+      it('renders no options when maxRating is 0', () => {
+        const { queryByLabelText } = render(
+          <StarRating {...defaultProps} maxRating={0} />
+        );
+
+        expect(queryByLabelText('Rate 1 out of 0')).toBeNull();
+      });
+
+      it('renders hearts style without crashing', () => {
         const { getByTestId } = render(
-          <StarRating {...defaultProps} rating={0} testID="star-rating" />
+          <StarRating {...defaultProps} style="hearts" testID="star-rating" />
         );
 
         expect(getByTestId('star-rating')).toBeTruthy();
       });
 
-      it('handles rating above maxRating', () => {
+      it('renders thumbs style without crashing', () => {
         const { getByTestId } = render(
-          <StarRating {...defaultProps} maxRating={5} rating={10} testID="star-rating" />
-        );
-
-        expect(getByTestId('star-rating')).toBeTruthy();
-      });
-
-      it('handles negative rating', () => {
-        const { getByTestId } = render(
-          <StarRating {...defaultProps} rating={-1} testID="star-rating" />
-        );
-
-        expect(getByTestId('star-rating')).toBeTruthy();
-      });
-
-      it('handles decimal rating without allowHalf', () => {
-        const { getByTestId } = render(
-          <StarRating {...defaultProps} rating={3.7} allowHalf={false} testID="star-rating" />
+          <StarRating {...defaultProps} style="thumbs" testID="star-rating" />
         );
 
         expect(getByTestId('star-rating')).toBeTruthy();
@@ -232,9 +206,15 @@ describe('RatingComponents', () => {
   // OPINION SCALE TESTS
   // ========================================
 
-  describe('OpinionScale', () => {
+  describe('OpinionScaleSelector', () => {
     const defaultProps = {
-      onSelect: jest.fn(),
+      type: 'opinionScale' as const,
+      nodeId: 'node-2',
+      question: 'How likely are you to recommend us?',
+      min: 0,
+      max: 10,
+      variableName: 'nps',
+      onSubmit: jest.fn(),
     };
 
     beforeEach(() => {
@@ -244,44 +224,35 @@ describe('RatingComponents', () => {
     describe('Rendering', () => {
       it('renders the opinion scale', () => {
         const { getByTestId } = render(
-          <OpinionScale {...defaultProps} testID="opinion-scale" />
+          <OpinionScaleSelector {...defaultProps} testID="opinion-scale" />
         );
 
         expect(getByTestId('opinion-scale')).toBeTruthy();
       });
 
-      it('renders default 0-10 scale', () => {
-        const { getByText } = render(
-          <OpinionScale {...defaultProps} min={0} max={10} />
-        );
+      it('renders the full 0-10 scale', () => {
+        const { getByText } = render(<OpinionScaleSelector {...defaultProps} />);
 
         expect(getByText('0')).toBeTruthy();
         expect(getByText('10')).toBeTruthy();
       });
 
-      it('renders custom scale range', () => {
-        const { getByText } = render(
-          <OpinionScale {...defaultProps} min={1} max={5} />
+      it('renders a custom scale range', () => {
+        const { getByText, queryByText } = render(
+          <OpinionScaleSelector {...defaultProps} min={1} max={5} />
         );
 
         expect(getByText('1')).toBeTruthy();
         expect(getByText('5')).toBeTruthy();
+        expect(queryByText('6')).toBeNull();
       });
 
-      it('renders with initial value', () => {
-        const { getByTestId } = render(
-          <OpinionScale {...defaultProps} value={5} testID="opinion-scale" />
-        );
-
-        expect(getByTestId('opinion-scale')).toBeTruthy();
-      });
-
-      it('renders left and right labels', () => {
+      it('renders min and max labels', () => {
         const { getByText } = render(
-          <OpinionScale
+          <OpinionScaleSelector
             {...defaultProps}
-            leftLabel="Not likely"
-            rightLabel="Very likely"
+            minLabel="Not likely"
+            maxLabel="Very likely"
           />
         );
 
@@ -289,122 +260,110 @@ describe('RatingComponents', () => {
         expect(getByText('Very likely')).toBeTruthy();
       });
 
-      it('renders in horizontal layout', () => {
-        const { getByTestId } = render(
-          <OpinionScale {...defaultProps} layout="horizontal" testID="opinion-scale" />
-        );
+      it('renders the question text', () => {
+        const { getByText } = render(<OpinionScaleSelector {...defaultProps} />);
 
-        expect(getByTestId('opinion-scale')).toBeTruthy();
+        expect(getByText('How likely are you to recommend us?')).toBeTruthy();
       });
 
-      it('renders in vertical layout', () => {
-        const { getByTestId } = render(
-          <OpinionScale {...defaultProps} layout="vertical" testID="opinion-scale" />
+      it('hides numbers when showNumbers is false', () => {
+        const { queryByText } = render(
+          <OpinionScaleSelector {...defaultProps} showNumbers={false} />
         );
 
-        expect(getByTestId('opinion-scale')).toBeTruthy();
-      });
-
-      it('renders selected state', () => {
-        const { getByTestId } = render(
-          <OpinionScale {...defaultProps} value={7} testID="opinion-scale" />
-        );
-
-        expect(getByTestId('opinion-scale')).toBeTruthy();
+        expect(queryByText('5')).toBeNull();
       });
     });
 
     describe('Interactions', () => {
-      it('calls onSelect when option is pressed', () => {
-        const onSelect = jest.fn();
+      it('calls onSubmit with the selected value', () => {
+        const onSubmit = jest.fn();
         const { getByText } = render(
-          <OpinionScale onSelect={onSelect} min={0} max={10} />
+          <OpinionScaleSelector {...defaultProps} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByText('5'));
+        fireEvent.press(getByText('7'));
+        fireEvent.press(getByText('Submit'));
 
-        expect(onSelect).toHaveBeenCalledWith(5);
+        expect(onSubmit).toHaveBeenCalledWith({
+          value: 7,
+          min: 0,
+          max: 10,
+          variableName: 'nps',
+        });
       });
 
-      it('allows changing selection', () => {
-        const onSelect = jest.fn();
+      it('allows changing the selection before submitting', () => {
+        const onSubmit = jest.fn();
         const { getByText } = render(
-          <OpinionScale onSelect={onSelect} min={0} max={10} />
+          <OpinionScaleSelector {...defaultProps} onSubmit={onSubmit} />
         );
 
         fireEvent.press(getByText('3'));
-        expect(onSelect).toHaveBeenCalledWith(3);
-
         fireEvent.press(getByText('8'));
-        expect(onSelect).toHaveBeenCalledWith(8);
+        fireEvent.press(getByText('Submit'));
+
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ value: 8 })
+        );
       });
 
-      it('does not allow selection when disabled', () => {
-        const onSelect = jest.fn();
+      it('does not submit when nothing is selected', () => {
+        const onSubmit = jest.fn();
         const { getByText } = render(
-          <OpinionScale onSelect={onSelect} disabled={true} min={0} max={10} />
+          <OpinionScaleSelector {...defaultProps} onSubmit={onSubmit} />
         );
 
-        fireEvent.press(getByText('5'));
+        fireEvent.press(getByText('Submit'));
 
-        expect(onSelect).not.toHaveBeenCalled();
+        expect(onSubmit).not.toHaveBeenCalled();
       });
     });
 
     describe('Accessibility', () => {
-      it('has accessible container', () => {
+      it('exposes the question as the radiogroup label', () => {
         const { getByTestId } = render(
-          <OpinionScale {...defaultProps} testID="opinion-scale" />
+          <OpinionScaleSelector {...defaultProps} testID="opinion-scale" />
         );
 
-        expect(getByTestId('opinion-scale')).toBeTruthy();
-      });
-
-      it('options are accessible', () => {
-        const { getByText } = render(
-          <OpinionScale {...defaultProps} min={0} max={10} />
-        );
-
-        const option = getByText('5');
-        expect(option).toBeTruthy();
+        const container = getByTestId('opinion-scale');
+        expect(container.props.accessibilityRole).toBe('radiogroup');
       });
     });
 
     describe('Edge Cases', () => {
       it('handles min equal to max', () => {
-        const { getByTestId } = render(
-          <OpinionScale {...defaultProps} min={5} max={5} testID="opinion-scale" />
+        const { getByText } = render(
+          <OpinionScaleSelector {...defaultProps} min={5} max={5} />
         );
 
-        expect(getByTestId('opinion-scale')).toBeTruthy();
+        expect(getByText('5')).toBeTruthy();
       });
 
-      it('handles negative range', () => {
+      it('handles negative ranges', () => {
         const { getByText } = render(
-          <OpinionScale {...defaultProps} min={-5} max={5} />
+          <OpinionScaleSelector {...defaultProps} min={-5} max={5} />
         );
 
         expect(getByText('-5')).toBeTruthy();
         expect(getByText('5')).toBeTruthy();
       });
-
-      it('handles large range', () => {
-        const { getByTestId } = render(
-          <OpinionScale {...defaultProps} min={1} max={100} testID="opinion-scale" />
-        );
-
-        expect(getByTestId('opinion-scale')).toBeTruthy();
-      });
     });
   });
 
   // ========================================
-  // SLIDER RATING TESTS
+  // SLIDER INPUT TESTS
   // ========================================
 
-  describe('SliderRating', () => {
+  describe('SliderInput', () => {
     const defaultProps = {
-      onValueChange: jest.fn(),
+      type: 'slider' as const,
+      nodeId: 'node-3',
+      question: 'Select a value',
+      min: 0,
+      max: 100,
+      variableName: 'amount',
+      onSubmit: jest.fn(),
     };
 
     beforeEach(() => {
@@ -414,234 +373,109 @@ describe('RatingComponents', () => {
     describe('Rendering', () => {
       it('renders the slider', () => {
         const { getByTestId } = render(
-          <SliderRating {...defaultProps} testID="slider-rating" />
+          <SliderInput {...defaultProps} testID="slider-input" />
         );
 
-        expect(getByTestId('slider-rating')).toBeTruthy();
+        expect(getByTestId('slider-input')).toBeTruthy();
       });
 
-      it('renders with default range', () => {
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} min={0} max={100} testID="slider-rating" />
-        );
+      it('renders the question text', () => {
+        const { getByText } = render(<SliderInput {...defaultProps} />);
 
-        expect(getByTestId('slider-rating')).toBeTruthy();
+        expect(getByText('Select a value')).toBeTruthy();
       });
 
-      it('renders with initial value', () => {
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} value={50} testID="slider-rating" />
-        );
-
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('renders value label', () => {
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} value={50} showValue={true} testID="slider-rating" />
-        );
-
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('renders min/max labels', () => {
+      it('shows the current value when showValue is true', () => {
         const { getByText } = render(
-          <SliderRating
-            {...defaultProps}
-            min={0}
-            max={100}
-            minLabel="0%"
-            maxLabel="100%"
-            showMinMaxLabels={true}
-          />
+          <SliderInput {...defaultProps} defaultValue={50} showValue={true} />
+        );
+
+        expect(getByText('50')).toBeTruthy();
+      });
+
+      it('renders custom min and max labels', () => {
+        const { getByText } = render(
+          <SliderInput {...defaultProps} minLabel="0%" maxLabel="100%" />
         );
 
         expect(getByText('0%')).toBeTruthy();
         expect(getByText('100%')).toBeTruthy();
       });
 
-      it('renders step markers', () => {
-        const { getByTestId } = render(
-          <SliderRating
-            {...defaultProps}
-            step={10}
-            showStepMarkers={true}
-            testID="slider-rating"
-          />
+      it('falls back to numeric min/max labels', () => {
+        // showValue=false so the value display does not duplicate the '0' label
+        const { getByText } = render(
+          <SliderInput {...defaultProps} showValue={false} />
         );
 
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('renders custom track colors', () => {
-        const { getByTestId } = render(
-          <SliderRating
-            {...defaultProps}
-            trackColor="#e0e0e0"
-            activeTrackColor="#4CAF50"
-            testID="slider-rating"
-          />
-        );
-
-        expect(getByTestId('slider-rating')).toBeTruthy();
+        expect(getByText('0')).toBeTruthy();
+        expect(getByText('100')).toBeTruthy();
       });
     });
 
     describe('Interactions', () => {
-      it('calls onValueChange when slider is moved', () => {
-        const onValueChange = jest.fn();
-        const { getByTestId } = render(
-          <SliderRating onValueChange={onValueChange} testID="slider-rating" />
+      it('submits the default value', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <SliderInput {...defaultProps} defaultValue={40} onSubmit={onSubmit} />
         );
 
-        const slider = getByTestId('slider-rating');
-        fireEvent(slider, 'valueChange', 50);
+        fireEvent.press(getByText('Submit'));
 
-        expect(onValueChange).toHaveBeenCalledWith(50);
+        expect(onSubmit).toHaveBeenCalledWith({
+          value: 40,
+          min: 0,
+          max: 100,
+          variableName: 'amount',
+        });
       });
 
-      it('respects step value', () => {
-        const onValueChange = jest.fn();
-        const { getByTestId } = render(
-          <SliderRating onValueChange={onValueChange} step={10} testID="slider-rating" />
+      it('submits min when no default value is given', () => {
+        const onSubmit = jest.fn();
+        const { getByText } = render(
+          <SliderInput {...defaultProps} onSubmit={onSubmit} />
         );
 
-        const slider = getByTestId('slider-rating');
-        fireEvent(slider, 'valueChange', 45);
+        fireEvent.press(getByText('Submit'));
 
-        // Value should be snapped to nearest step
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('does not allow changes when disabled', () => {
-        const onValueChange = jest.fn();
-        const { getByTestId } = render(
-          <SliderRating onValueChange={onValueChange} disabled={true} testID="slider-rating" />
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ value: 0 })
         );
-
-        const slider = getByTestId('slider-rating');
-        fireEvent(slider, 'valueChange', 50);
-
-        expect(onValueChange).not.toHaveBeenCalled();
-      });
-
-      it('calls onSlidingStart when sliding begins', () => {
-        const onSlidingStart = jest.fn();
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} onSlidingStart={onSlidingStart} testID="slider-rating" />
-        );
-
-        const slider = getByTestId('slider-rating');
-        fireEvent(slider, 'slidingStart');
-
-        expect(onSlidingStart).toHaveBeenCalled();
-      });
-
-      it('calls onSlidingComplete when sliding ends', () => {
-        const onSlidingComplete = jest.fn();
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} onSlidingComplete={onSlidingComplete} testID="slider-rating" />
-        );
-
-        const slider = getByTestId('slider-rating');
-        fireEvent(slider, 'slidingComplete', 75);
-
-        expect(onSlidingComplete).toHaveBeenCalledWith(75);
-      });
-    });
-
-    describe('Value Formatting', () => {
-      it('formats value with custom formatter', () => {
-        const { getByTestId } = render(
-          <SliderRating
-            {...defaultProps}
-            value={50}
-            showValue={true}
-            formatValue={(v) => `${v}%`}
-            testID="slider-rating"
-          />
-        );
-
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('rounds displayed value', () => {
-        const { getByTestId } = render(
-          <SliderRating
-            {...defaultProps}
-            value={33.333}
-            showValue={true}
-            decimalPlaces={1}
-            testID="slider-rating"
-          />
-        );
-
-        expect(getByTestId('slider-rating')).toBeTruthy();
       });
     });
 
     describe('Accessibility', () => {
-      it('has accessible container', () => {
+      it('exposes an adjustable role with value info', () => {
         const { getByTestId } = render(
-          <SliderRating {...defaultProps} testID="slider-rating" />
+          <SliderInput {...defaultProps} defaultValue={25} testID="slider-input" />
         );
 
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('supports custom accessibility label', () => {
-        const { getByTestId } = render(
-          <SliderRating
-            {...defaultProps}
-            testID="slider-rating"
-            accessibilityLabel="Satisfaction level"
-          />
-        );
-
-        const component = getByTestId('slider-rating');
-        expect(component.props.accessibilityLabel).toBe('Satisfaction level');
+        const container = getByTestId('slider-input');
+        expect(container.props.accessibilityRole).toBe('adjustable');
+        expect(container.props.accessibilityValue).toEqual({
+          min: 0,
+          max: 100,
+          now: 25,
+        });
       });
     });
 
     describe('Edge Cases', () => {
-      it('handles value at minimum', () => {
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} min={0} max={100} value={0} testID="slider-rating" />
+      it('handles a negative range', () => {
+        const { getByText } = render(
+          <SliderInput {...defaultProps} min={-50} max={50} defaultValue={0} />
         );
 
-        expect(getByTestId('slider-rating')).toBeTruthy();
+        expect(getByText('-50')).toBeTruthy();
+        expect(getByText('50')).toBeTruthy();
       });
 
-      it('handles value at maximum', () => {
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} min={0} max={100} value={100} testID="slider-rating" />
+      it('hides value display when showValue is false', () => {
+        const { queryByText } = render(
+          <SliderInput {...defaultProps} defaultValue={42} showValue={false} />
         );
 
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('handles value outside range', () => {
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} min={0} max={100} value={150} testID="slider-rating" />
-        );
-
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('handles negative range', () => {
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} min={-50} max={50} value={0} testID="slider-rating" />
-        );
-
-        expect(getByTestId('slider-rating')).toBeTruthy();
-      });
-
-      it('handles decimal step', () => {
-        const { getByTestId } = render(
-          <SliderRating {...defaultProps} step={0.5} testID="slider-rating" />
-        );
-
-        expect(getByTestId('slider-rating')).toBeTruthy();
+        expect(queryByText('42')).toBeNull();
       });
     });
   });

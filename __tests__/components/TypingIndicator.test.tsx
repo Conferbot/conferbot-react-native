@@ -340,7 +340,8 @@ describe('TypingIndicator', () => {
         <TypingIndicator isTyping={true} testID="typing-indicator" />
       );
 
-      for (let i = 0; i < 10; i++) {
+      // Loop ends at i=10 (even), so the final state is visible
+      for (let i = 0; i <= 10; i++) {
         rerender(
           <TypingIndicator isTyping={i % 2 === 0} testID="typing-indicator" />
         );

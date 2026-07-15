@@ -29,7 +29,8 @@ jest.mock('expo-av', () => ({
       HIGH_QUALITY: {},
     },
   },
-}));
+  // virtual: expo-av is an optional peer integration and is not installed
+}), { virtual: true });
 
 describe('VoiceRecorder', () => {
   const defaultProps = {

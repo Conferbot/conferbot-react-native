@@ -58,7 +58,9 @@ describe('HandoverWaiting', () => {
         <HandoverWaiting {...defaultProps} queueInfo={mockQueueInfo} />
       );
 
-      expect(getByText(/3/)).toBeTruthy();
+      // Match the position badge specifically ("#3") - a bare /3/ also
+      // matches the estimated wait time text ("About 3 minutes")
+      expect(getByText(/#3/)).toBeTruthy();
     });
 
     it('renders estimated wait time when provided', () => {
@@ -157,7 +159,9 @@ describe('HandoverWaiting', () => {
         <HandoverWaiting {...defaultProps} queueInfo={{ position: 1, estimatedWaitTime: 60 }} />
       );
 
-      expect(getByText(/1/)).toBeTruthy();
+      // Match the position badge specifically ("#1") - a bare /1/ also
+      // matches the estimated wait time text ("About 1 minute")
+      expect(getByText(/#1/)).toBeTruthy();
     });
 
     it('formats estimated wait time in minutes', () => {
