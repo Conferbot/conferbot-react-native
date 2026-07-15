@@ -147,6 +147,9 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
   agent,
   message,
   onEndChat,
+  endChatButtonText = 'End Chat',
+  accessibilityLabel,
+  testID,
 }) => {
   const theme = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -182,7 +185,8 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
         theme.shadows.md,
       ]}
       accessibilityRole="alert"
-      accessibilityLabel={`Connected to ${agent.name || 'agent'}`}
+      accessibilityLabel={accessibilityLabel || `Connected to ${agent.name || 'agent'}`}
+      testID={testID}
     >
       {/* Success Banner */}
       <View
@@ -281,7 +285,7 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
               { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
             ]}
           >
-            End Chat
+            {endChatButtonText}
           </Text>
         </TouchableOpacity>
       )}

@@ -15,6 +15,18 @@ import type {
 } from './types';
 import { useConferBot } from '../../context/ConferBotContext';
 
+/**
+ * Safe context access - the KB screen can be rendered standalone
+ * (e.g. deep-linked help center) without a ConferBotProvider.
+ */
+function useOptionalConferBot(): { chatSessionId?: string; rateKBArticle?: any } {
+  try {
+    return useConferBot();
+  } catch {
+    return {};
+  }
+}
+
 // Action types
 type KBAction =
   | { type: 'SET_LOADING'; payload: boolean }
@@ -119,7 +131,7 @@ const getDeviceType = (): 'mobile' | 'tablet' | 'desktop' => {
  */
 export const KBProvider: React.FC<KBProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(kbReducer, initialState);
-  const { chatSessionId, rateKBArticle } = useConferBot();
+  const { chatSessionId, rateKBArticle } = useOptionalConferBot();
 
   // Track engagement for current article
   const engagementRef = useRef<{

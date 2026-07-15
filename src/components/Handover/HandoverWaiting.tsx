@@ -289,13 +289,23 @@ const EstimatedTime: React.FC<EstimatedTimeProps> = ({
 
 export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
   message = 'Please wait while we connect you with an agent...',
+  waitingMessage,
   queueInfo,
   onCancel,
   showQueuePosition = true,
   showEstimatedTime = true,
+  cancelButtonText = 'Cancel',
+  isConnecting = false,
+  connectingMessage = 'Connecting you to an agent...',
+  accessibilityLabel,
+  testID,
 }) => {
   const theme = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Resolve the displayed message: connecting state wins, then the
+  // waitingMessage alias, then message
+  const displayMessage = isConnecting ? connectingMessage : waitingMessage || message;
 
   // Fade in animation
   useEffect(() => {
@@ -318,8 +328,9 @@ export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
         theme.shadows.md,
       ]}
       accessibilityRole="alert"
-      accessibilityLabel="Waiting for agent"
+      accessibilityLabel={accessibilityLabel || 'Waiting for agent'}
       accessibilityLiveRegion="polite"
+      testID={testID}
     >
       {/* Animated Icon */}
       <View style={styles.iconContainer}>
@@ -341,7 +352,7 @@ export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
           { color: theme.colors.text, fontSize: theme.typography.fontSize.xl },
         ]}
       >
-        Connecting to Agent
+        {isConnecting ? 'Agent Found' : 'Connecting to Agent'}
       </Text>
 
       {/* Message */}
@@ -351,7 +362,7 @@ export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
           { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
         ]}
       >
-        {message}
+        {displayMessage}
       </Text>
 
       {/* Animated Dots */}
@@ -405,7 +416,7 @@ export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
               { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
             ]}
           >
-            Cancel
+            {cancelButtonText}
           </Text>
         </TouchableOpacity>
       )}

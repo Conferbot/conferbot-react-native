@@ -16,7 +16,7 @@ import type { ConferBotTheme } from '../../theme/types';
 
 const CONFERBOT_URL = 'https://www.conferbot.com';
 const CONFERBOT_LOGO_URL =
-  'https://prd.media.cdn.conferbot.com/62829a1c49f355163dfdbfb2/conferbot-logo-1710782074234.png';
+  'https://www.conferbot.com/img/logo/conferbot-logo.png';
 
 export interface ChatBottomBarProps {
   onSend: (text: string) => void | Promise<void>;
@@ -193,16 +193,16 @@ const createStyles = (theme: ConferBotTheme) =>
       justifyContent: 'center',
     },
     textInput: {
-      fontSize: 15,
+      fontSize: 16,
       color: '#000',
       paddingHorizontal: 16,
       paddingVertical: Platform.OS === 'ios' ? 10 : 6,
       maxHeight: 100,
     },
     sendButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       justifyContent: 'center',
       alignItems: 'center',
     },

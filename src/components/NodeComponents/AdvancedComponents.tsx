@@ -799,7 +799,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
   onSubmit,
   uploadFile: externalUploadFile,
   botId,
-  apiBaseUrl = 'https://embed.conferbot.com',
+  apiBaseUrl = 'https://wdt.conferbot.com',
 }) => {
   const theme = useTheme();
   const [selectedFiles, setSelectedFiles] = useState<FilePickerResult[]>([]);

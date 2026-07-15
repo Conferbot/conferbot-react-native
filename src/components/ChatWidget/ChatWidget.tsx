@@ -209,8 +209,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   // Use controlled visible if provided, otherwise use context isOpen
   const isVisible = controlledVisible !== undefined ? controlledVisible : isOpen;
 
-  // Agent typing indicator — from context (live chat) or local state
-  const isAgentTyping = agentTyping;
+  // Agent typing indicator — from context (live chat) or local socket events
+  const [localAgentTyping, setLocalAgentTyping] = useState(false);
+  const isAgentTyping = agentTyping || localAgentTyping;
 
   // Track flow completion locally
   const [isFlowComplete, setIsFlowComplete] = useState(false);
@@ -242,7 +243,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   // Listen for agent typing status
   useEffect(() => {
     const unsubscribe = on('agent-typing-status' as SocketEvents, (data: any) => {
-      setIsAgentTyping(data.isTyping || false);
+      setLocalAgentTyping(data?.isTyping || false);
     });
 
     return unsubscribe;
@@ -358,7 +359,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     } as any);
 
     const response = await fetch(
-      `https://embed.conferbot.com/api/v1/bot/${chatbotConfig.id}/media`,
+      `https://wdt.conferbot.com/api/v1/bot/${chatbotConfig.id}/media`,
       {
         method: 'POST',
         body: formData,

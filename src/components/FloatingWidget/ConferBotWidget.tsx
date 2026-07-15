@@ -185,9 +185,9 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     if (ctaText && !isChatOpen) {
       const timer = setTimeout(() => setShowCta(true), 2000);
       return () => clearTimeout(timer);
-    } else {
-      setShowCta(false);
     }
+    setShowCta(false);
+    return undefined;
   }, [ctaText, isChatOpen]);
 
   // Animate button press

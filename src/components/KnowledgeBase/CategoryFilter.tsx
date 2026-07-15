@@ -18,72 +18,112 @@ import type { ConferBotTheme } from '../../theme/types';
 import type { KBCategoryWithArticles } from './types';
 
 export interface CategoryFilterProps {
-  categories: KBCategoryWithArticles[];
-  selectedCategory: KBCategoryWithArticles | null;
-  onSelectCategory: (category: KBCategoryWithArticles | null) => void;
+  categories?: KBCategoryWithArticles[] | KBCategory[];
+  /** Selected category object (legacy API) */
+  selectedCategory?: KBCategoryWithArticles | null;
+  /** Selected category id (preferred API) */
+  selectedCategoryId?: string | null;
+  /** Called with the full category object, or null for "All" (legacy API) */
+  onSelectCategory?: (category: KBCategoryWithArticles | null) => void;
+  /** Called with the category id, or null for "All" (preferred API) */
+  onCategorySelect?: (categoryId: string | null) => void;
   showAllOption?: boolean;
+  /** Label for the "All" chip (legacy alias of allOptionText) */
   allLabel?: string;
+  /** Label for the "All" chip */
+  allOptionText?: string;
+  showIcons?: boolean;
+  showDescriptions?: boolean;
+  showCount?: boolean;
+  layout?: 'horizontal' | 'vertical' | 'grid';
+  accessibilityLabel?: string;
   testID?: string;
 }
 
 /**
- * Horizontal category filter with "All" option
+ * Scrollable category filter with "All" option
  */
 export const CategoryFilter: React.FC<CategoryFilterProps> = ({
-  categories,
-  selectedCategory,
+  categories = [],
+  selectedCategory = null,
+  selectedCategoryId,
   onSelectCategory,
+  onCategorySelect,
   showAllOption = true,
   allLabel = 'All',
+  allOptionText,
+  showIcons = true,
+  showDescriptions = false,
+  showCount = true,
+  layout = 'horizontal',
+  accessibilityLabel,
   testID,
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Scroll to selected category
+  const categoryId = (category: any): string => category?._id ?? category?.id;
+  const effectiveSelectedId =
+    selectedCategoryId !== undefined ? selectedCategoryId : selectedCategory ? categoryId(selectedCategory) : null;
+  const allChipLabel = allOptionText ?? allLabel;
+
+  const handleSelect = (category: any | null) => {
+    onSelectCategory?.(category);
+    onCategorySelect?.(category ? categoryId(category) : null);
+  };
+
+  // Scroll to selected category (horizontal layout only)
   useEffect(() => {
-    if (selectedCategory && scrollViewRef.current) {
-      const index = categories.findIndex((c) => c._id === selectedCategory._id);
+    if (layout === 'horizontal' && effectiveSelectedId && scrollViewRef.current) {
+      const index = categories.findIndex((c) => categoryId(c) === effectiveSelectedId);
       if (index !== -1) {
         // Approximate scroll position
         const scrollX = (index + (showAllOption ? 1 : 0)) * 100;
         scrollViewRef.current.scrollTo({ x: scrollX - 50, animated: true });
       }
     }
-  }, [selectedCategory, categories, showAllOption]);
+  }, [effectiveSelectedId, categories, showAllOption, layout]);
+
+  const horizontal = layout === 'horizontal';
 
   return (
-    <View style={styles.container} testID={testID}>
+    <View
+      style={styles.container}
+      accessible={accessibilityLabel !== undefined}
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+    >
       <ScrollView
         ref={scrollViewRef}
-        horizontal
+        horizontal={horizontal}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, layout === 'grid' && styles.gridContent]}
       >
         {/* All option */}
         {showAllOption && (
           <CategoryChip
-            label={allLabel}
-            isSelected={selectedCategory === null}
-            onPress={() => onSelectCategory(null)}
+            label={allChipLabel}
+            isSelected={effectiveSelectedId === null || effectiveSelectedId === undefined}
+            onPress={() => handleSelect(null)}
             theme={theme}
             testID={`${testID}-all`}
           />
         )}
 
         {/* Category chips */}
-        {categories.map((category, index) => (
+        {categories.map((category: any, index) => (
           <CategoryChip
-            key={category._id}
+            key={categoryId(category)}
             label={category.name}
-            icon={category.icon}
-            articleCount={category.articles?.length || category.articleCount}
-            isSelected={selectedCategory?._id === category._id}
-            onPress={() => onSelectCategory(category)}
+            icon={showIcons ? category.icon : undefined}
+            description={showDescriptions ? category.description : undefined}
+            articleCount={showCount ? category.articles?.length || category.articleCount : undefined}
+            isSelected={effectiveSelectedId === categoryId(category)}
+            onPress={() => handleSelect(category)}
             theme={theme}
             animationDelay={index * 50}
-            testID={`${testID}-${category._id}`}
+            testID={`${testID}-${categoryId(category)}`}
           />
         ))}
       </ScrollView>
@@ -95,6 +135,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
 interface CategoryChipProps {
   label: string;
   icon?: string;
+  description?: string;
   articleCount?: number;
   isSelected: boolean;
   onPress: () => void;
@@ -106,6 +147,7 @@ interface CategoryChipProps {
 const CategoryChip: React.FC<CategoryChipProps> = ({
   label,
   icon,
+  description,
   articleCount,
   isSelected,
   onPress,
@@ -198,7 +240,10 @@ const CategoryChip: React.FC<CategoryChipProps> = ({
         testID={testID}
       >
         {icon && <Text style={chipStyles.icon}>{icon}</Text>}
-        <Text style={chipStyles.label}>{label}</Text>
+        <View>
+          <Text style={chipStyles.label}>{label}</Text>
+          {description ? <Text style={chipStyles.count}>{description}</Text> : null}
+        </View>
         {articleCount !== undefined && articleCount > 0 && (
           <Text style={chipStyles.count}>({articleCount})</Text>
         )}
@@ -215,6 +260,10 @@ const createStyles = (theme: ConferBotTheme) =>
     scrollContent: {
       paddingHorizontal: theme.spacing.md,
       paddingVertical: theme.spacing.xs,
+    },
+    gridContent: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
     },
   });
 

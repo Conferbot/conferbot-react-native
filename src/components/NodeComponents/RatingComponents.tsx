@@ -32,6 +32,7 @@ const MAX_WIDTH = SCREEN_WIDTH - 24;
 
 interface StarRatingProps extends NodeUIState.Rating {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 /**
@@ -48,6 +49,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
   style = 'stars',
   allowHalf = false,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [rating, setRating] = useState<number>(0);
@@ -201,6 +203,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
       ]}
       accessibilityRole="radiogroup"
       accessibilityLabel={question}
+      testID={testID}
     >
       <Text
         style={[
@@ -270,6 +273,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
 
 interface OpinionScaleSelectorProps extends NodeUIState.OpinionScale {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 /**
@@ -287,6 +291,7 @@ export const OpinionScaleSelector: React.FC<OpinionScaleSelectorProps> = ({
   variableName,
   showNumbers = true,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [selectedValue, setSelectedValue] = useState<number | null>(null);
@@ -327,6 +332,7 @@ export const OpinionScaleSelector: React.FC<OpinionScaleSelectorProps> = ({
       ]}
       accessibilityRole="radiogroup"
       accessibilityLabel={question}
+      testID={testID}
     >
       <Text
         style={[
@@ -455,6 +461,7 @@ export const OpinionScaleSelector: React.FC<OpinionScaleSelectorProps> = ({
 
 interface SliderInputProps extends NodeUIState.Slider {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 /**
@@ -474,6 +481,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
   minLabel,
   maxLabel,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [value, setValue] = useState<number>(defaultValue ?? min);
@@ -553,6 +561,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
         max,
         now: value,
       }}
+      testID={testID}
     >
       <Text
         style={[

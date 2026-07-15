@@ -28,12 +28,26 @@ import { ArticleCard } from './ArticleCard';
 import { ArticleDetail } from './ArticleDetail';
 
 export interface KnowledgeBaseScreenProps {
-  categories: KBCategoryWithArticles[];
+  categories?: KBCategoryWithArticles[];
   onClose?: () => void;
+  /** Screen-level back button handler (shown in the header) */
+  onBack?: () => void;
   onArticleView?: (article: KBArticle) => void;
+  /** Alias of onArticleView */
+  onArticleSelect?: (article: KBArticle) => void;
   initialCategory?: KBCategoryWithArticles | null;
   showHeader?: boolean;
   headerTitle?: string;
+  /** Alias of headerTitle */
+  title?: string;
+  searchEnabled?: boolean;
+  categoriesEnabled?: boolean;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  retryButtonText?: string;
+  noResultsMessage?: string;
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -52,16 +66,30 @@ export const KnowledgeBaseScreen: React.FC<KnowledgeBaseScreenProps> = (props) =
  * Inner content component that uses KB context
  */
 const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
-  categories,
+  categories = [],
   onClose,
+  onBack,
   onArticleView,
+  onArticleSelect,
   initialCategory = null,
   showHeader = true,
-  headerTitle = 'Help Center',
+  headerTitle,
+  title,
+  searchEnabled = true,
+  categoriesEnabled = true,
+  loading = false,
+  error = null,
+  onRetry,
+  retryButtonText = 'Retry',
+  noResultsMessage,
+  accessibilityLabel,
   testID,
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const screenTitle = title ?? headerTitle ?? 'Help Center';
+  const childID = (suffix: string): string | undefined =>
+    testID ? `${testID}-${suffix}` : undefined;
 
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState<KBScreenType>('categories');
@@ -167,12 +195,24 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
   const handleArticlePress = useCallback(
     (article: KBArticle) => {
       onArticleView?.(article);
+      onArticleSelect?.(article);
       animateTransition(() => {
         setSelectedArticle(article);
         setCurrentScreen('detail');
       });
     },
-    [onArticleView]
+    [onArticleView, onArticleSelect]
+  );
+
+  // Category filter selection (chip row)
+  const handleCategoryFilterSelect = useCallback(
+    (categoryId: string | null) => {
+      const category = categoryId
+        ? categories.find((c: any) => (c._id ?? c.id) === categoryId) || null
+        : null;
+      setSelectedCategory(category);
+    },
+    [categories]
   );
 
   // Navigate back
@@ -180,13 +220,15 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
     animateTransition(() => {
       if (currentScreen === 'detail') {
         setSelectedArticle(null);
-        setCurrentScreen('articles');
+        setCurrentScreen('categories');
       } else if (currentScreen === 'articles') {
         setSelectedCategory(null);
         setCurrentScreen('categories');
+      } else {
+        onBack?.();
       }
     });
-  }, [currentScreen]);
+  }, [currentScreen, onBack]);
 
   // Handle article rating (delegates to KBContext which emits via socket)
   const handleRateArticle = useCallback(
@@ -232,13 +274,9 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
   const renderHeader = () => {
     if (!showHeader) return null;
 
-    const showBackButton = currentScreen !== 'categories';
-    const title =
-      currentScreen === 'detail' && selectedArticle
-        ? selectedArticle.title
-        : currentScreen === 'articles' && selectedCategory
-        ? selectedCategory.name
-        : headerTitle;
+    const showBackButton = currentScreen !== 'categories' || Boolean(onBack);
+    const headerText =
+      currentScreen === 'detail' && selectedArticle ? selectedArticle.title : screenTitle;
 
     return (
       <View style={styles.header}>
@@ -250,14 +288,14 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
             accessible={true}
             accessibilityLabel="Go back"
             accessibilityRole="button"
-            testID={`${testID}-back`}
+            testID={childID('back')}
           >
             <ChevronLeftIcon color={theme.colors.text} />
           </TouchableOpacity>
         )}
 
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {title}
+          {headerText}
         </Text>
 
         {onClose && (
@@ -268,7 +306,7 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
             accessible={true}
             accessibilityLabel="Close knowledge base"
             accessibilityRole="button"
-            testID={`${testID}-close`}
+            testID={childID('close')}
           >
             <CloseIcon color={theme.colors.text} />
           </TouchableOpacity>
@@ -289,56 +327,57 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
       ]}
     >
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <SearchBar
-          value={searchQuery}
-          onSearch={handleSearch}
-          onClear={handleClearSearch}
-          placeholder="Search articles..."
-          testID={`${testID}-search`}
-        />
-      </View>
-
-      {/* Search Results */}
-      {isSearchActive ? (
-        <View style={styles.searchResultsContainer}>
-          <Text style={styles.searchResultsTitle}>
-            {searchResults.length > 0
-              ? `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''} found`
-              : 'No results found'}
-          </Text>
-          <ArticleList
-            articles={searchResults}
-            onArticlePress={handleArticlePress}
-            showCategoryHeader={false}
-            emptyTitle="No articles found"
-            emptyMessage="Try different keywords or browse categories below."
-            testID={`${testID}-search-results`}
+      {searchEnabled && (
+        <View style={styles.searchContainer}>
+          <SearchBar
+            value={searchQuery}
+            onSearch={handleSearch}
+            onClear={handleClearSearch}
+            placeholder="Search articles..."
+            testID={childID('search')}
           />
         </View>
-      ) : (
-        // Categories List
-        <View style={styles.categoriesContainer}>
-          {categories.map((category, index) => (
-            <CategoryCard
-              key={category._id}
-              category={category}
-              onPress={() => handleCategoryPress(category)}
-              animationDelay={index * 50}
-              testID={`${testID}-category-${category._id}`}
-            />
-          ))}
-
-          {categories.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No categories available</Text>
-              <Text style={styles.emptyMessage}>
-                Knowledge base articles will appear here.
-              </Text>
-            </View>
-          )}
-        </View>
       )}
+
+      {/* Category filter chips */}
+      {categoriesEnabled && (
+        <CategoryFilter
+          categories={categories}
+          selectedCategoryId={selectedCategory ? (selectedCategory as any)._id ?? (selectedCategory as any).id : null}
+          onCategorySelect={handleCategoryFilterSelect}
+          testID={childID('categories')}
+        />
+      )}
+
+      {/* Search result count */}
+      {isSearchActive && (
+        <Text style={styles.searchResultsTitle}>
+          {searchResults.length > 0
+            ? `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''} found`
+            : noResultsMessage || 'No results found'}
+        </Text>
+      )}
+
+      {/* Article list: search results, selected category, or all articles */}
+      <ArticleList
+        articles={
+          isSearchActive
+            ? searchResults
+            : selectedCategory
+            ? selectedCategory.articles || []
+            : getAllArticles()
+        }
+        category={!isSearchActive ? selectedCategory : null}
+        showCategoryHeader={Boolean(selectedCategory) && !isSearchActive}
+        onArticlePress={handleArticlePress}
+        emptyTitle="No articles found"
+        emptyMessage={
+          isSearchActive
+            ? noResultsMessage || 'Try different keywords or browse categories below.'
+            : 'Knowledge base articles will appear here.'
+        }
+        testID={childID('articles')}
+      />
     </Animated.View>
   );
 
@@ -360,7 +399,7 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
           articles={selectedCategory.articles || []}
           category={selectedCategory}
           onArticlePress={handleArticlePress}
-          testID={`${testID}-articles`}
+          testID={childID('articles')}
         />
       </Animated.View>
     );
@@ -386,15 +425,46 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
           onBack={handleBack}
           onArticlePress={handleArticlePress}
           onRate={handleRateArticle}
-          hasRated={hasRatedArticle(selectedArticle._id)}
-          testID={`${testID}-detail`}
+          hasRated={hasRatedArticle(selectedArticle._id ?? (selectedArticle as any).id)}
+          testID={childID('detail')}
         />
       </Animated.View>
     );
   };
 
+  // Error state
+  const renderError = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyTitle}>{error}</Text>
+      {onRetry && (
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={onRetry}
+          accessible={true}
+          accessibilityLabel={retryButtonText}
+          accessibilityRole="button"
+          testID={childID('retry')}
+        >
+          <Text style={styles.retryButtonText}>{retryButtonText}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  // Loading state
+  const renderLoading = () => (
+    <View style={styles.emptyContainer} testID={childID('loading')}>
+      <ActivityIndicator size="large" color={theme.colors.primary} />
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.container} testID={testID}>
+    <SafeAreaView
+      style={styles.container}
+      accessible={accessibilityLabel !== undefined}
+      accessibilityLabel={accessibilityLabel}
+      testID={testID ?? 'kb-screen'}
+    >
       <StatusBar
         barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.background}
@@ -402,9 +472,17 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
 
       {currentScreen !== 'detail' && renderHeader()}
 
-      {currentScreen === 'categories' && renderCategories()}
-      {currentScreen === 'articles' && renderArticles()}
-      {currentScreen === 'detail' && renderDetail()}
+      {error
+        ? renderError()
+        : loading
+        ? renderLoading()
+        : (
+          <>
+            {currentScreen === 'categories' && renderCategories()}
+            {currentScreen === 'articles' && renderArticles()}
+            {currentScreen === 'detail' && renderDetail()}
+          </>
+        )}
     </SafeAreaView>
   );
 };
@@ -696,6 +774,18 @@ const createStyles = (theme: ConferBotTheme) =>
       fontSize: theme.typography.fontSize.md,
       color: theme.colors.textSecondary,
       textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.borderRadius.button,
+      backgroundColor: theme.colors.primary,
+    },
+    retryButtonText: {
+      color: theme.colors.textInverse,
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
     },
   });
 

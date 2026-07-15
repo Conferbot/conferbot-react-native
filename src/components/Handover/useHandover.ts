@@ -135,81 +135,73 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
     });
   }, [onStageChange]);
 
-  // Setup socket listeners
+  // Setup socket listeners.
+  // The embed-server emits kebab-case events scoped to the chat room
+  // (agent-accepted, agent-message, agent-typing-status, chat-ended,
+  // no-agents-available), matching the web widget. These are bridged to the
+  // handover stage callbacks below. Events are room-scoped server-side, but we
+  // still filter defensively when a session ID is present in the payload.
   useEffect(() => {
     if (!socketClient) return;
 
-    const handleQueued = (data: any) => {
-      if (data.sessionId !== sessionId) return;
-      conversationIdRef.current = data.conversationId;
-      setState((prev) => ({
-        ...prev,
-        stage: 'waiting',
-        queueInfo: data.queueInfo,
-        conversationId: data.conversationId,
-      }));
+    const isForThisSession = (data: any): boolean => {
+      const eventSession = data?.chatSessionId || data?.sessionId;
+      return !eventSession || eventSession === sessionId;
     };
 
-    const handleQueueUpdate = (data: any) => {
-      if (data.sessionId !== sessionId) return;
-      setState((prev) => ({
-        ...prev,
-        queueInfo: data.queueInfo,
-      }));
-    };
-
-    const handleAgentAssigned = (data: any) => {
-      if (data.sessionId !== sessionId) return;
-      setState((prev) => ({
-        ...prev,
-        stage: 'connecting',
-        agent: data.agent,
-      }));
-    };
-
-    const handleConnected = (data: any) => {
-      if (data.sessionId !== sessionId) return;
+    // agent-accepted: an agent (human or AI) joined the chat.
+    // Server payload: { agentDetails } (see embed-server ticketController /
+    // omnichannelAIHandler). Marks the handover as connected.
+    const handleAgentAccepted = (data: any) => {
+      if (!isForThisSession(data)) return;
       // Clear timeout on successful connection
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      conversationIdRef.current = data.conversationId;
+      if (data?.conversationId) {
+        conversationIdRef.current = data.conversationId;
+      }
       setState((prev) => ({
         ...prev,
         stage: 'connected',
-        agent: data.agent,
-        conversationId: data.conversationId,
+        agent: data?.agentDetails || data?.agent || prev.agent,
+        conversationId: data?.conversationId || prev.conversationId,
         connectedAt: new Date().toISOString(),
       }));
     };
 
+    // agent-typing-status: agent typing indicator
     const handleAgentTyping = (data: any) => {
-      if (data.sessionId !== sessionId) return;
+      if (!isForThisSession(data)) return;
       setState((prev) => ({
         ...prev,
-        isAgentTyping: data.isTyping,
+        isAgentTyping: data?.isTyping ?? data?.typingStatus ?? false,
       }));
     };
 
+    // agent-message: message from the connected agent.
+    // Server payload: { message, agentDetails, chatSessionId }
     const handleAgentMessage = (data: any) => {
-      if (data.sessionId !== sessionId) return;
-      onAgentMessage?.(data.message, state.agent);
+      if (!isForThisSession(data)) return;
+      onAgentMessage?.(data?.message, data?.agentDetails || state.agent);
     };
 
+    // chat-ended: the agent or server ended the conversation
     const handleEnded = (data: any) => {
-      if (data.sessionId !== sessionId) return;
+      if (!isForThisSession(data)) return;
       isActive.current = false;
       setState((prev) => ({
         ...prev,
-        stage: data.showSurvey ? 'post_chat' : 'ended',
-        surveyConfig: data.surveyConfig || prev.surveyConfig,
+        stage: data?.showSurvey || prev.surveyConfig?.enabled ? 'post_chat' : 'ended',
+        surveyConfig: data?.surveyConfig || prev.surveyConfig,
         endedAt: new Date().toISOString(),
       }));
     };
 
+    // no-agents-available: server could not find an agent
     const handleNoAgents = (data: any) => {
-      if (data.sessionId !== sessionId) return;
+      if (!isForThisSession(data)) return;
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -218,58 +210,26 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
       setState((prev) => ({
         ...prev,
         stage: 'no_agents',
-        noAgentsMessage: data.message || prev.noAgentsMessage,
+        noAgentsMessage: data?.message || prev.noAgentsMessage,
       }));
     };
 
-    const handleTimeout = (data: any) => {
-      if (data.sessionId !== sessionId) return;
-      isActive.current = false;
-      setState((prev) => ({
-        ...prev,
-        stage: 'timeout',
-        timeoutMessage: data.message || prev.timeoutMessage,
-      }));
-    };
-
-    const handleError = (data: any) => {
-      if (data.sessionId !== sessionId) return;
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      isActive.current = false;
-      setState((prev) => ({
-        ...prev,
-        stage: 'error',
-        errorMessage: data.error,
-      }));
-    };
-
-    // Register listeners
-    socketClient.on('handover:queued', handleQueued);
-    socketClient.on('handover:queue_update', handleQueueUpdate);
-    socketClient.on('handover:agent_assigned', handleAgentAssigned);
-    socketClient.on('handover:connected', handleConnected);
-    socketClient.on('handover:agent_typing', handleAgentTyping);
-    socketClient.on('handover:agent_message', handleAgentMessage);
-    socketClient.on('handover:ended', handleEnded);
-    socketClient.on('handover:no_agents', handleNoAgents);
-    socketClient.on('handover:timeout', handleTimeout);
-    socketClient.on('handover:error', handleError);
+    // Register listeners for the real server events (kebab-case, matching
+    // web widget / embed-server). Timeout is handled by the local timer in
+    // submitPreChat, matching the web widget's client-side maxWaitTimer.
+    socketClient.on('agent-accepted', handleAgentAccepted);
+    socketClient.on('agent-typing-status', handleAgentTyping);
+    socketClient.on('agent-message', handleAgentMessage);
+    socketClient.on('chat-ended', handleEnded);
+    socketClient.on('no-agents-available', handleNoAgents);
 
     // Cleanup
     return () => {
-      socketClient.off('handover:queued', handleQueued);
-      socketClient.off('handover:queue_update', handleQueueUpdate);
-      socketClient.off('handover:agent_assigned', handleAgentAssigned);
-      socketClient.off('handover:connected', handleConnected);
-      socketClient.off('handover:agent_typing', handleAgentTyping);
-      socketClient.off('handover:agent_message', handleAgentMessage);
-      socketClient.off('handover:ended', handleEnded);
-      socketClient.off('handover:no_agents', handleNoAgents);
-      socketClient.off('handover:timeout', handleTimeout);
-      socketClient.off('handover:error', handleError);
+      socketClient.off('agent-accepted', handleAgentAccepted);
+      socketClient.off('agent-typing-status', handleAgentTyping);
+      socketClient.off('agent-message', handleAgentMessage);
+      socketClient.off('chat-ended', handleEnded);
+      socketClient.off('no-agents-available', handleNoAgents);
     };
   }, [socketClient, sessionId, state.agent, onAgentMessage]);
 

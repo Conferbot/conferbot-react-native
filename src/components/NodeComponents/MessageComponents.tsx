@@ -32,6 +32,7 @@ const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.75;
 
 interface MessageBubbleProps extends NodeUIState.Message {
   isBot?: boolean;
+  testID?: string;
 }
 
 /**
@@ -46,6 +47,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   showAvatar = true,
   typing,
   isBot = true,
+  testID,
 }) => {
   const theme = useTheme();
 
@@ -71,6 +73,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       ]}
       accessibilityRole="text"
       accessibilityLabel={isBot ? `Bot message: ${text}` : `Your message: ${text}`}
+      testID={testID}
     >
       {showAvatar && isBot && (
         <View
@@ -142,7 +145,9 @@ const TypingDots: React.FC = () => {
 // IMAGE DISPLAY
 // ========================================
 
-interface ImageDisplayProps extends NodeUIState.Image {}
+interface ImageDisplayProps extends NodeUIState.Image {
+  testID?: string;
+}
 
 /**
  * ImageDisplay component
@@ -155,6 +160,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   url,
   alt,
   caption,
+  testID,
 }) => {
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
@@ -181,6 +187,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
       ]}
       accessibilityRole="image"
       accessibilityLabel={alt || caption || 'Image'}
+      testID={testID}
     >
       {loading && (
         <View style={styles.imageLoader}>
@@ -227,7 +234,9 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
 // VIDEO PLAYER
 // ========================================
 
-interface VideoPlayerProps extends NodeUIState.Video {}
+interface VideoPlayerProps extends NodeUIState.Video {
+  testID?: string;
+}
 
 /**
  * VideoPlayer component
@@ -240,6 +249,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   url,
   poster,
   autoplay = false,
+  testID,
 }) => {
   const theme = useTheme();
   const [isPlaying, setIsPlaying] = useState(autoplay);
@@ -264,6 +274,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ]}
       accessibilityRole="button"
       accessibilityLabel="Video player. Tap to play"
+      testID={testID}
     >
       {poster ? (
         <Image
@@ -303,7 +314,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 // AUDIO PLAYER
 // ========================================
 
-interface AudioPlayerProps extends NodeUIState.Audio {}
+interface AudioPlayerProps extends NodeUIState.Audio {
+  testID?: string;
+}
 
 /**
  * AudioPlayer component
@@ -315,6 +328,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   nodeId,
   url,
   autoplay = false,
+  testID,
 }) => {
   const theme = useTheme();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -338,6 +352,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       ]}
       accessibilityRole="button"
       accessibilityLabel={`Audio player. ${isPlaying ? 'Playing' : 'Paused'}`}
+      testID={testID}
     >
       <TouchableOpacity
         style={[
@@ -389,7 +404,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 // FILE DOWNLOAD
 // ========================================
 
-interface FileDownloadProps extends NodeUIState.File {}
+interface FileDownloadProps extends NodeUIState.File {
+  testID?: string;
+}
 
 /**
  * FileDownload component
@@ -402,6 +419,7 @@ export const FileDownload: React.FC<FileDownloadProps> = ({
   filename,
   size,
   mimeType,
+  testID,
 }) => {
   const theme = useTheme();
   const [downloading, setDownloading] = useState(false);
@@ -449,6 +467,7 @@ export const FileDownload: React.FC<FileDownloadProps> = ({
       disabled={downloading}
       accessibilityRole="button"
       accessibilityLabel={`Download file: ${filename}`}
+      testID={testID}
     >
       <View style={[styles.fileIcon, { backgroundColor: theme.colors.primaryLight }]}>
         <Text style={styles.fileIconText}>{getFileIcon(mimeType)}</Text>
@@ -495,7 +514,9 @@ export const FileDownload: React.FC<FileDownloadProps> = ({
 // HTML VIEW
 // ========================================
 
-interface HTMLViewProps extends NodeUIState.HTML {}
+interface HTMLViewProps extends NodeUIState.HTML {
+  testID?: string;
+}
 
 /**
  * HTMLView component
@@ -503,7 +524,7 @@ interface HTMLViewProps extends NodeUIState.HTML {}
  * Renders HTML content. For full HTML support, integrate with
  * react-native-render-html or react-native-webview.
  */
-export const HTMLView: React.FC<HTMLViewProps> = ({ nodeId, content }) => {
+export const HTMLView: React.FC<HTMLViewProps> = ({ nodeId, content, testID }) => {
   const theme = useTheme();
 
   // Simple HTML stripping for basic display
@@ -532,6 +553,7 @@ export const HTMLView: React.FC<HTMLViewProps> = ({ nodeId, content }) => {
       ]}
       accessibilityRole="text"
       accessibilityLabel="HTML content"
+      testID={testID}
     >
       <ScrollView
         style={styles.htmlScroll}

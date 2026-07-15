@@ -27,10 +27,21 @@ export interface ArticleDetailProps {
   relatedArticles?: KBArticle[];
   onBack: () => void;
   onArticlePress?: (article: KBArticle) => void;
-  onRate: (articleId: string, helpful: boolean) => Promise<boolean>;
+  /** Alias of onArticlePress */
+  onRelatedArticlePress?: (article: KBArticle) => void;
+  onRate?: (articleId: string, helpful: boolean) => Promise<boolean>;
+  onRatingSubmit?: (articleId: string, helpful: boolean) => void;
+  onShare?: (article: KBArticle) => void;
   onTrackView?: (article: KBArticle) => void;
   onTrackEngagement?: (articleId: string, timeSpent: number, scrollDepth: number) => void;
   hasRated?: boolean;
+  showTags?: boolean;
+  showLastUpdated?: boolean;
+  showBackButton?: boolean;
+  backButtonText?: string;
+  ratingEnabled?: boolean;
+  shareEnabled?: boolean;
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -38,16 +49,35 @@ export interface ArticleDetailProps {
  * Full article detail view with content rendering and analytics
  */
 export const ArticleDetail: React.FC<ArticleDetailProps> = ({
-  article,
+  article: articleProp,
   relatedArticles = [],
   onBack,
   onArticlePress,
+  onRelatedArticlePress,
   onRate,
+  onRatingSubmit,
   onTrackView,
   onTrackEngagement,
   hasRated = false,
+  showTags = false,
+  showLastUpdated = true,
+  showBackButton = true,
+  backButtonText,
+  ratingEnabled = true,
+  accessibilityLabel,
   testID,
 }) => {
+  // Guard against undefined article (e.g. while loading)
+  const article: KBArticle = articleProp ?? ({ title: '', content: '' } as KBArticle);
+  const handleRelatedPress = onRelatedArticlePress || onArticlePress;
+  const handleRate =
+    onRate ||
+    (onRatingSubmit
+      ? async (articleId: string, helpful: boolean) => {
+          onRatingSubmit(articleId, helpful);
+          return true;
+        }
+      : async () => true);
   const theme = useTheme();
   const styles = createStyles(theme);
   const { width: screenWidth } = useWindowDimensions();
@@ -124,8 +154,14 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
   });
 
   return (
-    <View style={styles.container} testID={testID}>
-      {/* Fixed Header */}
+    <View
+      style={styles.container}
+      accessible={accessibilityLabel !== undefined}
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+    >
+      {/* Fixed Header. The title lives in the body only, so it is not
+          duplicated for screen readers; the header holds navigation. */}
       <Animated.View
         style={[
           styles.header,
@@ -141,21 +177,22 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
           ]}
         />
 
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={onBack}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessible={true}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          testID={`${testID}-back`}
-        >
-          <ChevronLeftIcon color={theme.colors.text} />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {article.title}
-        </Text>
+        {showBackButton && (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={onBack}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessible={true}
+            accessibilityLabel={backButtonText || 'Go back'}
+            accessibilityRole="button"
+            testID={`${testID}-back`}
+          >
+            <ChevronLeftIcon color={theme.colors.text} />
+            {backButtonText ? (
+              <Text style={styles.backButtonText}>{backButtonText}</Text>
+            ) : null}
+          </TouchableOpacity>
+        )}
 
         <View style={styles.headerSpacer} />
       </Animated.View>
@@ -196,9 +233,24 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
           <View style={styles.metaRow}>
             <ClockIcon color={theme.colors.textSecondary} />
             <Text style={styles.metaText}>{readingTime}</Text>
-            <Text style={styles.metaDot}>.</Text>
-            <Text style={styles.metaText}>Updated {lastUpdated}</Text>
+            {showLastUpdated && lastUpdated ? (
+              <>
+                <Text style={styles.metaDot}>.</Text>
+                <Text style={styles.metaText}>Updated {lastUpdated}</Text>
+              </>
+            ) : null}
           </View>
+
+          {/* Tags */}
+          {showTags && Array.isArray(article.tags) && article.tags.length > 0 && (
+            <View style={styles.tagsRow}>
+              {article.tags.map((tag: string) => (
+                <View key={tag} style={styles.tagChip}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Cover Image */}
           {article.coverImage && (
@@ -237,12 +289,14 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
           <View style={styles.contentContainer}>{renderedContent}</View>
 
           {/* Rating Section */}
-          <ArticleRating
-            articleId={article._id}
-            onRate={onRate}
-            hasRated={hasRated}
-            testID={`${testID}-rating`}
-          />
+          {ratingEnabled && (
+            <ArticleRating
+              articleId={article._id ?? article.id}
+              onRate={handleRate}
+              hasRated={hasRated}
+              testID={`${testID}-rating`}
+            />
+          )}
 
           {/* Related Articles */}
           {relatedArticles.length > 0 && (
@@ -250,12 +304,12 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
               <Text style={styles.relatedTitle}>Related Articles</Text>
               {relatedArticles.map((relatedArticle, index) => (
                 <ArticleCard
-                  key={relatedArticle._id}
+                  key={relatedArticle._id ?? relatedArticle.id}
                   article={relatedArticle}
-                  onPress={onArticlePress || (() => {})}
+                  onPress={handleRelatedPress || (() => {})}
                   variant="horizontal"
                   animationDelay={index * 100}
-                  testID={`${testID}-related-${relatedArticle._id}`}
+                  testID={`${testID}-related-${relatedArticle._id ?? relatedArticle.id}`}
                 />
               ))}
             </View>
@@ -608,11 +662,36 @@ const createStyles = (theme: ConferBotTheme) =>
       borderBottomColor: theme.colors.border,
     },
     backButton: {
-      width: 40,
+      minWidth: 40,
       height: 40,
+      flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
       marginLeft: -theme.spacing.sm,
+    },
+    backButtonText: {
+      fontSize: theme.typography.fontSize.md,
+      color: theme.colors.primary,
+      marginLeft: theme.spacing.xs,
+    },
+    tagsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.xs,
+      marginBottom: theme.spacing.lg,
+    },
+    tagChip: {
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: theme.spacing.xs / 2,
+      backgroundColor: theme.colors.primary + '15',
+      borderRadius: theme.borderRadius.sm,
+      marginRight: theme.spacing.xs,
+      marginBottom: theme.spacing.xs,
+    },
+    tagText: {
+      fontSize: theme.typography.fontSize.xs,
+      color: theme.colors.primary,
+      fontWeight: theme.typography.fontWeight.medium,
     },
     headerTitle: {
       flex: 1,

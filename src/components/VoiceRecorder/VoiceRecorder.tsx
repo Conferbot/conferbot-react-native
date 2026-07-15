@@ -63,6 +63,10 @@ export interface VoiceRecorderProps {
   onExpand?: () => void;
   /** Callback when recorder collapses to compact mode */
   onCollapse?: () => void;
+  /** Idle-state instruction text (default: 'Tap microphone to record') */
+  recordButtonText?: string;
+  /** Accessibility label for the recorder container */
+  accessibilityLabel?: string;
   /** Test ID for testing */
   testID?: string;
 }
@@ -254,6 +258,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   compact = false,
   onExpand,
   onCollapse,
+  recordButtonText = 'Tap microphone to record',
+  accessibilityLabel,
   testID,
 }) => {
   const theme = useTheme();
@@ -535,7 +541,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         onPress={handleMainButtonPress}
         disabled={disabled || !!error}
         accessibilityRole="button"
-        accessibilityLabel="Record voice message"
+        accessibilityLabel={accessibilityLabel || 'Record voice message'}
         testID={testID}
       >
         <View style={styles.micIconContainer}>
@@ -554,6 +560,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         stylesWithTheme.container,
         disabled && stylesWithTheme.disabledContainer,
       ]}
+      accessibilityLabel={accessibilityLabel}
       testID={testID}
     >
       {/* Error message */}
@@ -579,7 +586,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         <View style={stylesWithTheme.centerContent}>
           {state === 'idle' ? (
             <Text style={stylesWithTheme.instructionText}>
-              Tap microphone to record
+              {recordButtonText}
             </Text>
           ) : (
             <>

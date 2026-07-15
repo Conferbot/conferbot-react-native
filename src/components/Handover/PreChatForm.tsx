@@ -296,9 +296,24 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
   onSubmit,
   onCancel,
   isSubmitting = false,
+  title,
+  description,
+  submitButtonText,
+  cancelButtonText = 'Cancel',
+  accessibilityLabel,
+  testID,
 }) => {
   const theme = useTheme();
-  const [formData, setFormData] = useState<PreChatFormData>({});
+  const [formData, setFormData] = useState<PreChatFormData>(() => {
+    // Seed form data with any configured default values
+    const initial: PreChatFormData = {};
+    for (const field of config.fields) {
+      if (field.defaultValue) {
+        initial[field.id] = field.defaultValue;
+      }
+    }
+    return initial;
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [selectedDepartment, setSelectedDepartment] = useState<string | undefined>();
@@ -422,7 +437,12 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
     if (isSubmitting) return;
 
     if (validateForm()) {
-      onSubmit(formData, selectedDepartment);
+      // Only pass the department argument when one was actually selected
+      if (selectedDepartment !== undefined) {
+        onSubmit(formData, selectedDepartment);
+      } else {
+        onSubmit(formData);
+      }
     }
   }, [formData, selectedDepartment, isSubmitting, validateForm, onSubmit]);
 
@@ -506,6 +526,8 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
           },
           theme.shadows.md,
         ]}
+        accessibilityLabel={accessibilityLabel}
+        testID={testID}
       >
         <ScrollView
           style={styles.scrollView}
@@ -521,16 +543,16 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
                 { color: theme.colors.text, fontSize: theme.typography.fontSize.xl },
               ]}
             >
-              {config.title || 'Before we connect you'}
+              {title || config.title || 'Before we connect you'}
             </Text>
-            {config.subtitle && (
+            {(description || config.subtitle) && (
               <Text
                 style={[
                   styles.subtitle,
                   { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
                 ]}
               >
-                {config.subtitle}
+                {description || config.subtitle}
               </Text>
             )}
           </View>
@@ -564,7 +586,7 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
               onPress={handleSubmit}
               disabled={isSubmitting}
               accessibilityRole="button"
-              accessibilityLabel={config.submitButtonText || 'Start Chat'}
+              accessibilityLabel={submitButtonText || config.submitButtonText || 'Start Chat'}
               accessibilityState={{ disabled: isSubmitting }}
             >
               {isSubmitting ? (
@@ -576,7 +598,7 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
                     { color: theme.colors.textInverse, fontSize: theme.typography.fontSize.md },
                   ]}
                 >
-                  {config.submitButtonText || 'Start Chat'}
+                  {submitButtonText || config.submitButtonText || 'Start Chat'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -587,7 +609,7 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
                 onPress={onCancel}
                 disabled={isSubmitting}
                 accessibilityRole="button"
-                accessibilityLabel="Cancel"
+                accessibilityLabel={cancelButtonText}
               >
                 <Text
                   style={[
@@ -595,7 +617,7 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
                     { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
                   ]}
                 >
-                  Cancel
+                  {cancelButtonText}
                 </Text>
               </TouchableOpacity>
             )}

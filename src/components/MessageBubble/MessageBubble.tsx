@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useContext, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Linking,
 } from 'react-native';
 import { useTheme } from '../../theme';
-import { useConferBot } from '../../context/ConferBotContext';
+import ConferBotContext from '../../context/ConferBotContext';
 import { Avatar } from '../Avatar';
 import { MessageReactions } from '../MessageReactions';
 import { ReactionPicker } from '../ReactionPicker';
@@ -115,7 +115,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   showReadReceipt = true,
 }) => {
   const theme = useTheme();
-  const { botAvatarUrl, botName } = useConferBot();
+  // Presentational component: the provider is optional so the bubble can be
+  // rendered standalone (e.g. previews, tests). Falls back to defaults.
+  const conferBot = useContext(ConferBotContext);
+  const botAvatarUrl = conferBot?.botAvatarUrl ?? null;
+  const botName = conferBot?.botName ?? null;
   const styles = createStyles(theme);
 
   // State for reaction picker
@@ -229,8 +233,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const handleLongPress = useCallback(
     (event: GestureResponderEvent) => {
       if (enableReactions && onReactionPress && !isSystem) {
-        // Get press position for anchor
-        const { pageX, pageY } = event.nativeEvent;
+        // Get press position for anchor (nativeEvent may be absent in tests)
+        const { pageX, pageY } = event?.nativeEvent ?? { pageX: 0, pageY: 0 };
         setPickerAnchor({ x: pageX, y: pageY });
         setShowReactionPicker(true);
       }
@@ -418,7 +422,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 
   // Wrap in TouchableOpacity if press handlers exist or reactions are enabled
-  if (onPress || canReact) {
+  if (onPress || onLongPress || canReact) {
     return (
       <>
         <TouchableOpacity

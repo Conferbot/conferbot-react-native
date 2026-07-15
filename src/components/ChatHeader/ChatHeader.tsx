@@ -40,8 +40,10 @@ export interface ChatHeaderProps {
   showConnectionStatus?: boolean;
   onClose?: () => void;
   onAvatarPress?: () => void;
+  onTitlePress?: () => void;
   closeIcon?: React.ReactNode;
   rightActions?: React.ReactNode;
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -70,8 +72,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   showConnectionStatus = true,
   onClose,
   onAvatarPress,
+  onTitlePress,
   closeIcon,
   rightActions,
+  accessibilityLabel,
   testID,
 }) => {
   const theme = useTheme();
@@ -86,7 +90,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
     <View
       style={styles.container}
       accessible={true}
-      accessibilityLabel={`Chat header. ${displayTitle}${displaySubtitle ? `. ${displaySubtitle}` : ''}`}
+      accessibilityLabel={
+        accessibilityLabel ||
+        `Chat header. ${displayTitle}${displaySubtitle ? `. ${displaySubtitle}` : ''}`
+      }
       testID={testID}
     >
       {/* Avatar — always shown (bot avatar or agent avatar) */}
@@ -112,6 +119,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           numberOfLines={1}
           accessible={true}
           accessibilityRole="header"
+          onPress={onTitlePress}
         >
           {displayTitle}
         </Text>

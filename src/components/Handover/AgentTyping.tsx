@@ -179,14 +179,29 @@ const AgentAvatar: React.FC<AvatarProps> = ({
 export const AgentTyping: React.FC<AgentTypingProps> = ({
   agent,
   visible = true,
+  show,
+  typingMessage,
+  compact = false,
+  hideAgentInfo = false,
+  animated = true,
+  accessibilityLabel,
+  testID,
 }) => {
   const theme = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateYAnim = useRef(new Animated.Value(10)).current;
 
+  // `show` is an alias for `visible`; it wins when explicitly provided
+  const isVisible = show !== undefined ? show : visible;
+
   // Animate in/out
   useEffect(() => {
-    if (visible) {
+    if (!animated) {
+      fadeAnim.setValue(isVisible ? 1 : 0);
+      translateYAnim.setValue(isVisible ? 0 : 10);
+      return;
+    }
+    if (isVisible) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -213,11 +228,21 @@ export const AgentTyping: React.FC<AgentTypingProps> = ({
         }),
       ]).start();
     }
-  }, [visible, fadeAnim, translateYAnim]);
+  }, [isVisible, animated, fadeAnim, translateYAnim]);
 
-  if (!visible) {
+  if (!isVisible) {
     return null;
   }
+
+  // Resolve the typing message: custom message supports a {name} placeholder,
+  // default is "<agent name> is typing...". Empty string hides the text.
+  const agentName = agent?.name || 'Agent';
+  const resolvedMessage =
+    typingMessage !== undefined
+      ? typingMessage.replace(/\{name\}/g, agentName)
+      : `${agentName} is typing...`;
+
+  const avatarSize = compact ? 24 : 32;
 
   return (
     <Animated.View
@@ -229,12 +254,15 @@ export const AgentTyping: React.FC<AgentTypingProps> = ({
         },
       ]}
       accessibilityRole="status"
-      accessibilityLabel={agent?.name ? `${agent.name} is typing` : 'Agent is typing'}
+      accessibilityLabel={
+        accessibilityLabel || (agent?.name ? `${agent.name} is typing` : 'Agent is typing')
+      }
       accessibilityLiveRegion="polite"
+      testID={testID}
     >
       <AgentAvatar
         agent={agent}
-        size={32}
+        size={avatarSize}
         backgroundColor={theme.colors.agentBubble}
         textColor={theme.colors.agentBubbleText}
       />
@@ -242,6 +270,7 @@ export const AgentTyping: React.FC<AgentTypingProps> = ({
       <View
         style={[
           styles.bubble,
+          compact && styles.bubbleCompact,
           {
             backgroundColor: theme.colors.agentBubble,
             borderRadius: theme.borderRadius.lg,
@@ -250,10 +279,10 @@ export const AgentTyping: React.FC<AgentTypingProps> = ({
           theme.shadows.sm,
         ]}
       >
-        <TypingDots color={theme.colors.agentBubbleText} />
+        <TypingDots color={theme.colors.agentBubbleText} size={compact ? 6 : 8} />
       </View>
 
-      {agent?.name && (
+      {!hideAgentInfo && resolvedMessage !== '' && (
         <Text
           style={[
             styles.agentName,
@@ -263,7 +292,7 @@ export const AgentTyping: React.FC<AgentTypingProps> = ({
             },
           ]}
         >
-          {agent.name} is typing...
+          {resolvedMessage}
         </Text>
       )}
     </Animated.View>
@@ -301,6 +330,12 @@ const styles = StyleSheet.create({
     minHeight: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  bubbleCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 48,
+    minHeight: 32,
   },
   dotsContainer: {
     flexDirection: 'row',

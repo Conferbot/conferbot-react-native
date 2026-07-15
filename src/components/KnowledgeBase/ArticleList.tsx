@@ -2,17 +2,18 @@
 /**
  * ArticleList Component
  *
- * Scrollable list of KB articles with category filtering
+ * Scrollable list of KB articles with category filtering.
+ * Uses ScrollView + map (KB lists are small and paginated server-side).
  */
 import React, { useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  ScrollView,
   StyleSheet,
   Animated,
+  ActivityIndicator,
   RefreshControl,
-  ListRenderItemInfo,
 } from 'react-native';
 import { useTheme } from '../../theme';
 import type { ConferBotTheme } from '../../theme/types';
@@ -20,31 +21,53 @@ import type { KBArticle, KBCategoryWithArticles } from './types';
 import { ArticleCard } from './ArticleCard';
 
 export interface ArticleListProps {
-  articles: KBArticle[];
+  articles?: KBArticle[];
   category?: KBCategoryWithArticles | null;
   onArticlePress: (article: KBArticle) => void;
   onRefresh?: () => void;
   refreshing?: boolean;
+  refreshable?: boolean;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
   emptyTitle?: string;
   emptyMessage?: string;
+  headerText?: string;
   showCategoryHeader?: boolean;
+  showExcerpt?: boolean;
+  showIcons?: boolean;
+  showTimestamp?: boolean;
+  showSeparator?: boolean;
+  compact?: boolean;
   ListHeaderComponent?: React.ReactElement;
+  accessibilityLabel?: string;
   testID?: string;
 }
 
 /**
- * Virtualized article list with pull-to-refresh and empty state
+ * Article list with pull-to-refresh, load-more and empty state
  */
 export const ArticleList: React.FC<ArticleListProps> = ({
-  articles,
+  articles = [],
   category,
   onArticlePress,
   onRefresh,
   refreshing = false,
-  emptyTitle = 'No articles found',
+  refreshable = false,
+  onLoadMore,
+  hasMore = true,
+  loadingMore = false,
+  emptyTitle = 'No articles yet',
   emptyMessage = 'There are no articles in this category yet.',
+  headerText,
   showCategoryHeader = true,
+  showExcerpt = true,
+  showIcons = true,
+  showTimestamp = false,
+  showSeparator = false,
+  compact = false,
   ListHeaderComponent,
+  accessibilityLabel,
   testID,
 }) => {
   const theme = useTheme();
@@ -53,31 +76,69 @@ export const ArticleList: React.FC<ArticleListProps> = ({
   // Animation for scroll fade
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Render individual article
-  const renderArticle = useCallback(
-    ({ item, index }: ListRenderItemInfo<KBArticle>) => (
-      <ArticleCard
-        article={item}
-        onPress={onArticlePress}
-        animationDelay={index * 50}
-        testID={`${testID}-article-${item._id}`}
-      />
-    ),
-    [onArticlePress, testID]
+  const articleId = (item: any): string => item?._id ?? item?.id;
+
+  // Load-more guard
+  const handleEndReached = useCallback(() => {
+    if (hasMore && onLoadMore) {
+      onLoadMore();
+    }
+  }, [hasMore, onLoadMore]);
+
+  // Trigger load-more when scrolled near the bottom
+  const handleScroll = useCallback(
+    (event: any) => {
+      scrollY.setValue(event?.nativeEvent?.contentOffset?.y ?? 0);
+      const { layoutMeasurement, contentOffset, contentSize } = event?.nativeEvent || {};
+      if (
+        layoutMeasurement &&
+        contentOffset &&
+        contentSize &&
+        layoutMeasurement.height + contentOffset.y >= contentSize.height - 40
+      ) {
+        handleEndReached();
+      }
+    },
+    [handleEndReached, scrollY]
   );
 
-  // Key extractor
-  const keyExtractor = useCallback((item: KBArticle) => item._id, []);
+  const isEmpty = articles.length === 0;
 
-  // Header component
-  const renderHeader = () => (
-    <View>
+  return (
+    <ScrollView
+      contentContainerStyle={[styles.listContent, isEmpty && styles.emptyListContent]}
+      refreshControl={
+        onRefresh || refreshable ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
+        ) : undefined
+      }
+      onScroll={handleScroll}
+      // Exposed as direct props so callers (and tests) can trigger them
+      onEndReached={handleEndReached}
+      onRefresh={onRefresh}
+      scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
+      accessible={true}
+      accessibilityLabel={
+        accessibilityLabel ||
+        (category ? `Articles in ${category.name} category` : 'Article list')
+      }
+      testID={testID}
+    >
       {ListHeaderComponent}
+
+      {/* Simple text header */}
+      {headerText ? <Text style={styles.headerText}>{headerText}</Text> : null}
 
       {/* Category Info Header */}
       {showCategoryHeader && category && (
         <View style={styles.categoryHeader}>
-          {category.icon && (
+          {showIcons && category.icon && (
             <Text style={styles.categoryIcon}>{category.icon}</Text>
           )}
           <View style={styles.categoryInfo}>
@@ -93,57 +154,43 @@ export const ArticleList: React.FC<ArticleListProps> = ({
           </View>
         </View>
       )}
-    </View>
-  );
 
-  // Empty state component
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <EmptyIcon color={theme.colors.textSecondary} />
-      <Text style={styles.emptyTitle}>{emptyTitle}</Text>
-      <Text style={styles.emptyMessage}>{emptyMessage}</Text>
-    </View>
-  );
-
-  // Item separator
-  const ItemSeparator = () => <View style={styles.separator} />;
-
-  return (
-    <Animated.FlatList
-      data={articles}
-      renderItem={renderArticle}
-      keyExtractor={keyExtractor}
-      contentContainerStyle={[
-        styles.listContent,
-        articles.length === 0 && styles.emptyListContent,
-      ]}
-      ListHeaderComponent={renderHeader}
-      ListEmptyComponent={renderEmpty}
-      ItemSeparatorComponent={ItemSeparator}
-      refreshControl={
-        onRefresh ? (
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.colors.primary}
-            colors={[theme.colors.primary]}
+      {/* Articles */}
+      {articles.map((item, index) => (
+        <View key={articleId(item) ?? index}>
+          <ArticleCard
+            article={{
+              ...item,
+              description: showExcerpt ? item.description ?? item.excerpt : undefined,
+              updatedAt: showTimestamp ? item.updatedAt : undefined,
+            }}
+            variant={compact ? 'compact' : 'default'}
+            onPress={() => onArticlePress(item)}
+            animationDelay={index * 50}
+            testID={`${testID}-article-${articleId(item)}`}
           />
-        ) : undefined
-      }
-      onScroll={Animated.event(
-        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-        { useNativeDriver: true }
+          {showSeparator && index < articles.length - 1 && (
+            <View style={styles.separator} />
+          )}
+        </View>
+      ))}
+
+      {/* Empty state */}
+      {isEmpty && (
+        <View style={styles.emptyContainer}>
+          <EmptyIcon color={theme.colors.textSecondary} />
+          <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+          <Text style={styles.emptyMessage}>{emptyMessage}</Text>
+        </View>
       )}
-      scrollEventThrottle={16}
-      showsVerticalScrollIndicator={false}
-      accessible={true}
-      accessibilityLabel={
-        category
-          ? `Articles in ${category.name} category`
-          : 'Article list'
-      }
-      testID={testID}
-    />
+
+      {/* Load-more indicator */}
+      {loadingMore && (
+        <View style={styles.loadingMore} testID={testID ? `${testID}-loading-more` : undefined}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        </View>
+      )}
+    </ScrollView>
   );
 };
 
@@ -199,6 +246,12 @@ const createStyles = (theme: ConferBotTheme) =>
     emptyListContent: {
       flexGrow: 1,
     },
+    headerText: {
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text,
+      marginBottom: theme.spacing.md,
+    },
     categoryHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -233,7 +286,9 @@ const createStyles = (theme: ConferBotTheme) =>
       fontWeight: theme.typography.fontWeight.medium,
     },
     separator: {
-      height: 0,
+      height: 1,
+      backgroundColor: theme.colors.borderLight,
+      marginVertical: theme.spacing.xs,
     },
     emptyContainer: {
       flex: 1,
@@ -255,6 +310,10 @@ const createStyles = (theme: ConferBotTheme) =>
       color: theme.colors.textSecondary,
       textAlign: 'center',
       lineHeight: 22,
+    },
+    loadingMore: {
+      paddingVertical: theme.spacing.md,
+      alignItems: 'center',
     },
   });
 

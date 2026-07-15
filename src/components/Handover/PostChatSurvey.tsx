@@ -290,9 +290,14 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, theme }) => {
 export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
   config,
   agent,
+  agentName,
   onSubmit,
   onSkip,
   isSubmitting = false,
+  submitButtonText,
+  skipButtonText,
+  accessibilityLabel,
+  testID,
 }) => {
   const theme = useTheme();
   const [rating, setRating] = useState<number | undefined>();
@@ -318,20 +323,27 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
     ]).start();
   }, [fadeAnim, scaleAnim]);
 
+  // Rating is only mandatory when the config marks it required
+  const ratingEnabled = config.ratingEnabled !== false;
+  const ratingMissing = ratingEnabled && config.ratingRequired === true && rating === undefined;
+
   // Handle submit
   const handleSubmit = useCallback(() => {
-    if (isSubmitting || rating === undefined) return;
+    if (isSubmitting || ratingMissing) return;
 
+    const trimmedFeedback = feedback.trim() || undefined;
     const response: SurveyResponse = {
       rating,
-      feedback: feedback.trim() || undefined,
+      feedback: trimmedFeedback,
+      // comment mirrors feedback for consumers using that naming
+      comment: trimmedFeedback,
       agentId: agent?.id,
       timestamp: new Date().toISOString(),
     };
 
     setSubmitted(true);
-    onSubmit(response);
-  }, [rating, feedback, agent, isSubmitting, onSubmit]);
+    onSubmit?.(response);
+  }, [rating, ratingMissing, feedback, agent, isSubmitting, onSubmit]);
 
   // Render rating based on style
   const renderRating = useCallback(() => {
@@ -419,7 +431,8 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
         theme.shadows.md,
       ]}
       accessibilityRole="form"
-      accessibilityLabel="Post-chat survey"
+      accessibilityLabel={accessibilityLabel || 'Post-chat survey'}
+      testID={testID}
     >
       {/* Title */}
       <Text
@@ -433,22 +446,34 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
 
       {/* Agent Card */}
       {agent && <AgentCard agent={agent} theme={theme} />}
+      {!agent && agentName && (
+        <Text
+          style={[
+            styles.question,
+            { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
+          ]}
+        >
+          You chatted with {agentName}
+        </Text>
+      )}
 
-      {/* Rating Question */}
-      <Text
-        style={[
-          styles.question,
-          { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
-        ]}
-      >
-        {config.ratingQuestion || 'Please rate your conversation'}
-      </Text>
-
-      {/* Rating Component */}
-      {renderRating()}
+      {/* Rating Question + Component */}
+      {ratingEnabled && (
+        <>
+          <Text
+            style={[
+              styles.question,
+              { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
+            ]}
+          >
+            {config.ratingQuestion || 'Please rate your conversation'}
+          </Text>
+          {renderRating()}
+        </>
+      )}
 
       {/* Feedback Text */}
-      {config.feedbackQuestion !== undefined && (
+      {(config.commentEnabled === true || config.feedbackQuestion !== undefined) && (
         <View style={styles.feedbackContainer}>
           <Text
             style={[
@@ -471,7 +496,11 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
             ]}
             value={feedback}
             onChangeText={setFeedback}
-            placeholder={config.feedbackPlaceholder || 'Tell us more about your experience...'}
+            placeholder={
+              config.commentPlaceholder ||
+              config.feedbackPlaceholder ||
+              'Tell us more about your experience...'
+            }
             placeholderTextColor={theme.colors.textDisabled}
             multiline
             numberOfLines={3}
@@ -487,16 +516,16 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
           style={[
             styles.submitButton,
             {
-              backgroundColor: rating !== undefined ? theme.colors.primary : theme.colors.border,
+              backgroundColor: !ratingMissing ? theme.colors.primary : theme.colors.border,
               borderRadius: theme.borderRadius.md,
               opacity: isSubmitting ? 0.7 : 1,
             },
           ]}
           onPress={handleSubmit}
-          disabled={rating === undefined || isSubmitting}
+          disabled={ratingMissing || isSubmitting}
           accessibilityRole="button"
-          accessibilityLabel={config.submitButtonText || 'Submit feedback'}
-          accessibilityState={{ disabled: rating === undefined || isSubmitting }}
+          accessibilityLabel={submitButtonText || config.submitButtonText || 'Submit survey'}
+          accessibilityState={{ disabled: ratingMissing || isSubmitting }}
         >
           {isSubmitting ? (
             <ActivityIndicator size="small" color={theme.colors.textInverse} />
@@ -505,23 +534,23 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
               style={[
                 styles.submitButtonText,
                 {
-                  color: rating !== undefined ? theme.colors.textInverse : theme.colors.textDisabled,
+                  color: !ratingMissing ? theme.colors.textInverse : theme.colors.textDisabled,
                   fontSize: theme.typography.fontSize.md,
                 },
               ]}
             >
-              {config.submitButtonText || 'Submit'}
+              {submitButtonText || config.submitButtonText || 'Submit'}
             </Text>
           )}
         </TouchableOpacity>
 
-        {onSkip && (
+        {onSkip && config.skipEnabled !== false && (
           <TouchableOpacity
             style={styles.skipButton}
             onPress={onSkip}
             disabled={isSubmitting}
             accessibilityRole="button"
-            accessibilityLabel={config.skipButtonText || 'Skip survey'}
+            accessibilityLabel={skipButtonText || config.skipButtonText || 'Skip survey'}
           >
             <Text
               style={[
@@ -529,7 +558,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
                 { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
               ]}
             >
-              {config.skipButtonText || 'Skip'}
+              {skipButtonText || config.skipButtonText || 'Skip'}
             </Text>
           </TouchableOpacity>
         )}

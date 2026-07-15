@@ -72,6 +72,10 @@ export interface HandoverViewProps {
   /** Loading states */
   isPreChatSubmitting?: boolean;
   isSurveySubmitting?: boolean;
+
+  /** Accessibility */
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
 // ========================================
@@ -140,6 +144,8 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
   onContinue,
   isPreChatSubmitting = false,
   isSurveySubmitting = false,
+  accessibilityLabel,
+  testID = 'handover-view',
 }) => {
   // Memoize configs to prevent unnecessary re-renders
   const effectivePreChatConfig = useMemo(
@@ -155,7 +161,12 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
   // Handler for pre-chat form submission
   const handlePreChatSubmit = useCallback(
     (data: PreChatFormData, department?: string) => {
-      onPreChatSubmit?.(data, department);
+      // Forward the department argument only when one was selected
+      if (department !== undefined) {
+        onPreChatSubmit?.(data, department);
+      } else {
+        onPreChatSubmit?.(data);
+      }
     },
     [onPreChatSubmit]
   );
@@ -247,6 +258,7 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
             errorType="no_agents"
             message={noAgentsMessage}
             onRetry={onRetry}
+            onCancel={onCancel}
             onContinue={onContinue}
           />
         );
@@ -257,6 +269,7 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
             errorType="timeout"
             message={timeoutMessage}
             onRetry={onRetry}
+            onCancel={onCancel}
             onContinue={onContinue}
           />
         );
@@ -267,6 +280,7 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
             errorType="error"
             message={errorMessage}
             onRetry={onRetry}
+            onCancel={onCancel}
             onContinue={onContinue}
           />
         );
@@ -279,7 +293,8 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
   return (
     <View
       style={styles.container}
-      accessibilityLabel={`Handover view - ${stage}`}
+      accessibilityLabel={accessibilityLabel || `Handover view - ${stage}`}
+      testID={testID}
     >
       {renderContent()}
     </View>

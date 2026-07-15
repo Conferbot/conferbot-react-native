@@ -40,6 +40,7 @@ interface ValidationResult {
 
 interface TextInputComponentProps extends NodeUIState.TextInput {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 interface TextInputFieldProps {
@@ -52,6 +53,7 @@ interface TextInputFieldProps {
   disabled?: boolean;
   autoFocus?: boolean;
   onSubmit?: () => void;
+  testID?: string;
 }
 
 // ========================================
@@ -221,6 +223,7 @@ export const TextInputField: React.FC<TextInputFieldProps> = ({
   disabled = false,
   autoFocus = false,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [isFocused, setIsFocused] = useState(false);
@@ -323,6 +326,7 @@ export const TextInputField: React.FC<TextInputFieldProps> = ({
         }
         accessibilityLabel={placeholder}
         accessibilityHint={`Enter ${inputType}`}
+        testID={testID}
       />
       {displayError && (
         <Text
@@ -361,6 +365,7 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({
   validation,
   errorMessage,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [value, setValue] = useState('');
@@ -408,6 +413,7 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({
       ]}
       accessibilityRole="form"
       accessibilityLabel={`Question: ${question}`}
+      testID={testID}
     >
       <Text
         style={[

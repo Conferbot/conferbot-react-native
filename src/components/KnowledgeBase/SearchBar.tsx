@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  ActivityIndicator,
   Keyboard,
 } from 'react-native';
 import { useTheme } from '../../theme';
@@ -18,11 +19,23 @@ import type { ConferBotTheme } from '../../theme/types';
 
 export interface SearchBarProps {
   value?: string;
-  onSearch: (query: string) => void;
+  /** Initial (uncontrolled) input value */
+  initialValue?: string;
+  onSearch?: (query: string) => void;
   onClear?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  /** Called with the current query when the keyboard search action is used */
+  onSubmit?: (query: string) => void;
   placeholder?: string;
   debounceMs?: number;
   autoFocus?: boolean;
+  disabled?: boolean;
+  loading?: boolean;
+  showClearButton?: boolean;
+  /** Trim whitespace before calling onSubmit */
+  trimOnSubmit?: boolean;
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -30,26 +43,37 @@ export interface SearchBarProps {
  * SearchBar with debounced search and clear functionality
  */
 export const SearchBar: React.FC<SearchBarProps> = ({
-  value = '',
+  value,
+  initialValue = '',
   onSearch,
   onClear,
+  onFocus,
+  onBlur,
+  onSubmit,
   placeholder = 'Search for articles...',
   debounceMs = 300,
   autoFocus = false,
+  disabled = false,
+  loading = false,
+  showClearButton = true,
+  trimOnSubmit = false,
+  accessibilityLabel,
   testID,
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
 
-  const [query, setQuery] = useState(value);
+  const [query, setQuery] = useState(value ?? initialValue);
   const [isFocused, setIsFocused] = useState(false);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const focusAnimation = useRef(new Animated.Value(0)).current;
 
-  // Sync with external value
+  // Sync with external (controlled) value
   useEffect(() => {
-    setQuery(value);
+    if (value !== undefined) {
+      setQuery(value);
+    }
   }, [value]);
 
   // Animate focus state
@@ -64,6 +88,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   // Handle text change with debounce
   const handleTextChange = useCallback(
     (text: string) => {
+      if (disabled) return;
       setQuery(text);
 
       // Clear existing timer
@@ -71,18 +96,23 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         clearTimeout(debounceTimerRef.current);
       }
 
+      if (debounceMs <= 0) {
+        onSearch?.(text);
+        return;
+      }
+
       // Set new debounce timer
       debounceTimerRef.current = setTimeout(() => {
-        onSearch(text);
+        onSearch?.(text);
       }, debounceMs);
     },
-    [onSearch, debounceMs]
+    [onSearch, debounceMs, disabled]
   );
 
   // Handle clear
   const handleClear = useCallback(() => {
     setQuery('');
-    onSearch('');
+    onSearch?.('');
     onClear?.();
   }, [onSearch, onClear]);
 
@@ -91,9 +121,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    onSearch(query);
+    onSearch?.(query);
+    onSubmit?.(trimOnSubmit ? query.trim() : query);
     Keyboard.dismiss();
-  }, [onSearch, query]);
+  }, [onSearch, onSubmit, trimOnSubmit, query]);
 
   // Cleanup
   useEffect(() => {
@@ -113,6 +144,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <Animated.View
       style={[styles.container, { borderColor }]}
+      accessible={accessibilityLabel !== undefined}
+      accessibilityLabel={accessibilityLabel}
       testID={testID}
     >
       {/* Search Icon */}
@@ -127,22 +160,36 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         onChangeText={handleTextChange}
         placeholder={placeholder}
         placeholderTextColor={theme.colors.textSecondary}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
+        onFocus={() => {
+          setIsFocused(true);
+          onFocus?.();
+        }}
+        onBlur={() => {
+          setIsFocused(false);
+          onBlur?.();
+        }}
         onSubmitEditing={handleSubmit}
         returnKeyType="search"
         autoFocus={autoFocus}
+        editable={!disabled}
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="never"
         accessible={true}
-        accessibilityLabel="Search articles"
+        accessibilityLabel="Search input"
         accessibilityHint="Type to search knowledge base articles"
         testID={`${testID}-input`}
       />
 
+      {/* Loading Indicator */}
+      {loading && (
+        <View style={styles.iconContainer} testID={`${testID}-loading`}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        </View>
+      )}
+
       {/* Clear Button */}
-      {query.length > 0 && (
+      {showClearButton && query.length > 0 && (
         <TouchableOpacity
           style={styles.clearButton}
           onPress={handleClear}

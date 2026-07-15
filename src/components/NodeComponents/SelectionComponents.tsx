@@ -37,6 +37,7 @@ const CARD_WIDTH = SCREEN_WIDTH * 0.7;
 
 interface ButtonGroupProps extends NodeUIState.Buttons {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 /**
@@ -52,6 +53,7 @@ export const ButtonGroup: React.FC<ButtonGroupProps> = ({
   variableName,
   multiSelect = false,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -103,6 +105,7 @@ export const ButtonGroup: React.FC<ButtonGroupProps> = ({
       style={{ marginBottom: 8 }}
       accessibilityRole="radiogroup"
       accessibilityLabel={question}
+      testID={testID}
     >
       {/* Choice pills only — question is already in the message list as a bot message */}
       <View style={{
@@ -182,6 +185,7 @@ export const ButtonGroup: React.FC<ButtonGroupProps> = ({
 
 interface CardGridProps extends NodeUIState.Cards {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 /**
@@ -195,6 +199,7 @@ export const CardGrid: React.FC<CardGridProps> = ({
   cards,
   variableName,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -315,7 +320,7 @@ export const CardGrid: React.FC<CardGridProps> = ({
   );
 
   return (
-    <View style={styles.cardGridContainer}>
+    <View style={styles.cardGridContainer} testID={testID}>
       {question && (
         <Text
           style={[
@@ -341,6 +346,7 @@ export const CardGrid: React.FC<CardGridProps> = ({
 
 interface CarouselViewProps extends NodeUIState.Carousel {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 /**
@@ -353,6 +359,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
   cards,
   variableName,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -477,7 +484,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
   );
 
   return (
-    <View style={styles.carouselContainer}>
+    <View style={styles.carouselContainer} testID={testID}>
       <FlatList
         ref={flatListRef}
         data={cards}
@@ -501,6 +508,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
 
 interface PictureChoiceGridProps extends NodeUIState.PictureChoice {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 /**
@@ -517,6 +525,7 @@ export const PictureChoiceGrid: React.FC<PictureChoiceGridProps> = ({
   multiSelect = false,
   columns = 2,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -577,6 +586,7 @@ export const PictureChoiceGrid: React.FC<PictureChoiceGridProps> = ({
       ]}
       accessibilityRole="grid"
       accessibilityLabel={question}
+      testID={testID}
     >
       <Text
         style={[
@@ -709,6 +719,7 @@ export const PictureChoiceGrid: React.FC<PictureChoiceGridProps> = ({
 
 interface DropdownPickerProps extends NodeUIState.Dropdown {
   onSubmit: (response: any, portName?: string) => void;
+  testID?: string;
 }
 
 /**
@@ -726,6 +737,7 @@ export const DropdownPicker: React.FC<DropdownPickerProps> = ({
   searchable = false,
   multiSelect = false,
   onSubmit,
+  testID,
 }) => {
   const theme = useTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -797,6 +809,7 @@ export const DropdownPicker: React.FC<DropdownPickerProps> = ({
       ]}
       accessibilityRole="combobox"
       accessibilityLabel={question}
+      testID={testID}
     >
       <Text
         style={[

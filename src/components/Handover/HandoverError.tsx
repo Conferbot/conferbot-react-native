@@ -44,8 +44,16 @@ const defaultMessages: Record<HandoverErrorProps['errorType'], string> = {
 export const HandoverError: React.FC<HandoverErrorProps> = ({
   errorType,
   message,
+  errorMessage,
+  noAgentsMessage,
+  timeoutMessage,
   onRetry,
   onContinue,
+  onCancel,
+  retryButtonText = 'Try Again',
+  cancelButtonText = 'Go Back',
+  accessibilityLabel,
+  testID,
 }) => {
   const theme = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -85,11 +93,21 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
     ]).start();
   }, [fadeAnim, shakeAnim]);
 
-  const icon = errorIcons[errorType];
-  const displayMessage = message || defaultMessages[errorType];
+  // Tolerate an undefined errorType (falls back to the generic error state)
+  const resolvedType: HandoverErrorProps['errorType'] = errorType || 'error';
+  const icon = errorIcons[resolvedType];
+
+  // Per-type message props win over the generic message prop
+  const typeMessage =
+    resolvedType === 'no_agents'
+      ? noAgentsMessage
+      : resolvedType === 'timeout'
+        ? timeoutMessage
+        : errorMessage;
+  const displayMessage = typeMessage || message || defaultMessages[resolvedType];
 
   // Determine colors based on error type
-  const iconBackgroundColor = errorType === 'no_agents'
+  const iconBackgroundColor = resolvedType === 'no_agents'
     ? `${theme.colors.warning}20`
     : `${theme.colors.error}20`;
 
@@ -105,7 +123,8 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
         theme.shadows.md,
       ]}
       accessibilityRole="alert"
-      accessibilityLabel={`Error: ${displayMessage}`}
+      accessibilityLabel={accessibilityLabel || `Error: ${displayMessage}`}
+      testID={testID}
     >
       {/* Icon */}
       <Animated.View
@@ -127,9 +146,9 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
           { color: theme.colors.text, fontSize: theme.typography.fontSize.lg },
         ]}
       >
-        {errorType === 'no_agents' && 'No Agents Available'}
-        {errorType === 'timeout' && 'Connection Timeout'}
-        {errorType === 'error' && 'Connection Error'}
+        {resolvedType === 'no_agents' && 'No Agents Available'}
+        {resolvedType === 'timeout' && 'Connection Timeout'}
+        {resolvedType === 'error' && 'Connection Error'}
       </Text>
 
       {/* Message */}
@@ -163,7 +182,31 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
                 { color: theme.colors.textInverse, fontSize: theme.typography.fontSize.md },
               ]}
             >
-              Try Again
+              {retryButtonText}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {onCancel && (
+          <TouchableOpacity
+            style={[
+              styles.continueButton,
+              {
+                borderColor: theme.colors.border,
+                borderRadius: theme.borderRadius.md,
+              },
+            ]}
+            onPress={onCancel}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel and go back"
+          >
+            <Text
+              style={[
+                styles.continueButtonText,
+                { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
+              ]}
+            >
+              {cancelButtonText}
             </Text>
           </TouchableOpacity>
         )}
