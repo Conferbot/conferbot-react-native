@@ -497,6 +497,10 @@ export class QuizNodeHandler extends BaseNodeHandler {
 
     const selectedLabel = selectedOption?.label || selectedOption?.text || String(response);
 
+    // Add the selected answer to the transcript (matches web widget's
+    // _handleAddToTranscript("user", userMessage) on selection)
+    state.addUserMessage(selectedLabel, nodeId);
+
     // Store answer with correctness info
     const answerData = {
       selected: response,

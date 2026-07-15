@@ -817,6 +817,21 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
 
     const nodeId = this.getNodeId(node);
 
+    // Pre-chat form gate: when configured, collect visitor details BEFORE
+    // initiating the handover. handleResponse({ action: 'preChatSubmit' })
+    // re-invokes handle() once the form is completed.
+    const showPreChatForm = this.getBoolean(data, 'showPreChatForm', false);
+    const preChatCompleted = state.getVariable('_preChatFormCompleted') === true;
+    if (showPreChatForm && !preChatCompleted) {
+      return NodeResult.displayUI({
+        type: 'humanHandover',
+        nodeId,
+        stage: 'waiting',
+        showPreChatForm: true,
+        preChatFields: this.getArray(data, 'preChatFields'),
+      } as NodeUIState.HumanHandover);
+    }
+
     // Get handover message (matches web widget's nodeData.handoverMessage)
     const handoverMessage = this.getString(
       data,
@@ -847,17 +862,17 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
     // Ensure visitor socket is in the chat room before handover
     // (covers edge cases: restart, reconnect, or late room join)
     if (this.socketClient) {
-      this.socketClient.joinChatRoomVisitor(state.sessionId);
+      this.emitSocketEvent('join-chat-room-visitor', { chatSessionId: state.sessionId });
 
       // Send response-record BEFORE initiate-handover so the server
       // has the Response document when creating the ticket/notification
+      // (buildResponseData already includes botId/chatSessionId/record)
       const responseData = state.buildResponseData();
-      this.socketClient.sendResponseRecord(responseData);
-
+      this.emitSocketEvent('response-record', responseData);
     }
 
-    // Small delay to ensure response-record is processed before handover ticket creation
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // No artificial delay needed: socket.io preserves emit order on a single
+    // connection, so response-record is processed before initiate-handover.
 
     // Emit initiate-handover via socket (matches web widget's socket.emit("initiate-handover", ...))
     const maxWaitTime = this.getNumber(data, 'maxWaitTime', 2);
@@ -884,10 +899,16 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
     state.setVariable('_handoverInitiated', true);
     state.setVariable('_handoverStartTime', new Date().toISOString());
 
-    // Flow pauses here — agent-accepted/agent-message events are handled by
-    // ConferBotContext socket listeners (already wired up).
-    // The chat input stays active so the user can type messages to the agent.
-    return NodeResult.proceed(null, { flowComplete: true, completionStatus: 'handover' });
+    // Flow pauses on this node showing the waiting UI (matches the web
+    // widget's waiting/timer view). Agent events (agent-accepted,
+    // agent-message, no-agents-available) arrive via socket and are routed to
+    // handleResponse/handleStatusUpdate, which advances the stage or proceeds.
+    return NodeResult.displayUI({
+      type: 'humanHandover',
+      nodeId,
+      stage: 'waiting',
+      waitMessage: resolvedMessage,
+    } as NodeUIState.HumanHandover);
   }
 
   /**

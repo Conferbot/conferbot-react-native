@@ -949,8 +949,13 @@ export class SetVariableHandler extends BaseNodeHandler {
 
     // Handle string values that might be expressions
     if (typeof value === 'string') {
-      // Check for variable template syntax {{varName}}
-      if (value.includes('{{') && value.includes('}}')) {
+      // Check for variable template syntax: {{varName}}, ${varName} or {varName}
+      // (ChatState.resolveVariables handles all three forms, matching the web widget)
+      if (
+        (value.includes('{{') && value.includes('}}')) ||
+        /\$\{\w+\}/.test(value) ||
+        /\{\w+\}/.test(value)
+      ) {
         return state.resolveVariables(value);
       }
 
