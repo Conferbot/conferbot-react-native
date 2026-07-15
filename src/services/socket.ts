@@ -267,6 +267,14 @@ class ConferBotSocket {
       this.emit(SocketEvents.DESTROY_NOTIFICATION);
     });
 
+    // No agents available for handover (server to client)
+    this.socket.on(SocketEvents.NO_AGENTS_AVAILABLE, (data: any) => {
+      if (__DEV__) {
+        console.log('[ConferBot Socket] No agents available:', data);
+      }
+      this.emit(SocketEvents.NO_AGENTS_AVAILABLE, data);
+    });
+
     // Message reaction update (server to client)
     this.socket.on(SocketEvents.MESSAGE_REACTION_UPDATE, (data: any) => {
       if (__DEV__) {
