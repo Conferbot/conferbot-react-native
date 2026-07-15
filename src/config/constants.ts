@@ -1,13 +1,13 @@
 // ********** API Configuration ********** //
 // Base URL for Conferbot REST API
-export const DEFAULT_API_BASE_URL = 'https://embed.conferbot.com/api/v1/mobile';
+export const DEFAULT_API_BASE_URL = 'https://wdt.conferbot.com/api/v1/mobile';
 
 // API request timeout in milliseconds
 export const API_TIMEOUT = 30000; // 30 seconds
 
 // ********** Socket Configuration ********** //
 // Base URL for Conferbot Socket.IO server
-export const DEFAULT_SOCKET_URL = 'https://embed.conferbot.com';
+export const DEFAULT_SOCKET_URL = 'https://wdt.conferbot.com';
 
 // Socket connection timeout in milliseconds
 export const SOCKET_TIMEOUT = 20000; // 20 seconds
