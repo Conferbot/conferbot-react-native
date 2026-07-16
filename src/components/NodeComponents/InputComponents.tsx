@@ -411,7 +411,7 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({
         },
         theme.shadows.sm,
       ]}
-      accessibilityRole="form"
+      accessibilityRole="none"
       accessibilityLabel={`Question: ${question}`}
       testID={testID}
     >

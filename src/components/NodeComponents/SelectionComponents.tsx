@@ -239,7 +239,7 @@ export const CardGrid: React.FC<CardGridProps> = ({
         },
         theme.shadows.sm,
       ]}
-      accessibilityRole="article"
+      accessibilityRole="none"
       accessibilityLabel={card.title}
     >
       {card.imageUrl && (
@@ -403,7 +403,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
         },
         theme.shadows.md,
       ]}
-      accessibilityRole="article"
+      accessibilityRole="none"
       accessibilityLabel={card.title}
     >
       {card.imageUrl && (

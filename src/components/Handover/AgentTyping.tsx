@@ -253,7 +253,7 @@ export const AgentTyping: React.FC<AgentTypingProps> = ({
           transform: [{ translateY: translateYAnim }],
         },
       ]}
-      accessibilityRole="status"
+      accessibilityRole="text"
       accessibilityLabel={
         accessibilityLabel || (agent?.name ? `${agent.name} is typing` : 'Agent is typing')
       }

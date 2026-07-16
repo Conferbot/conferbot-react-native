@@ -430,7 +430,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
         },
         theme.shadows.md,
       ]}
-      accessibilityRole="form"
+      accessibilityRole="none"
       accessibilityLabel={accessibilityLabel || 'Post-chat survey'}
       testID={testID}
     >
