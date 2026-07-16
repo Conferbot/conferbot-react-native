@@ -12,11 +12,14 @@ import { ConferBotProvider, ConferBotWidget, ConferBotEndpoints } from '@conferb
 import { HeadlessExample } from './src/HeadlessExample';
 import { CustomExample } from './src/CustomExample';
 
-// Configure to local embed-server (10.0.2.2 = host localhost from Android emulator)
-ConferBotEndpoints.configure({
-  socketUrl: 'http://10.0.2.2:8001',
-  apiBaseUrl: 'http://10.0.2.2:8001/api/v1/mobile',
-});
+// Defaults point at production (https://wdt.conferbot.com). To test against
+// a local embed-server, uncomment (10.0.2.2 = host localhost from the
+// Android emulator):
+// ConferBotEndpoints.configure({
+//   socketUrl: 'http://10.0.2.2:8001',
+//   apiBaseUrl: 'http://10.0.2.2:8001/api/v1/mobile',
+// });
+void ConferBotEndpoints;
 
 type Tab = 'widget' | 'headless' | 'custom';
 
@@ -30,8 +33,8 @@ function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('widget');
 
   // Replace with your actual API key and bot ID
-  const API_KEY = 'test_key';
-  const BOT_ID = '69e8503cf33718a92ea792fe';
+  const API_KEY = 'conf_test_key_12345';
+  const BOT_ID = '691c970890527a0468f9b2c9';
 
   return (
     <ConferBotProvider
