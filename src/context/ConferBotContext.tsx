@@ -42,8 +42,10 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   if (!botId || botId.trim() === '') {
     throw new Error('[ConferBot] Bot ID is required');
   }
-  if (!__DEV__ && !apiKey.startsWith('conf_')) {
-    throw new Error('[ConferBot] Invalid API key format. API key must start with "conf_"');
+  if (!apiKey.startsWith('conf_') && !/^[a-f0-9]{32}$/i.test(apiKey)) {
+    console.warn(
+      '[ConferBot] API key looks unusual. Any non-empty key is accepted - the bot ID is the operative credential.'
+    );
   }
 
   // ********** Core State ********** //

@@ -59,7 +59,7 @@ If you skip AsyncStorage the SDK still works; persistence and offline queuing ar
 1. Log in to the [Conferbot Dashboard](https://app.conferbot.com)
 2. Create or select a bot, then **publish** it
 3. Bot ID: **Bot Settings > General** (shown at the top)
-4. API key: **Workspace Settings > API Keys** (starts with `conf_`)
+4. API key: **Workspace Settings > API Keys** - any placeholder works (e.g. `conf_test_key`); the bot ID is the credential
 
 ## 4. Step 1 - Add the floating chat bubble
 

@@ -84,7 +84,7 @@ Without `@react-native-async-storage/async-storage`, the SDK still works - persi
 1. **Log in** to the [Conferbot Dashboard](https://app.conferbot.com)
 2. **Create or select a bot** from the dashboard
 3. **Find your Bot ID**: Go to **Bot Settings** > **General** - the Bot ID is displayed at the top
-4. **Find your API Key**: Go to **Workspace Settings** > **API Keys** - copy the key starting with `conf_`
+4. **API Key**: any placeholder works (e.g. `conf_test_key`); the bot ID is the credential
 
 > **No account yet?** The public demo bot `691c970890527a0468f9b2c9` works without an account - drop it in as `botId` to try the SDK immediately.
 
