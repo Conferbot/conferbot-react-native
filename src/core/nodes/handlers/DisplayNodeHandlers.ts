@@ -109,9 +109,10 @@ export class ImageHandler extends BaseNodeHandler {
 
     const nodeId = this.getNodeId(node);
 
-    // Get image URL
+    // Get image URL ('image' is the field the server actually sends)
     const url = this.getString(data, 'url') ||
                 this.getString(data, 'src') ||
+                this.getString(data, 'image') ||
                 this.getString(data, 'imageUrl', '');
 
     if (!url) {
@@ -506,6 +507,23 @@ export class WelcomeNodeHandler extends BaseNodeHandler {
       text = this.resolveText(text, state);
       // Add to transcript
       state.addBotMessage(text, nodeId, this.nodeType);
+    }
+
+    // Welcome image/GIF renders BELOW the text bubble as a standalone
+    // rounded image (matches the web widget, which reads nodeData.image)
+    if (data) {
+      const imageUrl = this.getString(data, 'image') ||
+                       this.getString(data, 'imageUrl') ||
+                       this.getString(data, 'gif', '');
+      if (imageUrl) {
+        state.addToTranscript({
+          type: 'bot',
+          nodeId,
+          nodeType: this.nodeType,
+          timestamp: new Date().toISOString(),
+          data: { imageUrl },
+        });
+      }
     }
 
     // Create UI state for display (auto-proceed like message node)

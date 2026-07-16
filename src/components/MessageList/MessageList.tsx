@@ -8,6 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
   ViewToken,
+  Image,
 } from 'react-native';
 import { useTheme } from '../../theme';
 import { MessageBubble } from '../MessageBubble';
@@ -278,12 +279,50 @@ export const MessageList: React.FC<MessageListProps> = ({
     [theme]
   );
 
+  // Render a standalone bot image (e.g. welcome node image/GIF) - shown as a
+  // rounded image below the text bubble, like the web widget
+  const renderBotImage = useCallback(
+    (item: RecordItem) => {
+      const url = (item as any).url;
+      if (!url) return null;
+
+      return (
+        <View style={{
+          paddingLeft: theme.layout.avatarSize + 10 + theme.spacing.chatContentPadding,
+          paddingRight: theme.spacing.chatContentPadding,
+          marginBottom: 8,
+        }}>
+          <Image
+            source={{ uri: url }}
+            style={{
+              width: 220,
+              maxWidth: '100%',
+              height: 160,
+              borderRadius: theme.borderRadius.bubble,
+              backgroundColor: theme.colors.botBubble,
+            }}
+            resizeMode="cover"
+            accessible={true}
+            accessibilityRole="image"
+            accessibilityLabel="Image"
+          />
+        </View>
+      );
+    },
+    [theme]
+  );
+
   // Render individual message
   const renderMessage = useCallback(
     ({ item }: { item: RecordItem }) => {
       // Handle frozen choice buttons (submitted choice nodes)
       if ((item as any).shape === 'bot-choice-buttons') {
         return renderFrozenChoiceButtons(item);
+      }
+
+      // Handle standalone bot images (welcome node image/GIF)
+      if ((item as any).shape === 'bot-image-message') {
+        return renderBotImage(item);
       }
 
       const messageId = item._id;
@@ -333,6 +372,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       handleReactionPress,
       showReadReceipts,
       renderFrozenChoiceButtons,
+      renderBotImage,
     ]
   );
 
