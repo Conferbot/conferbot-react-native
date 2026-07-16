@@ -30,6 +30,7 @@ import {
   isImagePickerAvailable,
 } from '../../utils/FilePicker';
 import { isAudioRecorderAvailable } from '../../utils/AudioRecorder';
+import { getApiOrigin } from '../../config/constants';
 import type { VoiceRecordingResult } from '../VoiceRecorder';
 import type { ConferBotTheme } from '../../theme/types';
 import type { SocketEvents, RecordItem } from '../../types';
@@ -358,8 +359,14 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       name: file.name,
     } as any);
 
+    // Derive the origin from the configured endpoint and pass the chat
+    // session so the server can attach the upload to this conversation
+    const sessionQuery = chatSessionId
+      ? `?chatSessionId=${encodeURIComponent(chatSessionId)}`
+      : '';
+
     const response = await fetch(
-      `https://wdt.conferbot.com/api/v1/bot/${chatbotConfig.id}/media`,
+      `${getApiOrigin()}/api/v1/bot/${chatbotConfig.id}/media${sessionQuery}`,
       {
         method: 'POST',
         body: formData,
@@ -375,7 +382,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
     const data = await response.json();
     return data.url;
-  }, [chatbotConfig?.id]);
+  }, [chatbotConfig?.id, chatSessionId]);
 
   /**
    * Handle voice message send

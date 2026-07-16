@@ -78,6 +78,18 @@ export class ConferBotEndpoints {
   }
 }
 
+/**
+ * Derives the server ORIGIN for non-mobile endpoints (e.g. file uploads at
+ * /api/v1/bot/:id/media) from the configured API base URL by stripping the
+ * /api/v1/mobile suffix and any trailing slashes.
+ *
+ * @param baseUrl - Optional URL to derive from; defaults to the configured endpoint
+ */
+export function getApiOrigin(baseUrl?: string): string {
+  const url = baseUrl || ConferBotEndpoints.apiBaseUrl;
+  return url.replace(/\/api\/v1\/mobile\/?$/, '').replace(/\/+$/, '');
+}
+
 // ========================================
 // CONFIGURABLE NETWORK SETTINGS (HIGH FIX 3)
 // ========================================

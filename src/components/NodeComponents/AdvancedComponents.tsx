@@ -6,7 +6,7 @@
  * Includes: CalendarPicker, MultiFieldForm, FileUploadButton, LocationInput
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useContext, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import {
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import ConferBotContext from '../../context/ConferBotContext';
+import { getApiOrigin } from '../../config/constants';
 import {
   FilePicker,
   FilePickerResult,
@@ -799,9 +801,13 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
   onSubmit,
   uploadFile: externalUploadFile,
   botId,
-  apiBaseUrl = 'https://wdt.conferbot.com',
+  apiBaseUrl,
 }) => {
   const theme = useTheme();
+  // Optional provider context: supplies session/bot info when props are omitted
+  const conferBot = useContext(ConferBotContext);
+  const chatSessionId = conferBot?.chatSessionId;
+  const resolvedBotId = botId || conferBot?.chatbotConfig?.id;
   const [selectedFiles, setSelectedFiles] = useState<FilePickerResult[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -824,7 +830,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
     }
 
     // Otherwise, use the default upload endpoint
-    if (!botId) {
+    if (!resolvedBotId) {
       throw new Error('Bot ID is required for file upload');
     }
 
@@ -850,13 +856,22 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
     }, 200);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/bot/${botId}/media`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Derive the origin from the configured endpoint (strips /api/v1/mobile)
+      // and pass the chat session so the upload is attached to this conversation
+      const sessionQuery = chatSessionId
+        ? `?chatSessionId=${encodeURIComponent(chatSessionId)}`
+        : '';
+
+      const response = await fetch(
+        `${getApiOrigin(apiBaseUrl)}/api/v1/bot/${resolvedBotId}/media${sessionQuery}`,
+        {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
 
       clearInterval(progressInterval);
       setUploadProgress(prev => ({ ...prev, [file.id]: 100 }));
@@ -871,7 +886,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
       clearInterval(progressInterval);
       throw error;
     }
-  }, [externalUploadFile, botId, apiBaseUrl]);
+  }, [externalUploadFile, resolvedBotId, apiBaseUrl, chatSessionId]);
 
   /**
    * Handle file picker action
