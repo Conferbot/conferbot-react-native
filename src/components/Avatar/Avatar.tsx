@@ -99,7 +99,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     width: avatarSize,
     height: avatarSize,
     borderRadius: getBorderRadius(),
-    backgroundColor: hasImageSource ? 'transparent' : 'transparent',
+    backgroundColor: hasImageSource ? 'transparent' : getBackgroundColor(name),
   };
 
   return (
