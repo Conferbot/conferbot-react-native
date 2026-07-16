@@ -98,6 +98,12 @@ abstract class BaseAskHandler extends BaseNodeHandler {
     node: Record<string, any>,
     state: ChatState
   ): Promise<NodeResult> {
+    // Input components submit {value, variableName, type} - unwrap to the
+    // raw value so validation does not run against "[object Object]"
+    if (response && typeof response === 'object' && 'value' in response) {
+      response = response.value;
+    }
+
     const data = this.getNodeData(node);
     const nodeId = this.getNodeId(node);
 
@@ -652,6 +658,12 @@ export class AskFileHandler extends BaseNodeHandler {
     node: Record<string, any>,
     state: ChatState
   ): Promise<NodeResult> {
+    // Input components submit {value, variableName, type} - unwrap to the
+    // raw value so validation does not run against "[object Object]"
+    if (response && typeof response === 'object' && 'value' in response) {
+      response = response.value;
+    }
+
     const data = this.getNodeData(node);
     const nodeId = this.getNodeId(node);
 
@@ -736,6 +748,12 @@ export class AskLocationHandler extends BaseNodeHandler {
     node: Record<string, any>,
     state: ChatState
   ): Promise<NodeResult> {
+    // Input components submit {value, variableName, type} - unwrap to the
+    // raw value so validation does not run against "[object Object]"
+    if (response && typeof response === 'object' && 'value' in response) {
+      response = response.value;
+    }
+
     const data = this.getNodeData(node);
     const nodeId = this.getNodeId(node);
 
@@ -836,6 +854,12 @@ export class AskCustomQuestionHandler extends BaseNodeHandler {
     node: Record<string, any>,
     state: ChatState
   ): Promise<NodeResult> {
+    // Input components submit {value, variableName, type} - unwrap to the
+    // raw value so validation does not run against "[object Object]"
+    if (response && typeof response === 'object' && 'value' in response) {
+      response = response.value;
+    }
+
     const data = this.getNodeData(node);
     const nodeId = this.getNodeId(node);
 

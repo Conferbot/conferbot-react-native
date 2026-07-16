@@ -162,6 +162,31 @@ export class CalendarHandler extends BaseNodeHandler {
     state.setAnswer(nodeId, variableName, dateValue, nodeId);
     state.addUserMessage(displayText, nodeId);
 
+    // Record the slot selection on the server when a time slot was chosen
+    // (mirrors the web widget's 'calendar-slot-selection-record' emit)
+    const selectedTime = typeof dateValue === 'object' ? dateValue.time : undefined;
+    if (selectedTime) {
+      const socketClient = (data as any)?.socketClient;
+      const selectionPayload = {
+        visitorId: state.getVariable('_visitorId') || state.sessionId,
+        chatbotId: state.botId,
+        nodeId,
+        selectedDate: dateToCheck,
+        botTimeZone: this.getString(data || {}, 'timeZone') ||
+                     this.getString(data || {}, 'botTimeZone') ||
+                     this.getString(data || {}, 'timezone', 'UTC'),
+        visitorTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timeSlotSelected: selectedTime,
+        visitorTime: selectedTime,
+      };
+
+      if (typeof socketClient?.calendarSlotSelectionRecord === 'function') {
+        socketClient.calendarSlotSelectionRecord(selectionPayload);
+      } else if (typeof socketClient?.emitToServer === 'function') {
+        socketClient.emitToServer('calendar-slot-selection-record', selectionPayload);
+      }
+    }
+
     return this.proceed(node, { [variableName]: dateValue });
   }
 
