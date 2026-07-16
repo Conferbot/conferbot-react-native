@@ -117,17 +117,6 @@ interface WebhookConfig {
   proceedOnError?: boolean;
 }
 
-/** GPT configuration */
-interface GPTConfig {
-  prompt: string;
-  model?: string;
-  maxTokens?: number;
-  temperature?: number;
-  variableName?: string;
-  systemPrompt?: string;
-  streaming?: boolean;
-}
-
 /** Human handover configuration */
 interface HumanHandoverConfig {
   department?: string;
@@ -330,12 +319,80 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
       return false;
     }
 
+    // Do not report success when the socket is disconnected - emitToServer
+    // silently drops events in that case
+    const client = this.socketClient as SocketClient & { isConnected?: () => boolean };
+    const connected = typeof client.isConnected === 'function'
+      ? client.isConnected()
+      : client.connected !== false;
+    if (!connected) {
+      return false;
+    }
+
     try {
       this.socketClient.emitToServer(event, payload);
       return true;
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Waits for the server's 'integration-result' event for a specific node
+   * (matches the web widget's _executeNativeIntegration result handling).
+   *
+   * On success, applies `answerVariable`/`answerValue` and every entry of
+   * `columnMappedValues` (Google Sheets reads) into state as answer variables
+   * so ${var} resolution works downstream.
+   *
+   * @param nodeId    - node identifier used to filter results
+   * @param state     - current ChatState
+   * @param timeoutMs - how long to wait before giving up (default 30s)
+   * @returns the result payload, or null on timeout / unsupported client
+   */
+  protected waitForIntegrationResult(
+    nodeId: string,
+    state: ChatState,
+    timeoutMs: number = 30000,
+  ): Promise<Record<string, any> | null> {
+    return new Promise((resolve) => {
+      const client = this.socketClient;
+      if (!client?.on) {
+        resolve(null);
+        return;
+      }
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      const listener = (result: any) => {
+        if (!result || result.nodeId !== nodeId) return;
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
+        client.off?.('integration-result', listener as (data: unknown) => void);
+
+        if (result.success) {
+          if (result.answerVariable && result.answerValue !== undefined) {
+            state.setAnswer(nodeId, result.answerVariable, result.answerValue, nodeId);
+          }
+          if (result.columnMappedValues && typeof result.columnMappedValues === 'object') {
+            for (const [variableName, value] of Object.entries(result.columnMappedValues)) {
+              if (variableName && value !== undefined) {
+                state.setAnswer(nodeId, variableName, value, nodeId);
+              }
+            }
+          }
+        }
+        resolve(result);
+      };
+
+      timer = setTimeout(() => {
+        client.off?.('integration-result', listener as (data: unknown) => void);
+        resolve(null);
+      }, timeoutMs);
+
+      client.on('integration-result', listener as (data: unknown) => void);
+    });
   }
 
   /**
@@ -382,6 +439,8 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
     nodeData: Record<string, unknown>,
     state: ChatState,
   ): boolean {
+    const userMetadata = state.getUserMetadata();
+
     return this.emitSocketEvent('execute-integration', {
       nodeType,
       nodeId,
@@ -389,7 +448,18 @@ abstract class BaseIntegrationHandler extends BaseNodeHandler {
       chatSessionId: state.sessionId,
       chatbotId: state.botId,
       workspaceId: state.getVariable('_workspaceId') || '',
-      answerVariables: state.getAnswerVariables?.() ?? state.getAllAnswers?.() ?? [],
+      // The server expects an array of { key, value } objects (it reads
+      // .key/.value for ${var} resolution) - same mapping as
+      // ChatState.buildResponseData
+      answerVariables: state.getAnswerVariables().map((av) => ({
+        key: av.variableName,
+        value: av.value,
+      })),
+      visitorData: {
+        name: userMetadata.name || '',
+        email: userMetadata.email || '',
+        phone: userMetadata.phone || '',
+      },
     });
   }
 
@@ -658,13 +728,13 @@ export class WebhookHandler extends BaseIntegrationHandler {
 // ========================================
 
 /**
- * Handles GPT node - sends prompts to GPT via socket/API for AI responses.
+ * Handles GPT node - calls OpenAI directly from the client.
  *
- * Features:
- * - Variable interpolation in prompts
- * - Conversation history context
- * - Streaming response support
- * - Configurable model, temperature, and token limits
+ * The embed-server does NOT handle 'gpt-node' via execute-integration, so the
+ * web widget calls the OpenAI chat completions API with the key configured on
+ * the node (nodeData.apiKey) and displays the completion as a bot message.
+ * This handler mirrors that behavior. If no API key is configured, the error
+ * is recorded and the flow proceeds silently (web behavior).
  */
 export class GPTHandler extends BaseIntegrationHandler {
   readonly nodeType = 'gpt-node';
@@ -676,82 +746,67 @@ export class GPTHandler extends BaseIntegrationHandler {
     }
 
     const nodeId = this.getNodeId(node);
+    const apiKey = this.getString(data, 'apiKey');
+    const variableName = this.getString(data, 'variableName', 'gptResponse');
 
-    const config: GPTConfig = {
-      prompt: this.getString(data, 'prompt') || this.getString(data, 'message'),
-      model: this.getString(data, 'model', 'gpt-4'),
-      maxTokens: this.getNumber(data, 'maxTokens', 1000),
-      temperature: this.getNumber(data, 'temperature', 0.7),
-      variableName: this.getString(data, 'variableName', 'gptResponse'),
-      systemPrompt: this.getString(data, 'systemPrompt'),
-      streaming: this.getBoolean(data, 'streaming', true),
-    };
-
-    if (!config.prompt) {
-      return this.createError('GPT prompt is required');
+    if (!apiKey) {
+      // No key anywhere: record the error and proceed silently
+      this.storeIntegrationResult(state, 'gpt', false, undefined, 'GPT node missing API key');
+      return this.proceed(node, { gptSuccess: false });
     }
 
-    const resolvedPrompt = state.resolveVariables(config.prompt);
-    const resolvedSystemPrompt = config.systemPrompt
-      ? state.resolveVariables(config.systemPrompt)
-      : undefined;
-
-    const transcript = state.getTranscript();
-    const conversationHistory = transcript
-      .filter((entry) => entry.type === 'bot' || entry.type === 'user')
-      .slice(-10)
+    // Build the message array from the transcript (web widget maps 'bot'
+    // entries to 'system' and keeps 'user' as is)
+    const messages = state.getTranscript()
+      .filter((entry) => (entry.type === 'bot' || entry.type === 'user') && entry.text)
       .map((entry) => ({
-        role: entry.type === 'user' ? 'user' : 'assistant',
+        role: entry.type === 'bot' ? 'system' : 'user',
         content: entry.text || '',
       }));
 
-    const gptPayload = {
-      ...this.buildCommonPayload(state),
-      nodeId,
-      prompt: resolvedPrompt,
-      systemPrompt: resolvedSystemPrompt,
-      model: config.model,
-      maxTokens: config.maxTokens,
-      temperature: config.temperature,
-      conversationHistory,
-      streaming: config.streaming,
-    };
-
-    const socketEmitted = this.emitIntegrationEvent(
-      'gpt-node', nodeId, gptPayload as Record<string, unknown>, state,
-    );
-
-    if (!socketEmitted) {
-      const apiResponse = await this.makeGPTApiCall(config, resolvedPrompt, resolvedSystemPrompt, state);
-
-      if (apiResponse.success && apiResponse.data) {
-        const responseData = apiResponse.data as { response?: string; text?: string };
-        const responseText = responseData.response || responseData.text || '';
-        state.setVariable(config.variableName || 'gptResponse', responseText);
-
-        const uiState: NodeUIState.GPTResponse = {
-          type: 'gptResponse',
-          nodeId,
-          text: responseText,
-          isStreaming: false,
-          isComplete: true,
-        };
-
-        return NodeResult.displayUI(uiState);
-      }
-
-      return this.createError(`GPT request failed: ${apiResponse.error}`, true);
+    // Prepend the node's context/prompt as an initial system message
+    const context = this.getString(data, 'context') ||
+                    this.getString(data, 'systemPrompt') ||
+                    this.getString(data, 'prompt') ||
+                    this.getString(data, 'message');
+    if (context) {
+      messages.unshift({ role: 'system', content: state.resolveVariables(context) });
     }
 
-    const uiState: NodeUIState.GPTResponse = {
-      type: 'gptResponse',
-      nodeId,
-      text: '',
-      isStreaming: config.streaming,
-      isComplete: false,
+    const requestBody = {
+      model: this.getString(data, 'selectedModel') || this.getString(data, 'model') || 'gpt-3.5-turbo',
+      messages,
+      temperature: 0.7,
     };
 
-    return NodeResult.displayUI(uiState);
+    const response = await this.makeApiCall<{
+      choices?: Array<{ message?: { content?: string } }>;
+    }>(
+      'https://api.openai.com/v1/chat/completions',
+      'POST',
+      requestBody,
+      { Authorization: `Bearer ${apiKey}` },
+    );
+
+    const responseText = response.success
+      ? response.data?.choices?.[0]?.message?.content || ''
+      : '';
+
+    if (!responseText) {
+      // Record the error and proceed silently (matches web widget behavior)
+      this.storeIntegrationResult(
+        state, 'gpt', false, undefined, response.error || 'Empty GPT response',
+      );
+      return this.proceed(node, { gptSuccess: false });
+    }
+
+    state.setVariable(variableName, responseText);
+
+    // Display the completion as a bot message
+    state.addBotMessage(responseText, nodeId, this.nodeType);
+
+    this.storeIntegrationResult(state, 'gpt', true);
+    return this.proceed(node, { gptResponse: responseText });
   }
 
   /**
@@ -773,28 +828,6 @@ export class GPTHandler extends BaseIntegrationHandler {
     state.setVariable(variableName, responseText);
 
     return Promise.resolve(this.proceed(node, { gptResponse: responseText }));
-  }
-
-  private async makeGPTApiCall(
-    config: GPTConfig,
-    prompt: string,
-    systemPrompt: string | undefined,
-    state: ChatState
-  ): Promise<ApiResponse> {
-    const apiUrl = this.apiBaseUrl
-      ? `${this.apiBaseUrl}/api/gpt/complete`
-      : '/api/gpt/complete';
-
-    const requestBody = {
-      ...this.buildCommonPayload(state),
-      prompt,
-      systemPrompt,
-      model: config.model,
-      maxTokens: config.maxTokens,
-      temperature: config.temperature,
-    };
-
-    return this.makeApiCall(apiUrl, 'POST', requestBody);
   }
 }
 
@@ -1221,45 +1254,66 @@ export class EmailHandler extends BaseIntegrationHandler {
       resolvedConfig.bcc = bccResult.formatted || undefined;
     }
 
-    // Build email payload
+    // Build the 'email-node-trigger' payload (web widget contract):
+    // nodeData + botName + transcript + visitor info + flattened answers +
+    // answerVariables + chatDate + workspaceId. Fire-and-forget.
     const nodeId = this.getNodeId(node);
-    const emailPayload: EmailPayload = {
-      ...resolvedConfig,
-      sessionId: state.sessionId,
-      botId: state.botId,
-      timestamp: new Date().toISOString(),
-      nodeId,
-      userMetadata: state.getUserMetadata(),
+    const userMetadata = state.getUserMetadata();
+
+    // Strip the engine-injected socketClient before sending node data
+    const { socketClient: _socketClient, ...nodeDataClean } =
+      data as Record<string, unknown> & { socketClient?: unknown };
+
+    const transcript = state.getTranscript()
+      .filter((entry) => (entry.type === 'bot' || entry.type === 'user') && entry.text)
+      .map((entry) => ({ by: entry.type, message: entry.text || '' }));
+
+    const emailPayload: Record<string, unknown> = {
+      // Flatten each answer variable as key: value (web widget behavior)
+      ...state.getAllAnswers(),
+      // Raw node data with variable-resolved email fields merged on top
+      nodeData: { ...nodeDataClean, ...resolvedConfig, nodeId },
+      botName: state.getVariable('_botName') || '',
+      transcript,
+      visitorName: userMetadata.name || '',
+      visitorEmail: userMetadata.email || '',
+      answerVariables: state.getAnswerVariables().map((av) => ({
+        key: av.variableName,
+        value: av.value,
+      })),
+      chatDate: new Date().toISOString(),
+      workspaceId: state.getVariable('_workspaceId') || '',
     };
 
-    // Try socket first — emit the standardised 'execute-integration' event
-    const socketEmitted = this.emitIntegrationEvent(
-      'email-node', nodeId, emailPayload as unknown as Record<string, unknown>, state,
-    );
+    // The server handles 'email-node-trigger' (execute-integration rejects
+    // 'email-node'). Use the dedicated socket method when available.
+    const client = this.socketClient as
+      | (SocketClient & { emailNodeTrigger?: (payload: unknown) => void })
+      | null;
 
-    if (!socketEmitted) {
-      // Fallback to API
-      const apiUrl = this.apiBaseUrl
-        ? `${this.apiBaseUrl}/api/email/send`
-        : '/api/email/send';
-
-      const response = await this.makeApiCall(apiUrl, 'POST', emailPayload);
-
-      if (!response.success) {
-        this.storeIntegrationResult(state, 'email', false, undefined, response.error);
-
-        if (!config.proceedOnError) {
-          return this.createError(`Email send failed: ${response.error}`, true);
-        }
-        return this.proceed(node, { emailSent: false, emailError: response.error });
-      }
-
-      const responseData = response.data as { messageId?: string } | undefined;
-      state.setVariable('_emailMessageId', responseData?.messageId);
+    let sent = false;
+    if (client && typeof client.emailNodeTrigger === 'function') {
+      client.emailNodeTrigger(emailPayload);
+      sent = this.emitAvailable();
+    } else {
+      sent = this.emitSocketEvent('email-node-trigger', emailPayload);
     }
 
-    this.storeIntegrationResult(state, 'email', true);
-    return this.proceed(node, { emailSent: true });
+    this.storeIntegrationResult(
+      state, 'email', sent, undefined, sent ? undefined : 'Socket not connected',
+    );
+    return this.proceed(node, { emailSent: sent });
+  }
+
+  /** Whether the socket client can currently deliver events */
+  private emitAvailable(): boolean {
+    const client = this.socketClient as
+      | (SocketClient & { isConnected?: () => boolean })
+      | null;
+    if (!client) return false;
+    return typeof client.isConnected === 'function'
+      ? client.isConnected()
+      : client.connected !== false;
   }
 }
 
@@ -1338,25 +1392,14 @@ export class GmailHandler extends BaseIntegrationHandler {
       'gmail-node', nodeId, gmailPayload as Record<string, unknown>, state,
     );
 
+    // Fire-and-forget, but don't report success when the socket is down
     if (!socketEmitted) {
-      const apiUrl = this.apiBaseUrl
-        ? `${this.apiBaseUrl}/api/integrations/gmail/send`
-        : '/api/integrations/gmail/send';
+      this.storeIntegrationResult(state, 'gmail', false, undefined, 'Socket not connected');
 
-      const response = await this.makeApiCall(apiUrl, 'POST', gmailPayload);
-
-      if (!response.success) {
-        this.storeIntegrationResult(state, 'gmail', false, undefined, response.error);
-
-        if (!config.proceedOnError) {
-          return this.createError(`Gmail send failed: ${response.error}`, true);
-        }
-        return this.proceed(node, { gmailSent: false, gmailError: response.error });
+      if (!config.proceedOnError) {
+        return this.createError('Gmail send failed: socket not connected', true);
       }
-
-      const responseData = response.data as { messageId?: string; threadId?: string } | undefined;
-      state.setVariable('_gmailMessageId', responseData?.messageId);
-      state.setVariable('_gmailThreadId', responseData?.threadId);
+      return this.proceed(node, { gmailSent: false, gmailError: 'Socket not connected' });
     }
 
     this.storeIntegrationResult(state, 'gmail', true);
@@ -1531,7 +1574,12 @@ export class SlackHandler extends BaseCommunicationHandler {
         if (!proceedOnError) {
           return this.createError(`Slack send failed: ${response.error}`, true);
         }
+        return this.proceed(node, { slackSent: false });
       }
+    } else if (!socketEmitted) {
+      // Socket disconnected and no webhook fallback - don't report success
+      this.storeIntegrationResult(state, 'slack', false, undefined, 'Socket not connected');
+      return this.proceed(node, { slackSent: false });
     }
 
     this.storeIntegrationResult(state, 'slack', true);
@@ -1618,7 +1666,12 @@ export class DiscordHandler extends BaseCommunicationHandler {
         if (!proceedOnError) {
           return this.createError(`Discord send failed: ${response.error}`, true);
         }
+        return this.proceed(node, { discordSent: false });
       }
+    } else if (!socketEmitted) {
+      // Socket disconnected and no webhook fallback - don't report success
+      this.storeIntegrationResult(state, 'discord', false, undefined, 'Socket not connected');
+      return this.proceed(node, { discordSent: false });
     }
 
     this.storeIntegrationResult(state, 'discord', true);
@@ -1738,9 +1791,33 @@ export class GoogleSheetsHandler extends BaseIntegrationHandler {
       nodeId,
     };
 
+    // The server only accepts google-sheets-read-node / google-sheets-write-node
+    // ('google-sheets-node' is rejected). Pick by the node's operation field,
+    // mirroring the web widget's _handleGoogleSheetsNode.
+    const inputs = (data.inputs as Record<string, unknown>) || {};
+    const operation = this.getString(data, 'operation') ||
+                      this.getString(inputs, 'operation') ||
+                      'read';
+    const sheetsNodeType = operation === 'write'
+      ? 'google-sheets-write-node'
+      : 'google-sheets-read-node';
+
+    // Strip the engine-injected socketClient from the raw node data
+    const { socketClient: _socketClient, ...nodeDataClean } =
+      data as Record<string, unknown> & { socketClient?: unknown };
+
     const socketEmitted = this.emitIntegrationEvent(
-      'google-sheets-node', nodeId, payload as unknown as Record<string, unknown>, state,
+      sheetsNodeType,
+      nodeId,
+      { ...nodeDataClean, ...(payload as unknown as Record<string, unknown>), operation },
+      state,
     );
+
+    if (socketEmitted) {
+      // Wait for the server's integration-result (applies answerVariable and
+      // columnMappedValues into state); proceed anyway after the 30s timeout
+      await this.waitForIntegrationResult(nodeId, state);
+    }
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -1917,6 +1994,8 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
   protected abstract readonly crmName: string;
   protected abstract readonly socketEvent: string;
   protected abstract readonly apiEndpoint: string;
+  /** Whether to await the server's integration-result after emitting */
+  protected readonly awaitIntegrationResult: boolean = false;
 
   async handle(node: Record<string, unknown>, state: ChatState): Promise<NodeResult> {
     const data = this.getNodeData(node);
@@ -1960,6 +2039,11 @@ abstract class BaseCRMHandler extends BaseIntegrationHandler {
     const socketEmitted = this.emitIntegrationEvent(
       this.nodeType, nodeId, payload as Record<string, unknown>, state,
     );
+
+    if (socketEmitted && this.awaitIntegrationResult) {
+      // Await the server's integration-result (30s timeout, then proceed)
+      await this.waitForIntegrationResult(nodeId, state);
+    }
 
     if (!socketEmitted) {
       if (config.webhookUrl) {
@@ -2026,6 +2110,8 @@ export class HubSpotHandler extends BaseCRMHandler {
   protected readonly crmName = 'HubSpot';
   protected readonly socketEvent = IntegrationSocketEvents.HUBSPOT_EXECUTE;
   protected readonly apiEndpoint = '/api/integrations/hubspot';
+  // hubspot-node is handled by the server's execute-integration dispatcher
+  protected readonly awaitIntegrationResult = true;
 
   protected formatContactData(contact: ContactData, _action: string): Record<string, unknown> {
     return formatHubSpotContact(contact);
@@ -2092,6 +2178,11 @@ export class ZohoCRMHandler extends BaseIntegrationHandler {
     const socketEmitted = this.emitIntegrationEvent(
       'zohocrm-node', this.getNodeId(node), payload as unknown as Record<string, unknown>, state,
     );
+
+    if (socketEmitted) {
+      // Await the server's integration-result (30s timeout, then proceed)
+      await this.waitForIntegrationResult(this.getNodeId(node), state);
+    }
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -2170,8 +2261,22 @@ export class MailchimpHandler extends BaseCRMHandler {
 // 18-20. AUTOMATION & DATABASE HANDLERS
 // ========================================
 
+/** Integration webhook entry from get-chatbot-data (Zapier) */
+interface IntegrationWebhookEntry {
+  nodeId?: string;
+  botId?: string;
+  webhookURL?: string;
+  active?: boolean;
+}
+
 /**
- * Zapier node handler with proper webhook triggering.
+ * Zapier node handler.
+ *
+ * Matches the web widget contract: the webhook URL is NEVER posted to from
+ * the client. Instead, the bot's `integrationWebhooks` array (delivered in
+ * the get-chatbot-data response and stored in state) is used to look up the
+ * active webhook for this node, and the trigger is relayed through the
+ * server via the 'zapier-node-trigger' socket event.
  */
 export class ZapierHandler extends BaseIntegrationHandler {
   readonly nodeType = 'zapier-node';
@@ -2182,76 +2287,56 @@ export class ZapierHandler extends BaseIntegrationHandler {
       return this.createError('Zapier node missing data');
     }
 
-    const config: ZapierConfig = {
-      webhookUrl: this.getString(data, 'webhookUrl') || this.getString(data, 'webhook') || this.getString(data, 'zapUrl'),
-      data: data.data as Record<string, unknown> || data.payload as Record<string, unknown>,
-      includeAllAnswers: this.getBoolean(data, 'includeAllAnswers', true),
-      variableName: this.getString(data, 'variableName'),
-      proceedOnError: this.getBoolean(data, 'proceedOnError', true),
+    const nodeId = this.getNodeId(node);
+
+    // Look up the active webhook registered for this node
+    const webhooks = (state.getVariable('_integrationWebhooks') as IntegrationWebhookEntry[]) || [];
+    const webhookData = Array.isArray(webhooks)
+      ? webhooks.find(
+          (webhook) =>
+            webhook?.nodeId === nodeId &&
+            webhook?.botId === state.botId &&
+            webhook?.active
+        )
+      : undefined;
+
+    // No active webhook configured for this node: skip and proceed
+    if (!webhookData?.webhookURL) {
+      this.storeIntegrationResult(state, 'zapier', false, undefined, 'No active Zapier webhook for node');
+      return this.proceed(node, { zapierTriggered: false });
+    }
+
+    // Flattened { key: value } map of all answer variables (web contract)
+    const payload = state.getAllAnswers();
+
+    // Strip the engine-injected socketClient from the raw node data
+    const { socketClient: _socketClient, ...nodeDataClean } =
+      data as Record<string, unknown> & { socketClient?: unknown };
+
+    const triggerPayload = {
+      nodeData: { ...nodeDataClean, nodeId, webhookURL: webhookData.webhookURL },
+      payload,
+      chatSessionId: state.sessionId,
+      workspaceId: state.getVariable('_workspaceId') || '',
     };
 
-    if (!config.webhookUrl) {
-      return this.createError('Zapier webhook URL is required');
+    // Use the dedicated socket method when available
+    const client = this.socketClient as
+      | (SocketClient & { zapierNodeTrigger?: (payload: unknown) => void })
+      | null;
+
+    let sent = false;
+    if (client && typeof client.zapierNodeTrigger === 'function') {
+      client.zapierNodeTrigger(triggerPayload);
+      sent = true;
+    } else {
+      sent = this.emitSocketEvent('zapier-node-trigger', triggerPayload);
     }
 
-    // Validate webhook URL
-    const urlValidation = validateWebhookUrl(config.webhookUrl);
-    if (!urlValidation.isValid) {
-      return this.createError(urlValidation.error || 'Invalid Zapier webhook URL');
-    }
-
-    const resolvedWebhookUrl = state.resolveVariables(urlValidation.sanitizedUrl || config.webhookUrl);
-
-    // Build payload
-    let payload: Record<string, unknown> = {
-      sessionId: state.sessionId,
-      botId: state.botId,
-      timestamp: new Date().toISOString(),
-      nodeId: this.getNodeId(node),
-    };
-
-    // Add custom data or all answers
-    if (config.data && Object.keys(config.data).length > 0) {
-      payload = {
-        ...payload,
-        ...this.resolveObjectVariables(config.data, state),
-      };
-    }
-
-    if (config.includeAllAnswers) {
-      payload = {
-        ...payload,
-        answers: state.getAllAnswers(),
-        userMetadata: state.getUserMetadata(),
-      };
-    }
-
-    // Make webhook call
-    const response = await this.makeApiCall(resolvedWebhookUrl, 'POST', payload);
-
-    if (!response.success) {
-      this.storeIntegrationResult(state, 'zapier', false, undefined, response.error);
-
-      if (!config.proceedOnError) {
-        return this.createError(`Zapier webhook failed: ${response.error}`, true);
-      }
-      return this.proceed(node, { zapierTriggered: false, zapierError: response.error });
-    }
-
-    if (config.variableName && response.data) {
-      state.setVariable(config.variableName, response.data);
-    }
-
-    this.storeIntegrationResult(state, 'zapier', true, response.data);
-
-    // Emit legacy zapier-node-trigger event (server has a dedicated handler for it)
-    this.emitSocketEvent('zapier-node-trigger', {
-      sessionId: state.sessionId,
-      nodeId: this.getNodeId(node),
-      success: true,
-    });
-
-    return this.proceed(node, { zapierTriggered: true });
+    this.storeIntegrationResult(
+      state, 'zapier', sent, undefined, sent ? undefined : 'Socket not connected',
+    );
+    return this.proceed(node, { zapierTriggered: sent });
   }
 }
 
@@ -2326,6 +2411,11 @@ export class AirtableHandler extends BaseIntegrationHandler {
     const socketEmitted = this.emitIntegrationEvent(
       'airtable-node', this.getNodeId(node), payload as unknown as Record<string, unknown>, state,
     );
+
+    if (socketEmitted) {
+      // Await the server's integration-result (30s timeout, then proceed)
+      await this.waitForIntegrationResult(this.getNodeId(node), state);
+    }
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -2427,6 +2517,11 @@ export class NotionHandler extends BaseIntegrationHandler {
     const socketEmitted = this.emitIntegrationEvent(
       'notion-node', this.getNodeId(node), payload as unknown as Record<string, unknown>, state,
     );
+
+    if (socketEmitted) {
+      // Await the server's integration-result (30s timeout, then proceed)
+      await this.waitForIntegrationResult(this.getNodeId(node), state);
+    }
 
     if (!socketEmitted) {
       const apiUrl = this.apiBaseUrl
@@ -2717,10 +2812,18 @@ export class GoogleDocsHandler extends BaseIntegrationHandler {
       title: title ? state.resolveVariables(title) : undefined,
     };
 
-    this.emitIntegrationEvent('google-docs-node', nodeId, payload as Record<string, unknown>, state);
-    this.storeIntegrationResult(state, 'googleDocs', true);
+    const socketEmitted = this.emitIntegrationEvent(
+      'google-docs-node', nodeId, payload as Record<string, unknown>, state,
+    );
 
-    return this.proceed(node, { googleDocsSuccess: true, operation });
+    if (socketEmitted) {
+      // Await the server's integration-result (30s timeout, then proceed)
+      await this.waitForIntegrationResult(nodeId, state);
+    }
+
+    this.storeIntegrationResult(state, 'googleDocs', socketEmitted);
+
+    return this.proceed(node, { googleDocsSuccess: socketEmitted, operation });
   }
 }
 
@@ -2750,10 +2853,18 @@ export class GoogleDriveHandler extends BaseIntegrationHandler {
       operation,
     };
 
-    this.emitIntegrationEvent('google-drive-node', nodeId, payload as Record<string, unknown>, state);
-    this.storeIntegrationResult(state, 'googleDrive', true);
+    const socketEmitted = this.emitIntegrationEvent(
+      'google-drive-node', nodeId, payload as Record<string, unknown>, state,
+    );
 
-    return this.proceed(node, { googleDriveSuccess: true, operation });
+    if (socketEmitted) {
+      // Await the server's integration-result (30s timeout, then proceed)
+      await this.waitForIntegrationResult(nodeId, state);
+    }
+
+    this.storeIntegrationResult(state, 'googleDrive', socketEmitted);
+
+    return this.proceed(node, { googleDriveSuccess: socketEmitted, operation });
   }
 }
 

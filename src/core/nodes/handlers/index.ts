@@ -230,6 +230,13 @@ export function registerAllHandlers(
   registerLogicHandlers(registry);
 
   // Integration handlers (24 handlers including google-meet, google-docs, google-drive)
+  //
+  // 'gpt-node' collision resolution: the default GPTHandler (registered by
+  // registerIntegrationHandlers) calls OpenAI client-side with nodeData.apiKey,
+  // matching the web widget - the server does NOT handle gpt-node. When
+  // config.useEnhancedGPT is set, the EnhancedGPTHandler is registered AFTER
+  // it and deliberately wins (NodeHandlerRegistry.register overwrites by
+  // nodeType, last registration wins).
   if (config?.useEnhancedGPT) {
     registerIntegrationHandlersWithEnhancedGPT(
       registry,
