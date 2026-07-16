@@ -78,6 +78,15 @@ export function useSocketListeners({
         workspaceIdRef.current = chatbotData.workspaceId;
       }
 
+      // Store integration webhooks (Zapier) for the zapier-node handler
+      // Entries: { nodeId, botId, webhookURL, active }
+      const integrationWebhooks = Array.isArray(chatbotData.integrationWebhooks)
+        ? chatbotData.integrationWebhooks
+        : null;
+      if (integrationWebhooks && chatStateRef.current) {
+        chatStateRef.current.setVariable('_integrationWebhooks', integrationWebhooks);
+      }
+
       // Parse server customizations
       const customizations = chatbotData.customizations;
       if (customizations) {
@@ -146,6 +155,17 @@ export function useSocketListeners({
                         time: entry.timestamp || new Date().toISOString(),
                       } as any);
                     }
+                    // Standalone bot image (e.g. welcome node image/GIF),
+                    // rendered below the text bubble like the web widget
+                    if (entry.type === 'bot' && entry.data?.imageUrl) {
+                      newRecordItems.push({
+                        _id: `bot_img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                        type: 'bot-message',
+                        shape: 'bot-image-message',
+                        url: entry.data.imageUrl,
+                        time: entry.timestamp || new Date().toISOString(),
+                      } as any);
+                    }
                   }
 
                   if (newRecordItems.length > 0) {
@@ -165,6 +185,9 @@ export function useSocketListeners({
             if (chatStateRef.current) {
               if (workspaceIdRef.current) {
                 chatStateRef.current.setVariable('_workspaceId', workspaceIdRef.current);
+              }
+              if (integrationWebhooks) {
+                chatStateRef.current.setVariable('_integrationWebhooks', integrationWebhooks);
               }
               const resolvedBotName = customizations?.botName || customizations?.logoText || '';
               if (resolvedBotName) {
@@ -190,6 +213,13 @@ export function useSocketListeners({
 
     // *** BOT RESPONSE *** //
     socketClient.current.on(SocketEvents.BOT_RESPONSE, (data: any) => {
+      // Only render records for our own session - without this, records
+      // broadcast for other sessions (or the shared no-session record when
+      // a client emits without a chatSessionId) leak into the transcript
+      const ownSessionId = socketClient.current?.chatSessionId || chatSessionId;
+      if (ownSessionId && data.chatSessionId !== ownSessionId) {
+        return;
+      }
       if (data.record) {
         setRecord(deduplicateMessages(trimMessages(data.record)));
         persistMessages(data.record);

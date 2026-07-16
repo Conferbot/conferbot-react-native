@@ -318,37 +318,52 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setUnreadCount(0);
 
     if (!chatSessionId && apiClient.current) {
-      try {
-        const visitorId = storageService.current?.isReady()
-          ? await storageService.current.getOrCreateVisitorId()
-          : user?.id;
+      const visitorId = storageService.current?.isReady()
+        ? await storageService.current.getOrCreateVisitorId()
+        : user?.id;
 
+      let sessionId: string | undefined;
+      try {
         const response = await apiClient.current.initSession(visitorId);
         if (response.success && response.data) {
-          const sessionId = response.data.chatSessionId;
-          setChatSessionId(sessionId);
-
-          await persistSession({
-            chatSessionId: sessionId,
-            visitorId: visitorId || undefined,
-            isActive: true,
-          });
-          setHasPersistedSession(true);
-
-          initializeFlowEngine(sessionId);
-
-          const historyResponse = await apiClient.current.getSessionHistory(sessionId);
-          if (historyResponse.success && historyResponse.data && historyResponse.data.record) {
-            setRecord(deduplicateMessages(trimMessages(historyResponse.data.record)));
-            await persistMessages(historyResponse.data.record);
-          }
-
-          if (socketClient.current && socketClient.current.isConnected()) {
-            socketClient.current.joinChatRoomVisitor(sessionId);
-          }
+          sessionId = response.data.chatSessionId;
         }
       } catch (error) {
         console.error('[ConferBot] Failed to initialize session:', error);
+      }
+
+      // Local session fallback when the mobile REST API is unavailable -
+      // the socket flow works without it (same behavior as the other SDKs).
+      // Without this the session id stays undefined and every device ends
+      // up merged into one shared server record.
+      if (!sessionId) {
+        sessionId = `mobile_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      }
+
+      setChatSessionId(sessionId);
+
+      await persistSession({
+        chatSessionId: sessionId,
+        visitorId: visitorId || undefined,
+        isActive: true,
+      });
+      setHasPersistedSession(true);
+
+      initializeFlowEngine(sessionId);
+
+      try {
+        const historyResponse = await apiClient.current.getSessionHistory(sessionId);
+        if (historyResponse.success && historyResponse.data && historyResponse.data.record) {
+          setRecord(deduplicateMessages(trimMessages(historyResponse.data.record)));
+          await persistMessages(historyResponse.data.record);
+        }
+      } catch (error) {
+        // History is best-effort for restored sessions; a fresh local
+        // session has none.
+      }
+
+      if (socketClient.current && socketClient.current.isConnected()) {
+        socketClient.current.joinChatRoomVisitor(sessionId);
       }
     }
   }, [chatSessionId, user?.id, initializeFlowEngine, persistSession, persistMessages]);

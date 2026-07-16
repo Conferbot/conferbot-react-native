@@ -629,6 +629,15 @@ export class NodeFlowEngine {
 
     const responseData = this.chatState.buildResponseData();
 
+    // Never emit without a session id - the server would file the record
+    // under a shared no-session document that leaks across devices
+    if (!responseData.chatSessionId) {
+      if (__DEV__) {
+        console.warn('[ConferBot] Skipping response-record - no chatSessionId yet');
+      }
+      return;
+    }
+
     if (__DEV__) {
       console.log('[ConferBot] Sending record to server, entries:', responseData.record?.length);
       for (const r of (responseData.record || [])) {
