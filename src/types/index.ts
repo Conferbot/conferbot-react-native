@@ -393,6 +393,7 @@ export enum SocketEvents {
 
   // Server to client events
   FETCHED_CHATBOT_DATA = 'fetched-chatbot-data',
+  INTEGRATION_RESULT = 'integration-result',
   BOT_RESPONSE = 'bot-response',
   AGENT_MESSAGE = 'agent-message',
   AGENT_ACCEPTED = 'agent-accepted',

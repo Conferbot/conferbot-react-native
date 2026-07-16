@@ -74,6 +74,10 @@ class ConferBotSocket {
           reconnectionDelayMax: ConferBotNetworkConfig.reconnectionDelayMax,
           timeout: ConferBotNetworkConfig.socketTimeout,
           autoConnect: true,
+          // The server reads botId from the handshake query/auth (headers are
+          // ignored for websocket transport) - keep the headers for HTTP polling
+          query: { botId: this.botId },
+          auth: { botId: this.botId },
           extraHeaders: {
             [HEADER_API_KEY]: this.apiKey,
             [HEADER_BOT_ID]: this.botId,
@@ -273,6 +277,15 @@ class ConferBotSocket {
         console.log('[ConferBot Socket] No agents available:', data);
       }
       this.emit(SocketEvents.NO_AGENTS_AVAILABLE, data);
+    });
+
+    // Integration execution result (server to client)
+    // Forwarded to local listeners so integration handlers can await results
+    this.socket.on(SocketEvents.INTEGRATION_RESULT, (data: any) => {
+      if (__DEV__) {
+        console.log('[ConferBot Socket] Integration result received:', data);
+      }
+      this.emit(SocketEvents.INTEGRATION_RESULT, data);
     });
 
     // Message reaction update (server to client)
