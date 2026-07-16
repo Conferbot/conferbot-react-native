@@ -183,6 +183,22 @@ export function useFlowEngine({
           time: new Date().toISOString(),
         } as any,
       ]);
+    } else if (currentState.currentUIState && currentState.currentUIState.type === 'textInput') {
+      // Text answers from the bottom bar echo as a right-aligned user bubble
+      // (matches web widget's _displayUserInputMessage)
+      const answerText =
+        typeof response === 'object' && response !== null && 'value' in response
+          ? String(response.value)
+          : String(response);
+      setRecord((prev) => [
+        ...prev,
+        {
+          _id: `user_input_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: 'user-message',
+          text: answerText,
+          time: new Date().toISOString(),
+        } as any,
+      ]);
     }
 
     setIsNodeProcessing(true);

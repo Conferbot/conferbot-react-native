@@ -335,6 +335,13 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   };
 
   const handleSendMessage = async (text: string) => {
+    // Text questions are answered through the unified bottom bar (web widget
+    // parity) - route to the flow engine instead of a free-form message
+    if (!isLiveChatMode && currentUIState?.type === 'textInput') {
+      submitNodeResponse(text);
+      return;
+    }
+
     // During live chat, sendMessage handles everything (record + socket)
     // Don't add to chatState transcript to avoid duplicate user messages
     if (!isLiveChatMode && chatState.current) {
@@ -684,13 +691,16 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       return false;
     }
 
-    // Always show loading state
+    // Loading is covered by the message list's typing indicator - rendering
+    // the node's loading bubble too shows a double indicator
     if (currentUIState.type === 'loading') {
-      return true;
+      return false;
     }
 
-    // Non-interactive display types are shown inline in messages, not as input UI
-    const displayOnlyTypes = ['message', 'image', 'video', 'audio', 'file', 'html', 'gptResponse'];
+    // Non-interactive display types are shown inline in messages, not as input UI.
+    // textInput is answered through the unified bottom bar (web widget parity) -
+    // no floating inline input card.
+    const displayOnlyTypes = ['message', 'image', 'video', 'audio', 'file', 'html', 'gptResponse', 'textInput'];
 
     // Show node renderer for interactive types
     return !displayOnlyTypes.includes(currentUIState.type);
