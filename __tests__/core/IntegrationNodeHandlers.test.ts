@@ -288,44 +288,54 @@ describe('Integration Node Handlers', () => {
       expect(handler.nodeType).toBe('gpt-node');
     });
 
-    it('should return error when prompt is missing', async () => {
+    it('should proceed silently when API key is missing', async () => {
       const handler = new GPTHandler();
       const node = createNode('gpt-node', {
+        prompt: 'Tell me about chatbots',
         model: 'gpt-4',
       });
 
       const result = await handler.handle(node, chatState);
 
-      expect(result.type).toBe('error');
-      if (result.type === 'error') {
-        expect(result.message).toContain('prompt');
-      }
+      // No apiKey anywhere: record a gpt error and proceed (web behavior)
+      expect(result.type).toBe('proceed');
+      expect(chatState.getVariable('_gptSuccess')).toBe(false);
+      expect(chatState.getVariable('_gptError')).toBeDefined();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('should display GPT response UI state', async () => {
-      // Mock successful API response for when socket is not available
+    it('should call OpenAI directly and proceed with the response', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({ response: 'AI response about chatbots' }),
+        json: () => Promise.resolve({
+          choices: [{ message: { content: 'AI response about chatbots' } }],
+        }),
       });
 
       const handler = new GPTHandler();
       const node = createNode('gpt-node', {
+        apiKey: 'sk-test-key',
         prompt: 'Tell me about chatbots',
         variableName: 'gptResponse',
-        streaming: true,
       });
 
       const result = await handler.handle(node, chatState);
 
-      // Handler returns displayUI on success or error on API failure
-      expect(['displayUI', 'error']).toContain(result.type);
-      if (result.type === 'displayUI') {
-        const uiState = result.uiState as NodeUIState.GPTResponse;
-        expect(uiState.type).toBe('gptResponse');
-      }
+      expect(result.type).toBe('proceed');
+      expect(chatState.getVariable('gptResponse')).toBe('AI response about chatbots');
+
+      // Calls the OpenAI chat completions API with the node's key
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.openai.com/v1/chat/completions',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer sk-test-key',
+          }),
+        })
+      );
     });
 
     it('should resolve variables in prompt', async () => {
@@ -333,20 +343,25 @@ describe('Integration Node Handlers', () => {
         ok: true,
         status: 200,
         headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({ response: 'Explanation of AI' }),
+        json: () => Promise.resolve({
+          choices: [{ message: { content: 'Explanation of AI' } }],
+        }),
       });
 
       chatState.setVariable('topic', 'artificial intelligence');
 
       const handler = new GPTHandler();
       const node = createNode('gpt-node', {
+        apiKey: 'sk-test-key',
         prompt: 'Explain {{topic}} in simple terms',
         variableName: 'response',
       });
 
-      // Handler should not throw when processing
       const result = await handler.handle(node, chatState);
-      expect(['displayUI', 'error']).toContain(result.type);
+      expect(result.type).toBe('proceed');
+
+      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(requestBody.messages[0].content).toContain('artificial intelligence');
     });
 
     it('should include conversation history', async () => {
@@ -354,7 +369,9 @@ describe('Integration Node Handlers', () => {
         ok: true,
         status: 200,
         headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({ response: 'Response with context' }),
+        json: () => Promise.resolve({
+          choices: [{ message: { content: 'Response with context' } }],
+        }),
       });
 
       // Add some transcript entries
@@ -363,31 +380,42 @@ describe('Integration Node Handlers', () => {
 
       const handler = new GPTHandler();
       const node = createNode('gpt-node', {
+        apiKey: 'sk-test-key',
         prompt: 'Respond to the user',
         variableName: 'response',
       });
 
       const result = await handler.handle(node, chatState);
-      expect(['displayUI', 'error']).toContain(result.type);
+      expect(result.type).toBe('proceed');
+
+      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const contents = requestBody.messages.map((m: any) => m.content);
+      expect(contents).toContain('Hello! How can I help?');
+      expect(contents).toContain('I need information about your product');
     });
 
-    it('should support system prompt', async () => {
+    it('should proceed silently on API failure', async () => {
       mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
         headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({ response: 'Password reset instructions' }),
+        json: () => Promise.resolve({ error: { message: 'Invalid key' } }),
       });
 
       const handler = new GPTHandler();
       const node = createNode('gpt-node', {
+        apiKey: 'sk-bad-key',
         prompt: 'How do I reset my password?',
-        systemPrompt: 'You are a helpful customer support assistant for TechCorp.',
         variableName: 'response',
       });
 
       const result = await handler.handle(node, chatState);
-      expect(['displayUI', 'error']).toContain(result.type);
+
+      // Records the error and proceeds (matches web widget behavior)
+      expect(result.type).toBe('proceed');
+      expect(chatState.getVariable('_gptSuccess')).toBe(false);
+      expect(chatState.getVariable('_gptError')).toBeDefined();
     });
 
     it('should handle GPT response', async () => {
@@ -1128,19 +1156,37 @@ describe('Integration Node Handlers', () => {
 
   describe('Socket Event Emission', () => {
     it('should emit socket events when socket client is set', async () => {
-      const { GPTHandler } = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      const handler = new GPTHandler();
+      const { GoogleAnalyticsHandler } = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
+      const handler = new GoogleAnalyticsHandler();
+      mockSocket.connected = true;
       handler.setSocketClient(mockSocket);
 
-      const node = createNode('gpt-node', {
-        prompt: 'Test prompt',
-        variableName: 'response',
+      const node = createNode('google-analytics-node', {
+        eventAction: 'test_action',
+        eventCategory: 'Chatbot',
       });
 
       await handler.handle(node, chatState);
 
       // Socket should have received an emit call
       expect(mockSocket.emit).toHaveBeenCalled();
+    });
+
+    it('should not report success when the socket is disconnected', async () => {
+      const { SlackHandler } = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
+      const handler = new SlackHandler();
+      mockSocket.connected = false;
+      handler.setSocketClient(mockSocket);
+
+      const node = createNode('slack-node', {
+        message: 'Hello team',
+      });
+
+      const result = await handler.handle(node, chatState);
+
+      expect(result.type).toBe('proceed');
+      expect(chatState.getVariable('_slackSuccess')).toBe(false);
+      expect(mockSocket.emit).not.toHaveBeenCalled();
     });
   });
 });
