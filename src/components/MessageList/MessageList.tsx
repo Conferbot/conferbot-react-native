@@ -456,12 +456,15 @@ export const MessageList: React.FC<MessageListProps> = ({
         {hasTyping && (
           <View style={styles.typingContainer}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-              <Avatar
-                source={conferBot?.currentAgent?.avatar || conferBot?.botAvatarUrl || undefined}
-                name={conferBot?.currentAgent?.name || conferBot?.botName || 'Bot'}
-                size={32}
-              />
-              <TypingIndicator visible={true} />
+              {!(conferBot?.serverCustomizations && conferBot.customizations.hideAvatar) && (
+                <Avatar
+                  source={conferBot?.currentAgent ? conferBot.currentAgent.avatar : conferBot?.customizations?.avatar || conferBot?.botAvatarUrl || undefined}
+                  name={conferBot?.currentAgent?.name || conferBot?.botName || 'Bot'}
+                  size={conferBot?.serverCustomizations ? conferBot.customizations.avatarSize : 32}
+                  shape={conferBot?.serverCustomizations ? conferBot.customizations.avatarShape : undefined}
+                />
+              )}
+              <TypingIndicator visible={true} variant={conferBot?.customizations?.typingStyle} />
             </View>
           </View>
         )}
