@@ -159,7 +159,7 @@ export const QueueCard: React.FC = () => {
         <ActivityIndicator size="small" color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={s.title}>{queueLine(q)}</Text>
-          <Text style={s.sub}>{q.estimateLabel ? `About ${q.estimateLabel}` : 'Our team will be with you soon'}</Text>
+          <Text style={s.sub}>{q.estimateLabel || 'Our team will be with you soon'}</Text>
         </View>
       </View>
     </Card>
@@ -180,7 +180,7 @@ export const HandoverWaitCard: React.FC<{ onCancel?: () => void }> = ({ onCancel
         <ActivityIndicator size="small" color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={s.title}>{q ? queueLine(q) : 'Connecting you to the team'}</Text>
-          <Text style={s.sub}>{q?.estimateLabel ? `About ${q.estimateLabel}` : 'Our team will be with you soon'}</Text>
+          <Text style={s.sub}>{q?.estimateLabel || 'Our team will be with you soon'}</Text>
         </View>
         {onCancel ? (
           <TouchableOpacity onPress={onCancel} accessibilityRole="button" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
