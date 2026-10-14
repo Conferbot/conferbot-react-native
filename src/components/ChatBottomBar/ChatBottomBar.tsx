@@ -25,6 +25,8 @@ export interface ChatBottomBarProps {
   disabled?: boolean;
   hideBrand?: boolean;
   customBrand?: string;
+  /** The paperclip: shown when given (a live chat that takes visitor files). */
+  onAttach?: () => void;
   testID?: string;
 }
 
@@ -41,6 +43,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
   disabled = false,
   hideBrand = false,
   customBrand,
+  onAttach,
   testID,
 }) => {
   const theme = useTheme();
@@ -75,6 +78,19 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
     <View style={styles.container} testID={testID}>
       {/* Input row */}
       <View style={styles.inputRow}>
+        {onAttach && (
+          <TouchableOpacity
+            onPress={onAttach}
+            disabled={disabled}
+            activeOpacity={0.7}
+            style={[styles.attachButton, disabled && { opacity: 0.4 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Attach a file"
+            testID={testID ? `${testID}-attach` : undefined}
+          >
+            <Text style={styles.attachIcon}>{'\u{1F4CE}'}</Text>
+          </TouchableOpacity>
+        )}
         {/* Pill-shaped input with subtle border */}
         <View style={styles.inputPill}>
           <TextInput
@@ -199,6 +215,15 @@ const createStyles = (theme: ConferBotTheme) =>
       paddingVertical: Platform.OS === 'ios' ? 10 : 6,
       maxHeight: 100,
     },
+    attachButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 6,
+    },
+    attachIcon: { fontSize: 20, color: theme.colors.textSecondary },
     sendButton: {
       width: 44,
       height: 44,
