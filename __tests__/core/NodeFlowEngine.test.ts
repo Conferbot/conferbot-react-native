@@ -418,6 +418,28 @@ describe('NodeFlowEngine', () => {
       engine = new NodeFlowEngine(chatState, registry, { typingDelay: 0 });
     });
 
+    it("follows the builder's single-output handles (source-1, source, any one edge)", () => {
+      engine.loadFlow({
+        nodes: [
+          createNode('welcome-node', { text: 'Hi' }, { id: 'w' }),
+          createNode('message-node', { text: 'One' }, { id: 'm1' }),
+          createNode('message-node', { text: 'Two' }, { id: 'm2' }),
+          createNode('message-node', { text: 'Three' }, { id: 'm3' }),
+        ],
+        edges: [
+          { id: 'e1', source: 'w', sourceHandle: 'source-1', target: 'm1' },
+          { id: 'e2', source: 'm1', sourceHandle: 'source', target: 'm2' },
+          { id: 'e3', source: 'm2', sourceHandle: 'out-a', target: 'm3' },
+        ],
+        startNodeId: 'w',
+      } as any);
+      const next = (id: string) => (engine as any).resolveNextNode(id, null);
+      expect(next('w')).toBe('m1');
+      expect(next('m1')).toBe('m2');
+      expect(next('m2')).toBe('m3');
+      expect(next('m3')).toBeNull();
+    });
+
     it('should load a flow definition', () => {
       const flow = createLinearFlow();
       engine.loadFlow(flow);
