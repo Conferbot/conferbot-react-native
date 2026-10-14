@@ -509,6 +509,13 @@ describe('Integration Node Handlers', () => {
       expect(requiresUserInteraction('human-handover-node')).toBe(true);
     });
 
+    it('carries the flow on once the handover is over', async () => {
+      const handler = new HumanHandoverHandler();
+      const node = createNode('human-handover-node', { handoverMessage: 'Wait' });
+      const result = await handler.handleResponse({ action: 'continue' }, node, chatState);
+      expect(result.type).toBe('proceed');
+    });
+
     it('should show pre-chat form when configured', async () => {
       const handler = new HumanHandoverHandler();
       const node = createNode('human-handover-node', {
