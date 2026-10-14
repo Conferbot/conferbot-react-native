@@ -131,7 +131,8 @@ const createStyles = (theme: ConferBotTheme) =>
     menuContainer: {
       marginTop: theme.layout.headerHeight + (Platform.OS === 'android' ? 24 : 50),
       marginRight: 12,
-      backgroundColor: '#fff',
+      // White, or the theme's surface in a dark scheme.
+      backgroundColor: theme.mode === 'dark' ? theme.colors.surface : '#fff',
       borderRadius: 10,
       minWidth: 200,
       ...Platform.select({
@@ -155,7 +156,7 @@ const createStyles = (theme: ConferBotTheme) =>
     },
     menuItemBorder: {
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: '#e5e7eb',
+      borderBottomColor: theme.mode === 'dark' ? theme.colors.divider : '#e5e7eb',
     },
     menuIcon: {
       fontSize: 18,
@@ -164,7 +165,7 @@ const createStyles = (theme: ConferBotTheme) =>
     },
     menuLabel: {
       fontSize: 15,
-      color: '#1f2937',
+      color: theme.mode === 'dark' ? theme.colors.text : '#1f2937',
       fontWeight: '500',
     },
     menuLabelDestructive: {
