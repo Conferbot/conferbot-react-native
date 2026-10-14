@@ -164,6 +164,10 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     continueFlow: () => {
       if (flowEngineRef.current?.isAtHandover()) flowEngineRef.current.submitResponse({ action: 'continue' });
     },
+    // The waiting step's max wait, and the bot's workspace for handover-timeout.
+    handoverWait: () => {
+      return { data: flowEngineRef.current?.handoverNodeData(), workspaceId: workspaceIdRef.current || '' };
+    },
   });
 
   // The agent chat is greeted when the visitor opens the chat, never at
