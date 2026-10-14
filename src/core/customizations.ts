@@ -1,0 +1,110 @@
+/**
+ * The bot's customizations as the web widget applies them
+ * (conferbot-widget core/customizations.ts buildCustomizationsRef, the
+ * polish and owner sheets): defaults, the values that count as unset, and
+ * what each one turns into on screen. Pure: the components read the result.
+ */
+
+export interface Corners {
+  topLeft: number;
+  topRight: number;
+  bottomRight: number;
+  bottomLeft: number;
+}
+
+export interface ResolvedCustomizations {
+  /** "Powered by Conferbot" hidden (the server forces false on Free/Starter). */
+  hideBrand: boolean;
+  /** The owner's footer text instead of "Powered by", when turned on. */
+  customBrand: string | null;
+  /** Header title: logoText (or the bot name), cut to 18 characters. */
+  title: string;
+  /** Header logo: the owner's, else the Conferbot logo (as the web). */
+  logo: string;
+  hideLogo: boolean;
+  /** Under the title: the tagline when turned on, else "Online" (unless hidden). */
+  tagline: string | null;
+  showOnline: boolean;
+  /** Bot avatar beside messages (the logo when no avatar of its own). */
+  avatar: string;
+  hideAvatar: boolean;
+  avatarSize: number;
+  avatarRadius: number;
+  avatarShape: 'circle' | 'rounded' | 'square';
+  /** Bubble corners: the web's 18/6 shapes unless the owner set a radius. */
+  botBubble: Corners;
+  userBubble: Corners;
+  optionRadius: number;
+  /** Message text size: 14.5 unless the owner set something other than 14. */
+  fontSize: number;
+  /** The owner's font, or null for the platform font (Arial / unset). */
+  fontFamily: string | null;
+  /** Send button and accents: the header colour. */
+  accent: string;
+  typingStyle: 'dots' | 'wave' | 'shimmer' | 'pencil' | 'mascot';
+}
+
+const num = (v: unknown): number | null => {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+  return Number.isFinite(n) ? n : null;
+};
+const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+const usableUrl = (v: unknown): string | null => {
+  const s = str(v);
+  return /^(https?:)?\/\//i.test(s) || /^data:image\//i.test(s) ? s : null;
+};
+const all = (r: number): Corners => ({ topLeft: r, topRight: r, bottomRight: r, bottomLeft: r });
+
+/** The web widget's default logo (utils/constants BOT_LOGO): header and bot avatar. */
+export const DEFAULT_LOGO = 'https://www.conferbot.com/img/logo/conferbot-logo.png';
+
+const UNSET_FONTS = new Set(['', 'arial', 'gill sans']);
+const TYPING = new Set(['dots', 'wave', 'shimmer', 'pencil', 'mascot']);
+
+/** "Live chat test (tem..." - 18 characters, as the header cuts it. */
+export const headerTitle = (name: string): string => (name.length > 18 ? `${name.slice(0, 18)}...` : name);
+
+/** The avatar's corner radius for its shape: circle 50%, rounded 28%, square 4px. */
+export const avatarRadiusFor = (shape: unknown, size: number): number => {
+  if (shape === 'square') return 4;
+  if (shape === 'rounded') return Math.round(size * 0.28);
+  return size / 2;
+};
+
+export function resolveCustomizations(raw: Record<string, any> | null | undefined, botName = ''): ResolvedCustomizations {
+  const c = raw || {};
+  const name = str(c.logoText) || str(c.botName) || botName || 'Chat';
+  const tagline = c.enableTagline === true && str(c.tagline) ? str(c.tagline) : null;
+
+  const avatarSet = num(c.avatarSize);
+  const avatarSize = avatarSet && avatarSet !== 40 ? avatarSet : 32;
+
+  const bubbleSet = num(c.bubbleBorderRadius);
+  const ownBubble = bubbleSet !== null && bubbleSet !== 10;
+  const optionSet = num(c.optionBubbleBorderRadius);
+
+  const fontSet = num(c.fontSize);
+  const font = str(c.font);
+
+  return {
+    hideBrand: c.hideBrand === true,
+    customBrand: c.enableCustomBrand === true && str(c.customBrand) ? str(c.customBrand) : null,
+    title: headerTitle(name),
+    logo: usableUrl(c.logo) || DEFAULT_LOGO,
+    hideLogo: c.hideLogo === true,
+    tagline,
+    showOnline: !tagline && c.hideOnlineStatus !== true,
+    avatar: usableUrl(c.avatar) || usableUrl(c.logo) || DEFAULT_LOGO,
+    hideAvatar: c.hideAvatar === true,
+    avatarSize,
+    avatarRadius: avatarRadiusFor(c.avatarShape, avatarSize),
+    avatarShape: c.avatarShape === 'square' || c.avatarShape === 'rounded' ? c.avatarShape : 'circle',
+    botBubble: ownBubble ? all(bubbleSet as number) : { topLeft: 18, topRight: 18, bottomRight: 18, bottomLeft: 6 },
+    userBubble: ownBubble ? all(bubbleSet as number) : { topLeft: 18, topRight: 18, bottomRight: 6, bottomLeft: 18 },
+    optionRadius: optionSet !== null ? optionSet : 10,
+    fontSize: fontSet && fontSet !== 14 ? fontSet : 14.5,
+    fontFamily: UNSET_FONTS.has(font.toLowerCase()) ? null : font,
+    accent: str(c.headerBgColor) || '#0b4eb8',
+    typingStyle: TYPING.has(c.typingStyle) ? c.typingStyle : 'dots',
+  };
+}
