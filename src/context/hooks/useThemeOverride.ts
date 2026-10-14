@@ -1,8 +1,10 @@
 // @ts-nocheck
 import { useMemo } from 'react';
 import { toHex6, mix } from '../../theme/color';
+import { ownsChatBackground } from '../../core/widgetTheme';
+import type { ResolvedWidgetTheme } from '../../core/widgetTheme';
 
-export function useThemeOverride(serverCustomizations: Record<string, any> | null) {
+export function useThemeOverride(serverCustomizations: Record<string, any> | null, widgetTheme?: ResolvedWidgetTheme | null) {
   const serverThemeOverride = useMemo(() => {
     if (!serverCustomizations) return null;
     const c = serverCustomizations;
@@ -39,16 +41,39 @@ export function useThemeOverride(serverCustomizations: Record<string, any> | nul
     set('optionBubbleText', c.optionBubbleTextColor || c.botTextColor);
     set('background', c.chatBgColor);
 
+    // The widget theme's surfaces and text (every theme but classic in
+    // light): the panel, composer, footer, cards and quiet text. The
+    // owner's own chat background stays theirs.
+    const t = widgetTheme?.tokens;
+    if (t) {
+      override.mode = widgetTheme.scheme;
+      if (!ownsChatBackground(c)) set('background', t.bg);
+      set('surface', t.bg);
+      set('text', t.ink);
+      set('textSecondary', t.muted);
+      set('textDisabled', t.faint);
+      set('textInverse', t.bg);
+      set('border', t.line2);
+      set('borderLight', t.line);
+      set('divider', t.line);
+      set('systemBubble', t.card2);
+      set('systemBubbleText', t.text);
+    }
+
     // 14 is the unset default: AI and visitor bubbles are 14.5 on the web.
     const size = parseFloat(c.fontSize);
     override.typography = { fontSize: { md: Number.isFinite(size) && size !== 14 ? size : 14.5 } };
 
     // Choice buttons: the owner's radius (10, the server's default, is the web's 10 too).
+    // (A theme other than classic brings its own unless the owner changed it.)
     const optionRadius = parseFloat(c.optionBubbleBorderRadius);
-    override.borderRadius = { button: Number.isFinite(optionRadius) ? optionRadius : 10 };
+    const shape = widgetTheme?.shape;
+    override.borderRadius = {
+      button: Number.isFinite(optionRadius) && (optionRadius !== 10 || !shape) ? optionRadius : shape ? shape.rCtl : 10,
+    };
 
     return Object.keys(override.colors).length > 0 ? override : null;
-  }, [serverCustomizations]);
+  }, [serverCustomizations, widgetTheme]);
 
   return { serverThemeOverride };
 }
