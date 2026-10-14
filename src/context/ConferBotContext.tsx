@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Platform } from 'react-native';
 import ConferBotAPI from '../services/api';
 import ConferBotSocket from '../services/socket';
@@ -22,6 +22,7 @@ import { useFlowEngine } from './hooks/useFlowEngine';
 import { useSocketListeners } from './hooks/useSocketListeners';
 import { useLiveChat } from './hooks/useLiveChat';
 import { useThemeOverride } from './hooks/useThemeOverride';
+import { resolveCustomizations } from '../core/customizations';
 import { useAgentBot } from './hooks/useAgentBot';
 import { useLiveChatExtras } from './hooks/useLiveChatExtras';
 
@@ -213,6 +214,8 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
   // ********** Theme Override Hook ********** //
   const { serverThemeOverride } = useThemeOverride(serverCustomizations);
+  // The bot's settings as the web widget applies them (core/customizations).
+  const customizations = useMemo(() => resolveCustomizations(serverCustomizations), [serverCustomizations]);
 
   // ********** Socket Listeners Hook ********** //
   const { setupSocketListeners } = useSocketListeners({
@@ -542,8 +545,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     chatState: chatStateRef.current,
     serverCustomizations,
     serverThemeOverride,
+    customizations,
     botName: serverCustomizations?.botName || serverCustomizations?.logoText || null,
-    botAvatarUrl: serverCustomizations?.avatar || serverCustomizations?.logo || null,
+    botAvatarUrl: serverCustomizations ? customizations.avatar : null,
     isRestoring,
     hasPersistedSession,
     messageStatuses,
