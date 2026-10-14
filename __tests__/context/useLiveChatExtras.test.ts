@@ -146,7 +146,7 @@ describe('useLiveChatExtras', () => {
     expect(ok).toBe(true);
     expect(socket.emitWithAck).toHaveBeenCalledWith(
       'leave-message',
-      expect.objectContaining({ chatSessionId: 's1', email: 'jo@example.com', message: 'Need a quote', visitorId: 'v1' })
+      expect.objectContaining({ chatSessionId: 's1', email: 'jo@example.com', message: 'Need a quote', visitorId: 'v1', entryId: expect.stringMatching(/^leave-message-/) })
     );
     expect(state.addRecord).toHaveBeenCalledWith(expect.objectContaining({ via: 'email', text: 'Need a quote' }));
     expect(hook.result.current.noAgents).toBe(false);
