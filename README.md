@@ -317,6 +317,8 @@ Everything you configure in the Conferbot dashboard (Widget Customization / flow
 - **Colors**: header background/text, bot bubble, user bubble, option bubble, chat background, base font size
 - **Identity**: bot name in the header (server `botName` wins over the local `title` prop), avatar image, tagline
 - **Floating bubble**: FAB color or gradient, icon (SVG name or custom image), size, position, offsets, border radius, CTA text
+- **Chat background**: solid, gradient (linear, radial, mesh, blur), image with its mask, or one of the 13 patterns (drawn with `react-native-svg` when installed, else the base colour)
+- **Widget theme**: all 27 dashboard themes (Classic, Minimal, Glass, Neo-brutal, Midnight, Aurora and the rest). Each brings its surfaces, text colours, corner radii and bubble outline, as on the web widget. **Appearance** light, dark, or auto (follows the phone's dark mode); Midnight, Neon, Chalkboard, Cyberpunk and Space are always dark. **Colours** "Brand" keeps your colours; "Theme palette" swaps in the theme's own header, bubble, option, launcher and send-button colours. Your own bubble radius, option radius and chat background still win over the theme. Theme fonts are not loaded on mobile; the app's font is used.
 
 ### Precedence - be aware of how merging works
 
