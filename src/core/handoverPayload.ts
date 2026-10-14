@@ -41,7 +41,7 @@ export const buildHandoverPayload = (
     },
     priority: str(data.priority, 'normal'),
     // Minutes as the builder wrote them ("0.5" is half a minute), as the web sends it.
-    maxWaitTime: Number(data.maxWaitTime) > 0 ? Number(data.maxWaitTime) : 2,
+    maxWaitTime: waitMinutesOf(data.maxWaitTime),
     assignmentType: str(data.assignmentType, 'auto'),
     assignmentStrategy: str(data.agentAssignmentStrategy),
     assignedAgents: arr(data.assignedAgents),
@@ -49,3 +49,22 @@ export const buildHandoverPayload = (
     ...extra,
   };
 };
+
+/** Minutes as the builder wrote them ("0.5" is half a minute); 2 when unset. */
+export const waitMinutesOf = (v: unknown): number => (Number(v) > 0 ? Number(v) : 2);
+
+/**
+ * handover-timeout, sent once the handover step's max wait passes with
+ * nobody joined: the server then decides (no-agents-available), as the web
+ * widget's maxWaitTimer does.
+ */
+export const buildHandoverTimeoutPayload = (chatSessionId: string, data: Record<string, any> | undefined, workspaceId: string) => ({
+  chatSessionId,
+  assignmentData: {
+    assignmentType: data?.assignmentType,
+    assignmentStrategy: data?.agentAssignmentStrategy,
+    assignedAgents: data?.assignedAgents,
+  },
+  workspaceId,
+});
+
