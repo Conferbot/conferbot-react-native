@@ -1052,6 +1052,11 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
         }
         return Promise.resolve(this.proceed(node, { handoverEnded: true }));
 
+      // The handover is over (nobody came and the visitor left a message or
+      // skipped it): the flow carries on, as the web widget does.
+      case 'continue':
+        return Promise.resolve(this.proceed(node, { handoverOver: true }));
+
       case 'noAgents':
       case 'no_agents': {
         const proceedOnNoAgents = this.getBoolean(data || {}, 'proceedOnNoAgents', false);
