@@ -45,6 +45,7 @@ import {
 import type { VoiceRecordingResult } from '../VoiceRecorder';
 import type { ConferBotTheme } from '../../theme/types';
 import type { SocketEvents, RecordItem } from '../../types';
+import { resolveCustomizations } from '../../core/customizations';
 
 // Maximum file size for attachments (5MB)
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
@@ -204,6 +205,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     botName,
     botAvatarUrl,
     serverCustomizations,
+    customizations: resolvedCustomizations,
     // Use the context's flow engine state
     currentUIState,
     isNodeProcessing,
@@ -233,6 +235,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     // Actions
     resetConversation,
   } = useConferBot();
+  // The bot's settings as the web applies them; the defaults until it loads.
+  const customizations = resolvedCustomizations || resolveCustomizations(serverCustomizations);
 
   // Typing in the composer: a person is here (an agent bot's conversation
   // starts now), and the agent sees that they are typing.
@@ -911,8 +915,11 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       >
         {/* Header */}
         <ChatHeader
-          title={botName || title}
-          tagline={serverCustomizations?.enableTagline ? serverCustomizations?.tagline : undefined}
+          title={serverCustomizations ? customizations.title : botName || title}
+          tagline={customizations.tagline || undefined}
+          logoUrl={customizations.logo}
+          hideLogo={customizations.hideLogo}
+          showOnline={!!serverCustomizations && customizations.showOnline}
           subtitle={getSubtitle()}
           agent={currentAgent}
           botAvatarUrl={botAvatarUrl || undefined}
@@ -969,6 +976,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
                 ? handleAttachmentPress
                 : undefined
             }
+            hideBrand={customizations.hideBrand}
+            customBrand={customizations.customBrand || undefined}
+            accent={serverCustomizations ? customizations.accent : undefined}
             testID={`${testID}-input`}
           />
         )}
