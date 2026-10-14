@@ -203,9 +203,23 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     isLiveChatMode,
     agentTyping,
     sendVisitorTyping,
+    // AI agent bots
+    agentBot,
+    awaitingReply,
+    engageAgent,
     // Actions
     resetConversation,
   } = useConferBot();
+
+  // Typing in the composer: a person is here (an agent bot's conversation
+  // starts now), and the agent sees that they are typing.
+  const handleTyping = useCallback(
+    (isTyping: boolean) => {
+      if (isTyping && agentBot) engageAgent();
+      sendVisitorTyping(isTyping);
+    },
+    [agentBot, engageAgent, sendVisitorTyping]
+  );
 
   // Use controlled visible if provided, otherwise use context isOpen
   const isVisible = controlledVisible !== undefined ? controlledVisible : isOpen;
@@ -256,6 +270,15 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       openChat();
     }
   }, [controlledVisible, isOpen, openChat]);
+
+  // Controlled (the floating widget): the provider still has to know the
+  // chat is on screen - the unread count, and an agent bot's greeting,
+  // follow it.
+  useEffect(() => {
+    if (controlledVisible === undefined) return;
+    if (controlledVisible && !isOpen) openChat();
+    else if (!controlledVisible && isOpen) closeChat();
+  }, [controlledVisible, isOpen, openChat, closeChat]);
 
   // ---- Header Menu Actions ---- //
   const handleRestartChat = useCallback(() => {
@@ -664,7 +687,11 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
   // Determine subtitle based on connection and agent
   const getSubtitle = (): string | undefined => {
-    if (currentAgent) {
+    if (!isConnected) {
+      return 'Reconnecting...';
+    }
+    // An AI agent is the bot itself: no "Live Agent" under its name.
+    if (currentAgent && !currentAgent.isAIAgent) {
       return currentAgent.email || 'Live Agent';
     }
     if (!isConnected) {
@@ -859,7 +886,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
         {/* Message List — interactive node renders inline at the end */}
         <MessageList
           messages={record}
-          showTypingIndicator={isAgentTyping || isNodeProcessing}
+          showTypingIndicator={isAgentTyping || isNodeProcessing || awaitingReply}
           showTimestamps={showTimestamps}
           testID={`${testID}-messages`}
           activeNodeUI={shouldShowNodeRenderer() && currentUIState ? currentUIState : null}
@@ -871,7 +898,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
         {shouldShowInput() && (
           <ChatBottomBar
             onSend={handleSendMessage}
-            onTyping={sendVisitorTyping}
+            onTyping={handleTyping}
             placeholder={placeholder}
             disabled={!isConnected}
             testID={`${testID}-input`}
