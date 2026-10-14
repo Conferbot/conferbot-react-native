@@ -22,6 +22,23 @@ import {
   ConferBotNetworkConfig,
 } from '../config/constants';
 
+// Server events forwarded to local listeners without any handling here.
+export const FORWARDED_SERVER_EVENTS = [
+  'agent-message-stream',
+  'agent-message-rich',
+  'agent-message-edited',
+  'agent-message-deleted',
+  'agent-read-status',
+  'ai-agent-inactive-close',
+  'ai-agent-resumed',
+  'conversation-locked',
+  'conversation-unlocked',
+  'file-upload-requested',
+  'handover-queue',
+  'handover-waiting',
+  'queue-status',
+] as const;
+
 // Socket connection options
 interface SocketOptions {
   apiKey: string;
@@ -295,6 +312,13 @@ class ConferBotSocket {
       }
       this.emit(SocketEvents.MESSAGE_REACTION_UPDATE, data);
     });
+
+    // AI agent replies, live chat changes and the handover queue (server to
+    // client): passed through as sent, for the listeners in
+    // context/hooks/useSocketListeners.ts.
+    for (const event of FORWARDED_SERVER_EVENTS) {
+      this.socket.on(event, (data: any) => this.emit(event, data));
+    }
   }
 
   // ********** Read Receipt Event Handlers ********** //
@@ -642,6 +666,19 @@ class ConferBotSocket {
     if (eventListeners) {
       eventListeners.delete(callback);
     }
+  }
+
+  // Emit and wait for the server's acknowledgement (ai-action-decision,
+  // ai-answer-feedback). Resolves with null when offline or on timeout.
+  emitWithAck(event: string, payload: any, timeoutMs = 30000): Promise<any> {
+    return new Promise((resolve) => {
+      if (!this.socket || !this.isConnected()) return resolve(null);
+      const timer = setTimeout(() => resolve(null), timeoutMs);
+      this.socket.emit(event, payload, (res: any) => {
+        clearTimeout(timer);
+        resolve(res ?? null);
+      });
+    });
   }
 
   // Emit event to the server via the underlying socket.io connection.
