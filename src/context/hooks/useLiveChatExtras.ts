@@ -35,9 +35,11 @@ interface Params {
   isOpen: boolean;
   /** A handover to the team is waiting for a person (queue polling runs). */
   waitingForPerson: boolean;
+  /** The flow carries on from the handover (a message was left, or skipped). */
+  continueFlow?: () => void;
 }
 
-export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson }: Params) {
+export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow }: Params) {
   const [queue, setQueue] = useState<QueueStatus | null>(null);
   const [waiting, setWaiting] = useState<HandoverWaiting | null>(null);
   const [noAgents, setNoAgents] = useState(false);
@@ -175,10 +177,18 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     if (!res?.ok) return false;
     const entry = { id: entryId, _id: entryId, shape: 'user-message', type: 'user-message', via: 'email', text: message, time: new Date().toISOString(), data: { leftMessage: true, email } };
     addRecord({ ...entry, text: message }, entry);
+    chatStateRef.current?.setUserMetadata?.({ email });
     setLeftMessageTo(email);
     setNoAgents(false);
+    continueFlow?.();
     return true;
-  }, [addRecord]);
+  }, [addRecord, continueFlow]);
+
+  /** "Not now" on leave a message: the flow carries on. */
+  const skipLeaveMessage = useCallback(() => {
+    setNoAgents(false);
+    continueFlow?.();
+  }, [continueFlow]);
 
   /** The email the team replies to when nobody could join (handover-waiting). */
   const shareEmailForReply = useCallback(async (email: string): Promise<boolean> => {
@@ -264,6 +274,7 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     captureLeadEmail,
     submitRating,
     sendLiveFile,
+    skipLeaveMessage,
     dismissCsat,
     dismissFileRequest,
     resetLiveChatExtras,
