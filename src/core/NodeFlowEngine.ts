@@ -707,6 +707,12 @@ export class NodeFlowEngine {
     return node?.type === 'human-handover-node';
   }
 
+  /** The handover step's data while the flow waits on it (its max wait, assignment). */
+  handoverNodeData(): Record<string, any> | undefined {
+    const node = this._currentNodeId ? this.nodes.get(this._currentNodeId) : undefined;
+    return node?.type === 'human-handover-node' ? (node as any).data : undefined;
+  }
+
   getState(): EngineState {
     return {
       isProcessing: this._isProcessing,
