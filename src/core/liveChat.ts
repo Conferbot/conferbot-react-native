@@ -229,3 +229,29 @@ export const fileNameOf = (message: any, url: string): string => {
   const last = decodeURIComponent(String(url).split(/[?#]/)[0].split('/').pop() || '');
   return last || 'File';
 };
+
+/** The visitor's email for leave a message: their own, else the latest email they answered. */
+export const knownEmail = (visitorEmail: unknown, answerVariables: unknown): string => {
+  if (isEmail(String(visitorEmail || ''))) return String(visitorEmail).trim();
+  const values: unknown[] = Array.isArray(answerVariables)
+    ? answerVariables.map((v: any) => v?.value)
+    : answerVariables && typeof answerVariables === 'object'
+      ? Object.values(answerVariables as any).map((v: any) => (v && typeof v === 'object' ? v.value : v))
+      : [];
+  for (let i = values.length - 1; i >= 0; i--) if (isEmail(String(values[i] ?? ''))) return String(values[i]).trim();
+  return '';
+};
+
+/** What they last asked in their own words: the newest typed visitor message, not a button tap. */
+export const lastQuestion = (record: unknown): string => {
+  const list = Array.isArray(record) ? record : [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const r: any = list[i];
+    const kind = String(r?.shape || r?.type || '');
+    if (kind === 'user-live-message' || kind === 'user-input' || kind === 'user-message' || kind === 'ask-question-answer') {
+      const text = String(r?.text ?? r?.userInput ?? r?.value ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (text && !isEmail(text)) return text.slice(0, 2000);
+    }
+  }
+  return '';
+};
