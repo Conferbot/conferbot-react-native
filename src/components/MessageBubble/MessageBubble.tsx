@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   GestureResponderEvent,
   Linking,
+  Image,
 } from 'react-native';
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
@@ -18,6 +19,8 @@ import { MessageStatus as MessageStatusComponent } from '../MessageStatus';
 import { parseTextForUrls, type TextSegment } from '../../utils/LinkDetector';
 import { ChatText } from '../AgentReply/ChatText';
 import { isAIAgentDetails } from '../../core/agentBot';
+import { fileNameOf, fileUrlOf, isImageUrl, resolveMediaUrl, translationLabels } from '../../core/liveChat';
+import { getApiOrigin } from '../../config/constants';
 import { MessageStatus } from '../../types/messageStatus';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Agent, Reaction, ReactionEmoji } from '../../types';
@@ -205,8 +208,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isDeleted = isAgent && (message as any).deleted === true;
   const isEdited = isAgent && !isDeleted && (message as any).edited === true;
 
+  // An agent's message in the visitor's language: the original one tap away.
+  const translation = isAgent && !isDeleted ? (message as any).translation : null;
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [seeOriginal, seeTranslation] = translationLabels(translation?.to);
+
+  // A file the agent sent or the visitor uploaded.
+  const rawFileUrl = isDeleted ? null : fileUrlOf(message);
+  const fileUrl = rawFileUrl ? resolveMediaUrl(rawFileUrl, getApiOrigin()) : null;
+  const [imageFailed, setImageFailed] = useState(false);
+  const fileIsImage = !!fileUrl && !imageFailed && isImageUrl(fileUrl, (message as any).fileType || (message as any).mimeType);
+
   // Get message text
-  const messageText = isDeleted ? 'This message was deleted' : 'text' in message ? message.text : undefined;
+  const messageText = isDeleted
+    ? 'This message was deleted'
+    : translation && showOriginal
+      ? translation.original
+      : 'text' in message
+        ? message.text
+        : undefined;
   // An agent's text is formatted (lists, bold, links); an AI reply's pages
   // come as its sources, so no link previews under it.
   const formatted = isAgent && !isDeleted;
@@ -386,7 +406,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {messageText}
               </Text>
             ))}
+          {fileUrl && fileIsImage ? (
+            <TouchableOpacity onPress={() => Linking.openURL(fileUrl).catch(() => {})} accessibilityRole="imagebutton" accessibilityLabel={fileNameOf(message, fileUrl)}>
+              <Image source={{ uri: fileUrl }} style={styles.fileImage} resizeMode="cover" onError={() => setImageFailed(true)} />
+            </TouchableOpacity>
+          ) : fileUrl ? (
+            <TouchableOpacity style={styles.fileRow} onPress={() => Linking.openURL(fileUrl).catch(() => {})} accessibilityRole="link">
+              <Text style={[styles.fileIcon, { color: textColor }]}>{'\u{1F4CE}'}</Text>
+              <Text style={[styles.fileName, { color: textColor }]} numberOfLines={1}>{fileNameOf(message, fileUrl)}</Text>
+            </TouchableOpacity>
+          ) : null}
           {isEdited ? <Text style={[styles.timestamp, { color: textColor, opacity: 0.6, marginTop: 2 }]}>Edited</Text> : null}
+          {translation ? (
+            <TouchableOpacity onPress={() => setShowOriginal((v) => !v)} accessibilityRole="button" hitSlop={{ top: 6, bottom: 6 }}>
+              <Text style={[styles.timestamp, { color: textColor, opacity: 0.7, marginTop: 4, textDecorationLine: 'underline' }]}>
+                {showOriginal ? seeTranslation : seeOriginal}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           {/* Link Previews */}
           {renderLinkPreviews()}
@@ -500,6 +537,20 @@ const createStyles = (theme: ConferBotTheme) =>
       maxWidth: theme.layout.maxBubbleWidth,
       ...theme.shadows.sm,
     },
+    fileImage: {
+      width: 220,
+      height: 160,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.border,
+    },
+    fileRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      maxWidth: 240,
+    },
+    fileIcon: { fontSize: 16 },
+    fileName: { flexShrink: 1, fontSize: theme.typography.fontSize.md, textDecorationLine: 'underline' },
     messageText: {
       fontSize: theme.typography.fontSize.md,
       lineHeight: theme.typography.fontSize.md * theme.typography.lineHeight.normal,
