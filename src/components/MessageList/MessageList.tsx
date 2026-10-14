@@ -69,6 +69,8 @@ import { MessageStatus } from '../../types';
  * ```
  */
 export interface MessageListProps {
+  /** A chat background is drawn behind the list (the list itself is see-through). */
+  transparent?: boolean;
   messages: RecordItem[];
   loading?: boolean;
   showTypingIndicator?: boolean;
@@ -127,6 +129,7 @@ export interface MessageListProps {
  * @component
  */
 export const MessageList: React.FC<MessageListProps> = ({
+  transparent = false,
   messages,
   loading = false,
   showTypingIndicator = false,
@@ -507,7 +510,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       // A tap on a card button (Send, a star) works with the keyboard up.
       keyboardShouldPersistTaps="handled"
       ListEmptyComponent={renderEmpty}
-      style={styles.container}
+      style={[styles.container, transparent && { backgroundColor: 'transparent' }]}
       contentContainerStyle={[
         styles.contentContainer,
         messages.length === 0 && styles.emptyContent,
