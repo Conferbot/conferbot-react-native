@@ -1,11 +1,13 @@
 // @ts-nocheck
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { RecordItem } from '../../types';
 import { SocketEvents } from '../../types';
 import type { NodeFlowEngine, ChatState, NodeUIState, FlowDefinition } from '../../core';
 import type ConferBotSocket from '../../services/socket';
 import type { Agent, Reaction } from '../../types';
 import { stripHtml, deduplicateMessages, trimMessages } from '../types';
+import { parseAgentBot, type AgentBot } from '../../core/agentBot';
+import { htmlToMarkdown } from '../../utils/chatMarkdown';
 
 interface UseSocketListenersParams {
   socketClient: React.MutableRefObject<ConferBotSocket | null>;
@@ -33,6 +35,12 @@ interface UseSocketListenersParams {
   initializeFlowEngine: (sessionId: string, persistedState?: any) => void;
   // Last user choice ref — to skip duplicate bot messages from message-nodes echoing ${selection}
   lastUserChoiceRef: React.MutableRefObject<string | null>;
+  // AI agent bots (useAgentBot)
+  setAgentBot: (bot: AgentBot | null) => void;
+  onAgentBotReady: (sessionId: string, bot: AgentBot, nodes: any[]) => void;
+  onAgentAccepted: (data: any) => boolean;
+  onAgentMessage: (data: any) => Record<string, unknown>;
+  setupAgentListeners: () => void;
 }
 
 export function useSocketListeners({
@@ -57,9 +65,24 @@ export function useSocketListeners({
   persistSession,
   initializeFlowEngine,
   lastUserChoiceRef,
+  setAgentBot,
+  onAgentBotReady,
+  onAgentAccepted,
+  onAgentMessage,
+  setupAgentListeners,
 }: UseSocketListenersParams) {
+  // The session whose flow has been started: fetched-chatbot-data comes
+  // again on every reconnect, and must not restart the conversation.
+  const flowStartedFor = useRef<string | null>(null);
+  // The session as of the latest render. The listeners are set up once, so
+  // the chatSessionId they closed over goes stale (after a restart it is
+  // the old conversation's).
+  const sessionRef = useRef(chatSessionId);
+  sessionRef.current = chatSessionId;
+
   const setupSocketListeners = useCallback(() => {
     if (!socketClient.current) return;
+    setupAgentListeners();
 
     // *** FETCHED CHATBOT DATA *** //
     socketClient.current.on(SocketEvents.FETCHED_CHATBOT_DATA, (data: any) => {
@@ -96,8 +119,14 @@ export function useSocketListeners({
         }
       }
 
+      // No-flow AI agent bot (Agent Studio)? null for every flow bot.
+      const agentBot = parseAgentBot(chatbotData);
+      setAgentBot(agentBot);
+
       // Parse elements (nodes and edges)
-      const elements = chatbotData.elements;
+      const elements = Array.isArray(chatbotData.elements) && chatbotData.elements.length > 0
+        ? chatbotData.elements
+        : agentBot ? [{ nodes: [], edges: [] }] : null;
       if (elements && Array.isArray(elements) && elements.length > 0) {
         const firstElement = elements[0];
         const nodes = firstElement.nodes || [];
@@ -107,9 +136,9 @@ export function useSocketListeners({
           console.log('[ConferBot] Loaded', nodes.length, 'nodes and', edges.length, 'edges');
         }
 
-        if (nodes.length > 0) {
+        if (nodes.length > 0 || agentBot) {
           // Use socket's stored chatSessionId (always current) instead of stale closure value
-          const currentSessionId = socketClient.current?.chatSessionId || chatSessionId;
+          const currentSessionId = socketClient.current?.chatSessionId || sessionRef.current;
           if (__DEV__) {
             console.log('[ConferBot] flowEngine.current:', !!flowEngine.current, 'chatSessionId:', currentSessionId);
           }
@@ -180,7 +209,28 @@ export function useSocketListeners({
           if (__DEV__) {
             console.log('[ConferBot] After init, flowEngine.current:', !!flowEngine.current, 'chatStateRef.current:', !!chatStateRef.current);
           }
+          const startedSessionId = socketClient.current?.chatSessionId || chatStateRef.current?.sessionId || sessionRef.current;
+
+          // An agent bot opens into the agent chat (useAgentBot), never the
+          // shell flow.
+          if (agentBot && chatStateRef.current) {
+            if (resolvedBotNameOf(customizations)) {
+              chatStateRef.current.setVariable('_botName', resolvedBotNameOf(customizations));
+            }
+            setIsNodeProcessing(false);
+            onAgentBotReady(startedSessionId, agentBot, nodes);
+            return;
+          }
+
+          // Already running for this session (a reconnect): back in the
+          // room, nothing restarted.
+          if (startedSessionId && flowStartedFor.current === startedSessionId) {
+            if (socketClient.current?.isConnected()) socketClient.current.joinChatRoomVisitor(startedSessionId);
+            return;
+          }
+
           if (flowEngine.current) {
+            flowStartedFor.current = startedSessionId || null;
             // Set metadata on chatState
             if (chatStateRef.current) {
               if (workspaceIdRef.current) {
@@ -189,7 +239,7 @@ export function useSocketListeners({
               if (integrationWebhooks) {
                 chatStateRef.current.setVariable('_integrationWebhooks', integrationWebhooks);
               }
-              const resolvedBotName = customizations?.botName || customizations?.logoText || '';
+              const resolvedBotName = resolvedBotNameOf(customizations);
               if (resolvedBotName) {
                 chatStateRef.current.setVariable('_botName', resolvedBotName);
               }
@@ -216,7 +266,7 @@ export function useSocketListeners({
       // Only render records for our own session - without this, records
       // broadcast for other sessions (or the shared no-session record when
       // a client emits without a chatSessionId) leak into the transcript
-      const ownSessionId = socketClient.current?.chatSessionId || chatSessionId;
+      const ownSessionId = socketClient.current?.chatSessionId || sessionRef.current;
       if (ownSessionId && data.chatSessionId !== ownSessionId) {
         return;
       }
@@ -245,6 +295,13 @@ export function useSocketListeners({
 
     // *** AGENT ACCEPTED *** //
     socketClient.current.on(SocketEvents.AGENT_ACCEPTED, (data: any) => {
+      // An agent bot's own AI agent taking the chat it already greeted:
+      // nothing to announce.
+      if (onAgentAccepted(data)) {
+        setCurrentUIState(null);
+        setIsNodeProcessing(false);
+        return;
+      }
       if (data.agentDetails) {
         const agentName = data.agentDetails.name || 'Agent';
 
@@ -252,6 +309,8 @@ export function useSocketListeners({
           id: data.agentDetails._id,
           name: agentName,
           email: data.agentDetails.email,
+          avatar: data.agentDetails.avatar,
+          isAIAgent: data.agentDetails.isAIAgent === true,
         });
 
         setIsLiveChatMode(true);
@@ -286,8 +345,12 @@ export function useSocketListeners({
 
     // *** AGENT MESSAGE *** //
     socketClient.current.on(SocketEvents.AGENT_MESSAGE, (data: any) => {
+      const ownSessionId = socketClient.current?.chatSessionId || sessionRef.current;
+      if (data?.chatSessionId && ownSessionId && data.chatSessionId !== ownSessionId) return;
       const agentDetails = data.agentDetails || {};
       const messageId = data.agentMessageId || `agent-msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      // An AI reply's sources, buttons and cards (core/agentBot.ts).
+      const extras = onAgentMessage(data);
 
       let newRecord: RecordItem;
 
@@ -296,8 +359,9 @@ export function useSocketListeners({
           _id: messageId,
           type: 'agent-message',
           shape: 'agent-message',
-          text: stripHtml(data.message),
+          text: htmlToMarkdown(data.message),
           agentDetails,
+          ...extras,
           time: new Date().toISOString(),
         } as any;
       } else if (data.isFileInput) {
@@ -337,6 +401,7 @@ export function useSocketListeners({
           time: new Date().toISOString(),
           text: data.message,
           agentDetails,
+          ...(newRecord.shape === 'agent-message' ? recordedExtras(extras) : {}),
         });
       }
 
@@ -477,7 +542,17 @@ export function useSocketListeners({
         });
       }
     });
-  }, [isOpen, persistMessages, persistSession, initializeFlowEngine, chatSessionId]);
+  }, [isOpen, persistMessages, persistSession, initializeFlowEngine, chatSessionId, setAgentBot, onAgentBotReady, onAgentAccepted, onAgentMessage, setupAgentListeners]);
 
   return { setupSocketListeners };
 }
+
+const resolvedBotNameOf = (customizations: any): string =>
+  customizations?.botName || customizations?.logoText || '';
+
+// What the record keeps of an AI reply's extras: not the moment's offers
+// (an action awaiting confirmation), as the web widget does.
+const recordedExtras = (extras: Record<string, unknown>) => {
+  const { actionRequest, isAIReply, ...kept } = extras as any;
+  return kept;
+};
