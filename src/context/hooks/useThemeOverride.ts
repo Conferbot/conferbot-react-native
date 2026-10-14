@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useMemo } from 'react';
+import { toHex6, mix } from '../../theme/color';
 
 export function useThemeOverride(serverCustomizations: Record<string, any> | null) {
   const serverThemeOverride = useMemo(() => {
@@ -7,19 +8,33 @@ export function useThemeOverride(serverCustomizations: Record<string, any> | nul
     const c = serverCustomizations;
     const override: Record<string, any> = { colors: {} };
 
-    if (c.headerBgColor) override.colors.headerBg = c.headerBgColor;
-    if (c.headerTextColor) override.colors.headerText = c.headerTextColor;
-    if (c.botMsgColor) {
-      override.colors.botBubble = c.botMsgColor;
-      override.colors.primary = c.botMsgColor;
-      override.colors.primaryLight = c.botMsgColor + '33';
+    // Six-digit hex only: components append an alpha (theme/color.ts).
+    const col = (v: unknown) => toHex6(v);
+    const set = (key: string, v: unknown) => {
+      const hex = col(v);
+      if (hex) override.colors[key] = hex;
+    };
+
+    set('headerBg', c.headerBgColor);
+    set('headerText', c.headerTextColor);
+    const bot = col(c.botMsgColor);
+    if (bot) {
+      override.colors.botBubble = bot;
+      // An agent - person or AI - speaks in the bot's colours, as on the web.
+      override.colors.agentBubble = bot;
+      override.colors.primary = bot;
+      override.colors.primaryLight = mix(bot, '#ffffff', 0.8);
     }
-    if (c.botTextColor) override.colors.botBubbleText = c.botTextColor;
-    if (c.userMsgColor) override.colors.userBubble = c.userMsgColor;
-    if (c.userTextColor) override.colors.userBubbleText = c.userTextColor;
-    if (c.optionBubbleMsgColor) override.colors.optionBubble = c.optionBubbleMsgColor;
-    if (c.optionBubbleTextColor) override.colors.optionBubbleText = c.optionBubbleTextColor;
-    if (c.chatBgColor) override.colors.background = c.chatBgColor;
+    const botText = col(c.botTextColor);
+    if (botText) {
+      override.colors.botBubbleText = botText;
+      override.colors.agentBubbleText = botText;
+    }
+    set('userBubble', c.userMsgColor);
+    set('userBubbleText', c.userTextColor);
+    set('optionBubble', c.optionBubbleMsgColor);
+    set('optionBubbleText', c.optionBubbleTextColor);
+    set('background', c.chatBgColor);
 
     // Font size
     if (c.fontSize) {
