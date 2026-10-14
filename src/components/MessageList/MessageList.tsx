@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useContext } from 'react';
 import {
   FlatList,
   View,
@@ -16,6 +16,10 @@ import { TypingIndicator } from '../TypingIndicator';
 import { Avatar } from '../Avatar';
 import { EmptyState } from '../EmptyState';
 import { NodeRenderer } from '../NodeComponents';
+import { AgentReplyExtras, RichAgentMessage, SuggestionChips } from '../AgentReply';
+import ConferBotContext from '../../context/ConferBotContext';
+import { htmlToMarkdown } from '../../utils/chatMarkdown';
+import { isAIAgentDetails } from '../../core/agentBot';
 import type { NodeUIState } from '../../core/nodes/NodeHandler';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Reaction, ReactionEmoji, MessageStatusEntry } from '../../types';
@@ -142,9 +146,17 @@ export const MessageList: React.FC<MessageListProps> = ({
   isNodeLoading,
 }) => {
   const theme = useTheme();
+  // Optional: the list also renders standalone (tests, previews).
+  const conferBot = useContext(ConferBotContext);
   const styles = createStyles(theme);
   const flatListRef = useRef<any>(null);
   const visibleMessageIdsRef = useRef<Set<string | number>>(new Set());
+
+  // Opened on an existing conversation: start at its latest message.
+  useEffect(() => {
+    const t = setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 250);
+    return () => clearTimeout(t);
+  }, []);
 
   // Auto-scroll to end when new messages arrive
   useEffect(() => {
@@ -154,6 +166,16 @@ export const MessageList: React.FC<MessageListProps> = ({
       }, 100);
     }
   }, [messages.length]);
+
+  // ...and while a reply is written, or new suggestions or a node appear
+  // below the last message.
+  const footerKey = `${conferBot?.agentStream?.text?.length || 0}:${(conferBot?.suggestions || []).length}:${!!activeNodeUI}:${showTypingIndicator}`;
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      const t = setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 60);
+      return () => clearTimeout(t);
+    }
+  }, [footerKey]);
 
   // Get reactions for a specific message
   const getMessageReactions = useCallback(
@@ -285,29 +307,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     (item: RecordItem) => {
       const url = (item as any).url;
       if (!url) return null;
-
-      return (
-        <View style={{
-          paddingLeft: theme.layout.avatarSize + 10 + theme.spacing.chatContentPadding,
-          paddingRight: theme.spacing.chatContentPadding,
-          marginBottom: 8,
-        }}>
-          <Image
-            source={{ uri: url }}
-            style={{
-              width: 220,
-              maxWidth: '100%',
-              height: 160,
-              borderRadius: theme.borderRadius.bubble,
-              backgroundColor: theme.colors.botBubble,
-            }}
-            resizeMode="cover"
-            accessible={true}
-            accessibilityRole="image"
-            accessibilityLabel="Image"
-          />
-        </View>
-      );
+      return <BotImage url={url} theme={theme} />;
     },
     [theme]
   );
@@ -325,6 +325,11 @@ export const MessageList: React.FC<MessageListProps> = ({
         return renderBotImage(item);
       }
 
+      // An agent's article, quick replies or card
+      if ((item as any).shape === 'agent-message-rich' && (item as any).rich) {
+        return <RichAgentMessage message={item} testID={`${testID}-rich-${item._id}`} />;
+      }
+
       const messageId = item._id;
       const messageReactions = getMessageReactions(item._id);
       const messageStatus = getMessageStatus(item._id);
@@ -335,7 +340,10 @@ export const MessageList: React.FC<MessageListProps> = ({
       const shouldShowReceipt =
         showReadReceipts && isUserMessage && messageStatus !== undefined;
 
-      return (
+      // An AI agent's reply: its sources, buttons, cards and "Helpful?" below.
+      const isAIReply = item.type === 'agent-message' && isAIAgentDetails((item as any).agentDetails) && !(item as any).deleted;
+
+      const bubble = (
         <MessageBubble
           message={item}
           showAvatar={showAvatars}
@@ -356,6 +364,13 @@ export const MessageList: React.FC<MessageListProps> = ({
           messageStatus={shouldShowReceipt ? messageStatus : undefined}
           showReadReceipt={showReadReceipts}
         />
+      );
+      if (!isAIReply) return bubble;
+      return (
+        <View>
+          {bubble}
+          <AgentReplyExtras message={item} testID={`${testID}-extras-${item._id}`} />
+        </View>
       );
     },
     [
@@ -379,10 +394,25 @@ export const MessageList: React.FC<MessageListProps> = ({
   // Render list footer: inline interactive node + typing indicator
   const renderListFooter = () => {
     const hasNode = !!activeNodeUI && !!onNodeSubmit;
-    const hasTyping = showTypingIndicator;
-    if (!hasNode && !hasTyping) return null;
+    const stream = conferBot?.agentStream || null;
+    // The live reply replaces the dots once it is writing.
+    const hasTyping = showTypingIndicator && !stream;
+    const suggestions = !stream && !hasTyping ? conferBot?.suggestions || [] : [];
+    if (!hasNode && !hasTyping && !stream && !suggestions.length) return null;
     return (
       <View>
+        {stream && (
+          <MessageBubble
+            message={{ _id: `stream-${stream.id}`, type: 'agent-message', text: htmlToMarkdown(stream.text), agentDetails: stream.agentDetails, time: new Date().toISOString() } as any}
+            showAvatar={showAvatars}
+            enableReactions={false}
+            enableLinkPreviews={false}
+            testID={`${testID}-stream`}
+          />
+        )}
+        {suggestions.length > 0 && (
+          <SuggestionChips items={suggestions} onPick={(q) => conferBot?.sendMessage?.(q)} testID={`${testID}-suggestions`} />
+        )}
         {hasNode && (
           <View style={{ paddingBottom: theme.spacing.sm }}>
             <NodeRenderer
@@ -396,7 +426,11 @@ export const MessageList: React.FC<MessageListProps> = ({
         {hasTyping && (
           <View style={styles.typingContainer}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-              <Avatar name="Bot" size={32} />
+              <Avatar
+                source={conferBot?.currentAgent?.avatar || conferBot?.botAvatarUrl || undefined}
+                name={conferBot?.currentAgent?.name || conferBot?.botName || 'Bot'}
+                size={32}
+              />
               <TypingIndicator visible={true} />
             </View>
           </View>
@@ -494,3 +528,32 @@ const createStyles = (theme: ConferBotTheme) =>
       paddingBottom: theme.spacing.sm,
     },
   });
+
+/** A bot's standalone image; one that does not load is not drawn (no empty box). */
+const BotImage: React.FC<{ url: string; theme: ConferBotTheme }> = ({ url, theme }) => {
+  const [failed, setFailed] = React.useState(false);
+  if (failed) return null;
+  return (
+    <View style={{
+      paddingLeft: theme.layout.avatarSize + 10 + theme.spacing.chatContentPadding,
+      paddingRight: theme.spacing.chatContentPadding,
+      marginBottom: 8,
+    }}>
+      <Image
+        source={{ uri: url }}
+        style={{
+          width: 220,
+          maxWidth: '100%',
+          height: 160,
+          borderRadius: theme.borderRadius.bubble,
+          backgroundColor: theme.colors.botBubble,
+        }}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+        accessible={true}
+        accessibilityRole="image"
+        accessibilityLabel="Image"
+      />
+    </View>
+  );
+};
