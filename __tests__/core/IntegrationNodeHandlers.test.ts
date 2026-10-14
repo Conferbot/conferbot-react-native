@@ -492,6 +492,23 @@ describe('Integration Node Handlers', () => {
       }
     });
 
+    it('shows the builder rich text handover message as plain text, and waits there', async () => {
+      const { requiresUserInteraction } = require('../../src/core/nodes/NodeTypes');
+      const handler = new HumanHandoverHandler();
+      const node = createNode('human-handover-node', {
+        handoverMessage: '<p>Please wait while I connect you to the next available agent.</p>',
+      });
+
+      const result = await handler.handle(node, chatState);
+
+      expect(result.type).toBe('displayUI');
+      if (result.type === 'displayUI') {
+        expect((result.uiState as any).waitMessage).toBe('Please wait while I connect you to the next available agent.');
+      }
+      // The flow pauses on it until a person joins or nobody can.
+      expect(requiresUserInteraction('human-handover-node')).toBe(true);
+    });
+
     it('should show pre-chat form when configured', async () => {
       const handler = new HumanHandoverHandler();
       const node = createNode('human-handover-node', {
