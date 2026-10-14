@@ -341,7 +341,7 @@ export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
             { backgroundColor: theme.colors.primary },
           ]}
         >
-          <Text style={styles.iconEmoji}>{'\\uD83D\\uDC64'}</Text>
+          <Text style={styles.iconEmoji}>{'\u{1F464}'}</Text>
         </View>
       </View>
 
