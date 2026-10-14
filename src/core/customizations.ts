@@ -4,6 +4,8 @@
  * polish and owner sheets): defaults, the values that count as unset, and
  * what each one turns into on screen. Pure: the components read the result.
  */
+import { ownsChatBackground } from './widgetTheme';
+import type { ResolvedWidgetTheme } from './widgetTheme';
 
 export interface Corners {
   topLeft: number;
@@ -35,12 +37,20 @@ export interface ResolvedCustomizations {
   botBubble: Corners;
   userBubble: Corners;
   optionRadius: number;
+  /** An outline round each bubble, from the theme (cartoon, neo-brutal...), or null. */
+  bubbleBorder: { width: number; color: string } | null;
+  /** The composer field's corner radius: 25 (a pill) unless the theme has its own. */
+  fieldRadius: number;
+  /** The chat surface the theme paints when the owner kept the default white, else null. */
+  surface: string | null;
   /** Message text size: 14.5 unless the owner set something other than 14. */
   fontSize: number;
   /** The owner's font, or null for the platform font (Arial / unset). */
   fontFamily: string | null;
   /** Send button and accents: the header colour. */
   accent: string;
+  /** Ink on the accent: the theme palette's, else null (picked for contrast). */
+  accentInk: string | null;
   typingStyle: 'dots' | 'wave' | 'shimmer' | 'pencil' | 'mascot';
 }
 
@@ -71,7 +81,11 @@ export const avatarRadiusFor = (shape: unknown, size: number): number => {
   return size / 2;
 };
 
-export function resolveCustomizations(raw: Record<string, any> | null | undefined, botName = ''): ResolvedCustomizations {
+export function resolveCustomizations(
+  raw: Record<string, any> | null | undefined,
+  botName = '',
+  theme?: ResolvedWidgetTheme | null
+): ResolvedCustomizations {
   const c = raw || {};
   const name = str(c.logoText) || str(c.botName) || botName || 'Chat';
   const tagline = c.enableTagline === true && str(c.tagline) ? str(c.tagline) : null;
@@ -82,6 +96,11 @@ export function resolveCustomizations(raw: Record<string, any> | null | undefine
   const bubbleSet = num(c.bubbleBorderRadius);
   const ownBubble = bubbleSet !== null && bubbleSet !== 10;
   const optionSet = num(c.optionBubbleBorderRadius);
+  // A theme other than classic brings its own radii; the owner's still win.
+  const shape = theme?.shape || null;
+  const r = shape ? shape.rBubble : 18;
+  const tail = shape ? shape.rTail : 6;
+  const ownsBg = ownsChatBackground(c);
 
   const fontSet = num(c.fontSize);
   const font = str(c.font);
@@ -99,12 +118,17 @@ export function resolveCustomizations(raw: Record<string, any> | null | undefine
     avatarSize,
     avatarRadius: avatarRadiusFor(c.avatarShape, avatarSize),
     avatarShape: c.avatarShape === 'square' || c.avatarShape === 'rounded' ? c.avatarShape : 'circle',
-    botBubble: ownBubble ? all(bubbleSet as number) : { topLeft: 18, topRight: 18, bottomRight: 18, bottomLeft: 6 },
-    userBubble: ownBubble ? all(bubbleSet as number) : { topLeft: 18, topRight: 18, bottomRight: 6, bottomLeft: 18 },
-    optionRadius: optionSet !== null ? optionSet : 10,
+    botBubble: ownBubble ? all(bubbleSet as number) : { topLeft: r, topRight: r, bottomRight: r, bottomLeft: tail },
+    userBubble: ownBubble ? all(bubbleSet as number) : { topLeft: r, topRight: r, bottomRight: tail, bottomLeft: r },
+    optionRadius: optionSet !== null && (optionSet !== 10 || !shape) ? optionSet : shape ? shape.rCtl : 10,
+    bubbleBorder: shape?.bubbleBorder || null,
+    fieldRadius: shape ? shape.rField : 25,
+    surface: theme?.tokens && !ownsBg ? theme.tokens.bg : null,
     fontSize: fontSet && fontSet !== 14 ? fontSet : 14.5,
     fontFamily: UNSET_FONTS.has(font.toLowerCase()) ? null : font,
-    accent: str(c.headerBgColor) || '#0b4eb8',
+    // The theme palette's accent when it supplied the colours, else the header colour.
+    accent: str(c.themeAccent) || str(c.headerBgColor) || '#0b4eb8',
+    accentInk: str(c.themeOnAccent) || null,
     typingStyle: TYPING.has(c.typingStyle) ? c.typingStyle : 'dots',
   };
 }
