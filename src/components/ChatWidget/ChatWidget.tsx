@@ -208,6 +208,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     botAvatarUrl,
     serverCustomizations,
     customizations: resolvedCustomizations,
+    widgetTheme,
     // Use the context's flow engine state
     currentUIState,
     isNodeProcessing,
@@ -239,7 +240,11 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   } = useConferBot();
   // The bot's settings as the web applies them; the defaults until it loads.
   const customizations = resolvedCustomizations || resolveCustomizations(serverCustomizations);
-  const chatBackground = useMemo(() => resolveChatBackground(serverCustomizations), [serverCustomizations]);
+  // The theme paints the chat when the owner kept the default white (core/widgetTheme).
+  const chatBackground = useMemo(
+    () => (customizations.surface ? { type: 'solid' as const, color: customizations.surface } : resolveChatBackground(serverCustomizations)),
+    [serverCustomizations, customizations.surface]
+  );
 
   // Typing in the composer: a person is here (an agent bot's conversation
   // starts now), and the agent sees that they are typing.
@@ -914,7 +919,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       <ThemeProvider theme={serverThemeOverride || undefined}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.container}
+        style={[styles.container, serverThemeOverride?.colors?.surface ? { backgroundColor: serverThemeOverride.colors.surface } : null]}
       >
         {/* Header */}
         <ChatHeader
@@ -987,6 +992,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
             hideBrand={customizations.hideBrand}
             customBrand={customizations.customBrand || undefined}
             accent={serverCustomizations ? customizations.accent : undefined}
+            accentInk={customizations.accentInk || undefined}
+            fieldRadius={serverCustomizations ? customizations.fieldRadius : undefined}
+            fieldColor={serverThemeOverride?.mode ? widgetTheme?.tokens?.field : undefined}
             testID={`${testID}-input`}
           />
         )}
