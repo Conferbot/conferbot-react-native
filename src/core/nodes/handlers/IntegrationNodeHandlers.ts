@@ -90,6 +90,7 @@ import type {
 
 import { IntegrationSocketEvents } from '../../utils/IntegrationTypes';
 import { buildHandoverPayload } from '../../handoverPayload';
+import { stripHtml } from './DisplayNodeHandlers';
 
 // ========================================
 // ADDITIONAL TYPES
@@ -872,7 +873,8 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
       'handoverMessage',
       this.getString(data, 'waitMessage', 'Please wait while we connect you with an agent...')
     );
-    const resolvedMessage = state.resolveVariables(handoverMessage);
+    // The builder writes it as rich text (<p>...</p>).
+    const resolvedMessage = stripHtml(state.resolveVariables(handoverMessage));
 
     // Show the handover message as a bot message (matches web widget behavior)
     state.addBotMessage(resolvedMessage, nodeId, 'human-handover-node');
