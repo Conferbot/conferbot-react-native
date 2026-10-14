@@ -24,6 +24,7 @@ import {
   type ReceiptMarks,
 } from '../../core/liveChat';
 import { deduplicateMessages, trimMessages } from '../types';
+import { buildHandoverTimeoutPayload, waitMinutesOf } from '../../core/handoverPayload';
 
 export const QUEUE_POLL_MS = 20000;
 
@@ -37,9 +38,11 @@ interface Params {
   waitingForPerson: boolean;
   /** The flow carries on from the handover (a message was left, or skipped). */
   continueFlow?: () => void;
+  /** The waiting handover step's data and the bot's workspace, for its max wait. */
+  handoverWait?: () => { data: Record<string, any> | undefined; workspaceId: string };
 }
 
-export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow }: Params) {
+export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow, handoverWait }: Params) {
   const [queue, setQueue] = useState<QueueStatus | null>(null);
   const [waiting, setWaiting] = useState<HandoverWaiting | null>(null);
   const [noAgents, setNoAgents] = useState(false);
@@ -150,6 +153,19 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     ask();
     const t = setInterval(ask, QUEUE_POLL_MS);
     return () => clearInterval(t);
+  }, [waitingForPerson]);
+
+  // The handover step's max wait: once it passes with nobody joined, the
+  // server is asked to decide (handover-timeout) and answers with
+  // no-agents-available. Once per wait.
+  useEffect(() => {
+    if (!waitingForPerson || !handoverWait) return;
+    const { data, workspaceId } = handoverWait();
+    const t = setTimeout(() => {
+      const id = sid();
+      if (id) socketClient.current?.emitToServer('handover-timeout', buildHandoverTimeoutPayload(id, data, workspaceId));
+    }, waitMinutesOf(data?.maxWaitTime) * 60000);
+    return () => clearTimeout(t);
   }, [waitingForPerson]);
 
   // The visitor's receipts for the agent's newest message: delivered when it
