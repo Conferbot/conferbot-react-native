@@ -16,6 +16,8 @@ import { ReactionPicker } from '../ReactionPicker';
 import { LinkPreview } from '../LinkPreview';
 import { MessageStatus as MessageStatusComponent } from '../MessageStatus';
 import { parseTextForUrls, type TextSegment } from '../../utils/LinkDetector';
+import { ChatText } from '../AgentReply/ChatText';
+import { isAIAgentDetails } from '../../core/agentBot';
 import { MessageStatus } from '../../types/messageStatus';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Agent, Reaction, ReactionEmoji } from '../../types';
@@ -199,16 +201,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Get agent info if available (embed-server sends agentDetails)
   const agentDetails: AgentDetails | undefined = (message as any).agentDetails;
 
+  // An agent unsent it / edited it (agent-message-deleted / -edited).
+  const isDeleted = isAgent && (message as any).deleted === true;
+  const isEdited = isAgent && !isDeleted && (message as any).edited === true;
+
   // Get message text
-  const messageText = 'text' in message ? message.text : undefined;
+  const messageText = isDeleted ? 'This message was deleted' : 'text' in message ? message.text : undefined;
+  // An agent's text is formatted (lists, bold, links); an AI reply's pages
+  // come as its sources, so no link previews under it.
+  const formatted = isAgent && !isDeleted;
+  const isAIReply = isAgent && isAIAgentDetails((message as any).agentDetails);
 
   // Parse message text for URLs
   const parsedText = useMemo(() => {
-    if (!messageText || !enableLinkPreviews) {
+    if (!messageText || !enableLinkPreviews || isAIReply || isDeleted) {
       return null;
     }
     return parseTextForUrls(messageText);
-  }, [messageText, enableLinkPreviews]);
+  }, [messageText, enableLinkPreviews, isAIReply, isDeleted]);
 
   // Get user's selected reactions for this message
   const userReactions: ReactionEmoji[] = reactions
@@ -338,7 +348,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {!isUser && !isSystem && showAvatar && (
         <View style={styles.avatarContainer}>
           <Avatar
-            source={botAvatarUrl || undefined}
+            source={agentDetails?.avatar || botAvatarUrl || undefined}
             name={agentDetails?.name || botName || 'Bot'}
             size={theme.layout.avatarSize}
           />
@@ -354,12 +364,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
 
           {/* Message text with links */}
-          {messageText &&
+          {messageText && formatted ? (
+            <ChatText
+              text={messageText}
+              color={textColor}
+              fontSize={theme.typography.fontSize.md}
+              lineHeight={theme.typography.fontSize.md * theme.typography.lineHeight.normal}
+              linkColor={theme.colors.link}
+              onLinkPress={handleLinkPress}
+            />
+          ) : messageText &&
             (parsedText && parsedText.hasUrls ? (
               renderTextWithLinks(parsedText.segments, textColor)
             ) : (
               <Text
-                style={[styles.messageText, { color: textColor }]}
+                style={[styles.messageText, { color: textColor }, isDeleted && { fontStyle: 'italic', opacity: 0.7 }]}
                 accessible={true}
                 accessibilityLabel={`Message: ${messageText}`}
                 accessibilityRole="text"
@@ -367,6 +386,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {messageText}
               </Text>
             ))}
+          {isEdited ? <Text style={[styles.timestamp, { color: textColor, opacity: 0.6, marginTop: 2 }]}>Edited</Text> : null}
 
           {/* Link Previews */}
           {renderLinkPreviews()}
