@@ -58,40 +58,18 @@ export const Avatar: React.FC<AvatarProps> = ({
     switch (shape) {
       case 'circle':
         return avatarSize / 2;
+      // The web's avatar shapes: square 4px, rounded 28%.
       case 'square':
-        return 0;
+        return 4;
       case 'rounded':
-        return theme.borderRadius.md;
+        return Math.round(avatarSize * 0.28);
       default:
         return avatarSize / 2;
     }
   };
 
-  // Generate background color from name
-  const getBackgroundColor = (fullName?: string): string => {
-    if (backgroundColor) return backgroundColor;
-
-    if (!fullName) return theme.colors.textSecondary;
-
-    // Simple hash function to generate consistent color
-    let hash = 0;
-    for (let i = 0; i < fullName.length; i++) {
-      hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-
-    const colors = [
-      theme.colors.primary,
-      theme.colors.secondary,
-      '#FF6B6B',
-      '#4ECDC4',
-      '#45B7D1',
-      '#FFA07A',
-      '#98D8C8',
-      '#6C5CE7',
-    ];
-
-    return colors[Math.abs(hash) % colors.length];
-  };
+  // Initials sit on the brand colour: one accent, never a rainbow of names.
+  const getBackgroundColor = (_fullName?: string): string => backgroundColor || theme.colors.primary;
 
   const hasImageSource = source && (typeof source === 'string' ? source.length > 0 : source.uri.length > 0);
 
