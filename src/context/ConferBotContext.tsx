@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Platform } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import ConferBotAPI from '../services/api';
 import ConferBotSocket from '../services/socket';
 import { useReadReceipts } from '../hooks/useReadReceipts';
@@ -23,6 +23,7 @@ import { useSocketListeners } from './hooks/useSocketListeners';
 import { useLiveChat } from './hooks/useLiveChat';
 import { useThemeOverride } from './hooks/useThemeOverride';
 import { resolveCustomizations } from '../core/customizations';
+import { resolveWidgetTheme, withThemePalette } from '../core/widgetTheme';
 import { useAgentBot } from './hooks/useAgentBot';
 import { useLiveChatExtras } from './hooks/useLiveChatExtras';
 
@@ -213,9 +214,23 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   });
 
   // ********** Theme Override Hook ********** //
-  const { serverThemeOverride } = useThemeOverride(serverCustomizations);
+  // The widget theme (core/widgetTheme): with themeColors "theme" its palette
+  // replaces the owner's colours; "auto" follows the phone's light/dark.
+  const prefersDark = useColorScheme() === 'dark';
+  const themedCustomizations = useMemo(
+    () => withThemePalette(serverCustomizations, prefersDark),
+    [serverCustomizations, prefersDark]
+  );
+  const widgetTheme = useMemo(
+    () => resolveWidgetTheme(themedCustomizations, prefersDark),
+    [themedCustomizations, prefersDark]
+  );
+  const { serverThemeOverride } = useThemeOverride(themedCustomizations, widgetTheme);
   // The bot's settings as the web widget applies them (core/customizations).
-  const customizations = useMemo(() => resolveCustomizations(serverCustomizations), [serverCustomizations]);
+  const customizations = useMemo(
+    () => resolveCustomizations(themedCustomizations, '', widgetTheme),
+    [themedCustomizations, widgetTheme]
+  );
 
   // ********** Socket Listeners Hook ********** //
   const { setupSocketListeners } = useSocketListeners({
@@ -543,9 +558,10 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     isNodeProcessing,
     flowEngine: flowEngineRef.current,
     chatState: chatStateRef.current,
-    serverCustomizations,
+    serverCustomizations: themedCustomizations,
     serverThemeOverride,
     customizations,
+    widgetTheme,
     botName: serverCustomizations?.botName || serverCustomizations?.logoText || null,
     botAvatarUrl: serverCustomizations ? customizations.avatar : null,
     isRestoring,
