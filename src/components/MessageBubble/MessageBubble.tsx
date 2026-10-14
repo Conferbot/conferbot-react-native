@@ -158,7 +158,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       const base = isUser
         ? { backgroundColor: theme.colors.userBubble, alignSelf: 'flex-end' as const }
         : { backgroundColor: isAgent ? theme.colors.agentBubble : theme.colors.botBubble, alignSelf: 'flex-start' as const };
-      return { ...base, ...corners(isUser ? look.userBubble : look.botBubble) };
+      // The theme's outline round every bubble (cartoon, neo-brutal, sketch...).
+      const outline = look.bubbleBorder ? { borderWidth: look.bubbleBorder.width, borderColor: look.bubbleBorder.color } : null;
+      return { ...base, ...corners(isUser ? look.userBubble : look.botBubble), ...outline };
     }
     if (isUser) {
       return {
