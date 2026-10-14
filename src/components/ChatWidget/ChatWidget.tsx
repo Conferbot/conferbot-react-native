@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   Modal,
   StyleSheet,
@@ -31,6 +31,17 @@ import {
 } from '../../utils/FilePicker';
 import { isAudioRecorderAvailable } from '../../utils/AudioRecorder';
 import { getApiOrigin } from '../../config/constants';
+import { visitorUploadsOn } from '../../core/liveChat';
+import {
+  CsatCard,
+  FileRequestCard,
+  HandoverWaitingCard,
+  LeadCard,
+  LeaveMessageCard,
+  QueueCard,
+  QuickActionsStrip,
+  SystemLine,
+} from '../LiveChat/LiveChatCards';
 import type { VoiceRecordingResult } from '../VoiceRecorder';
 import type { ConferBotTheme } from '../../theme/types';
 import type { SocketEvents, RecordItem } from '../../types';
@@ -207,6 +218,18 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     agentBot,
     awaitingReply,
     engageAgent,
+    // Live chat extras
+    botId,
+    queue,
+    handoverWaiting,
+    noAgentsAvailable,
+    lockedBy,
+    visitorInputEnabled,
+    agentConnectionLost,
+    fileRequestedBy,
+    leadCardOpen,
+    csatOpen,
+    sendLiveFile,
     // Actions
     resetConversation,
   } = useConferBot();
@@ -234,6 +257,16 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   // Attachment state
   const [selectedAttachment, setSelectedAttachment] = useState<SelectedAttachment | null>(null);
   const [showAttachmentPreview, setShowAttachmentPreview] = useState(false);
+
+  // Attachments need a picker package in the host app; without one the
+  // visitor sees no paperclip (the developer gets a console note instead).
+  const canPickFiles = useMemo(() => {
+    const ok = isFilePickerAvailable() || isImagePickerAvailable();
+    if (!ok && __DEV__) {
+      console.warn('[ConferBot] File attachments are off: install react-native-document-picker, expo-document-picker, react-native-image-picker or expo-image-picker.');
+    }
+    return ok;
+  }, []);
 
   // Reference to context chat state for local operations
   const chatState = useRef<ChatState | null>(contextChatState);
@@ -378,7 +411,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
    * Upload file to server
    */
   const uploadFileToServer = useCallback(async (file: { uri: string; type: string; name: string }): Promise<string> => {
-    if (!chatbotConfig?.id) {
+    const uploadBotId = botId || chatbotConfig?.id;
+    if (!uploadBotId) {
       throw new Error('Bot ID is required for file upload');
     }
 
@@ -391,18 +425,17 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
     // Derive the origin from the configured endpoint and pass the chat
     // session so the server can attach the upload to this conversation
-    const sessionQuery = chatSessionId
-      ? `?chatSessionId=${encodeURIComponent(chatSessionId)}`
-      : '';
+    // (the visitor too, as the web widget does), so the file is bound to
+    // this conversation and comes back as the /media proxy URL.
+    const visitorId = chatState.current?.getVariable?.('_visitorId') || '';
+    const sessionQuery = `?chatSessionId=${encodeURIComponent(chatSessionId || '')}&visitorId=${encodeURIComponent(String(visitorId))}`;
 
+    // No Content-Type: fetch sets multipart with its boundary for FormData.
     const response = await fetch(
-      `${getApiOrigin()}/api/v1/bot/${chatbotConfig.id}/media${sessionQuery}`,
+      `${getApiOrigin()}/api/v1/bot/${encodeURIComponent(uploadBotId)}/media${sessionQuery}`,
       {
         method: 'POST',
         body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
       }
     );
 
@@ -411,8 +444,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     }
 
     const data = await response.json();
+    if (!data?.url) throw new Error("That file can't be sent. Please try another one.");
     return data.url;
-  }, [chatbotConfig?.id, chatSessionId]);
+  }, [botId, chatbotConfig?.id, chatSessionId]);
 
   /**
    * Handle voice message send
@@ -626,8 +660,11 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       clearInterval(progressInterval);
       setSelectedAttachment(prev => prev ? { ...prev, uploadProgress: 100, uploadedUrl } : null);
 
-      // Add the file message to the record
-      if (chatState.current) {
+      if (isLiveChatMode) {
+        // A live chat: the file goes to the agent as the web widget sends it.
+        sendLiveFile(uploadedUrl, { name: file.name, type: file.type, size: file.size });
+      } else if (chatState.current) {
+        // Add the file message to the record
         chatState.current.addRecord({
           id: `file_${Date.now()}`,
           type: 'user-message',
@@ -640,8 +677,10 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
         } as any);
       }
 
-      // Send as a message with the file URL
-      await sendMessage(`[File: ${file.name}] ${uploadedUrl}`);
+      if (!isLiveChatMode) {
+        // Send as a message with the file URL
+        await sendMessage(`[File: ${file.name}] ${uploadedUrl}`);
+      }
 
       // Clear the attachment
       setSelectedAttachment(null);
@@ -662,7 +701,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
       Alert.alert('Upload Failed', error.message || 'Failed to upload file. Please try again.');
     }
-  }, [selectedAttachment, uploadFileToServer, sendMessage, debug]);
+  }, [selectedAttachment, uploadFileToServer, sendMessage, debug, isLiveChatMode, sendLiveFile]);
 
   /**
    * Check if file is an image
@@ -892,15 +931,44 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           activeNodeUI={shouldShowNodeRenderer() && currentUIState ? currentUIState : null}
           onNodeSubmit={handleNodeResponse}
           isNodeLoading={isNodeProcessing}
+          footerExtras={
+            <>
+              <QueueCard />
+              <HandoverWaitingCard />
+              <LeaveMessageCard />
+              <FileRequestCard onUpload={canPickFiles ? handleAttachmentPress : undefined} />
+              <LeadCard />
+              <CsatCard />
+            </>
+          }
+          footerExtrasKey={[
+            queue?.position ?? '',
+            !!handoverWaiting,
+            noAgentsAvailable,
+            fileRequestedBy || '',
+            leadCardOpen,
+            csatOpen,
+          ].join(':')}
         />
+
+        {lockedBy ? <SystemLine text="This conversation has been locked" testID={`${testID}-locked`} /> : null}
+        {agentConnectionLost ? (
+          <SystemLine text={`${agentConnectionLost}'s connection dropped. Hang on, they should be right back.`} testID={`${testID}-agent-lost`} />
+        ) : null}
+        <QuickActionsStrip offerHuman={!!agentBot && !(currentAgent && !currentAgent.isAIAgent)} />
 
         {/* Unified input + footer — one seamless bottom bar */}
         {shouldShowInput() && (
           <ChatBottomBar
             onSend={handleSendMessage}
             onTyping={handleTyping}
-            placeholder={placeholder}
-            disabled={!isConnected}
+            placeholder={lockedBy || !visitorInputEnabled ? 'Replies are turned off for now' : placeholder}
+            disabled={!isConnected || !!lockedBy || !visitorInputEnabled}
+            onAttach={
+              isLiveChatMode && canPickFiles && (visitorUploadsOn(serverCustomizations) || !!fileRequestedBy)
+                ? handleAttachmentPress
+                : undefined
+            }
             testID={`${testID}-input`}
           />
         )}
