@@ -78,6 +78,8 @@ export function useSocketListeners({
   // The session whose flow has been started: fetched-chatbot-data comes
   // again on every reconnect, and must not restart the conversation.
   const flowStartedFor = useRef<string | null>(null);
+  // The bot's customizations, for listeners set up before they arrive.
+  const customizationsRef = useRef<any>(null);
   // The session as of the latest render. The listeners are set up once, so
   // the chatSessionId they closed over goes stale (after a restart it is
   // the old conversation's).
@@ -118,6 +120,7 @@ export function useSocketListeners({
       const customizations = chatbotData.customizations;
       if (customizations) {
         setServerCustomizations(customizations);
+        customizationsRef.current = customizations;
         if (__DEV__) {
           console.log('[ConferBot] Server customizations loaded:', Object.keys(customizations).length, 'keys');
         }
@@ -465,6 +468,23 @@ export function useSocketListeners({
       setIsLiveChatMode(false);
       setCurrentUIState(null);
       setIsNodeProcessing(false);
+
+      // A flow at its handover step, as the web widget does it: the owner's
+      // fallback as the bot's message, then "Leave a message" (the flow
+      // carries on once it is sent or skipped), or straight on when the
+      // owner turned that off.
+      const engine = flowEngine.current;
+      if (engine?.isAtHandover()) {
+        const node: any = engine.getNode(engine.getState().currentNodeId || '');
+        const fallback = stripHtml(chatStateRef.current?.resolveVariables(String(node?.data?.fallbackMessage || '')) || '');
+        if (fallback) {
+          const id = `agent-declined-${Date.now()}`;
+          setRecord((prev) => deduplicateMessages(trimMessages([...prev, { _id: id, type: 'bot-message', text: fallback, time: new Date().toISOString() } as any])));
+          chatStateRef.current?.addRecord({ id, type: 'agent-declined-message', message: fallback, renderedText: fallback, time: new Date().toISOString() } as any);
+        }
+        if (customizationsRef.current?.chatLeaveMessage === false) engine.submitResponse({ action: 'continue' });
+        return;
+      }
 
       const noAgentsRecord: RecordItem = {
         _id: `no-agents-${Date.now()}`,
