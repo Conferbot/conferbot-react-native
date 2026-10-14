@@ -206,7 +206,18 @@ export class StorageService {
    *
    * @param sessionData - Session data to persist
    */
-  async saveSession(sessionData: Partial<PersistedSessionData>): Promise<void> {
+  // Session saves read the stored session and write it back merged; run
+  // at once, the last to finish would write over the others' fields (the
+  // flow state's save, which carries no session id, blanked it).
+  private sessionWrites: Promise<void> = Promise.resolve();
+
+  saveSession(sessionData: Partial<PersistedSessionData>): Promise<void> {
+    const next = this.sessionWrites.then(() => this.writeSession(sessionData));
+    this.sessionWrites = next.catch(() => {});
+    return next;
+  }
+
+  private async writeSession(sessionData: Partial<PersistedSessionData>): Promise<void> {
     if (!this.isReady()) return;
 
     try {
