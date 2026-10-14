@@ -466,7 +466,7 @@ export class NavigateHandler extends BaseNodeHandler {
 /**
  * Strips HTML tags from text, leaving only plain text content
  */
-function stripHtml(html: string): string {
+export function stripHtml(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
