@@ -88,6 +88,23 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   isLiveChatMode: boolean;
   agentTyping: boolean;
   sendVisitorTyping: (isTyping: boolean) => void;
+  // ---- AI agent bots (Agent Studio) ----
+  /** The bot's AI agent when it is a no-flow agent bot, else null. */
+  agentBot: import('../core/agentBot').AgentBot | null;
+  /** The AI reply as it is being written (one live bubble), or null. */
+  agentStream: { id: string; text: string; agentDetails: any } | null;
+  /** One-tap questions: the greeting's starters, then each answer's follow-ups. */
+  suggestions: string[];
+  /** Waiting for the AI's reply (the typing dots). */
+  awaitingReply: boolean;
+  /** The visitor is engaging (typing): starts the agent conversation. */
+  engageAgent: () => void;
+  /** "Helpful?" on an AI answer. */
+  sendAnswerFeedback: (agentMessageId: string, feedback: { helpful: boolean; reason?: string; comment?: string }) => void;
+  /** Confirm / Not now on an action the AI is about to take. */
+  decideAction: (token: string, accept: boolean) => Promise<{ ok: boolean; code?: string }>;
+  /** A tapped answer button or quick action, as a goal. */
+  trackGoal: (goalId: string, conversionEvent: string) => void;
 }
 
 // ********** Extended Config Types ********** //
