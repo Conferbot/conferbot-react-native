@@ -28,8 +28,13 @@ export interface ChatBottomBarProps {
   customBrand?: string;
   /** The send button's colour: the bot's header colour, as on the web. */
   accent?: string;
+  /** Ink on the send button (the theme palette's); else picked for contrast. */
+  accentInk?: string;
   /** The paperclip: shown when given (a live chat that takes visitor files). */
   onAttach?: () => void;
+  /** The field's corner radius and fill, from the widget theme (a pill on the surface by default). */
+  fieldRadius?: number;
+  fieldColor?: string;
   testID?: string;
 }
 
@@ -47,7 +52,10 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
   hideBrand = false,
   customBrand,
   accent,
+  accentInk,
   onAttach,
+  fieldRadius,
+  fieldColor,
   testID,
 }) => {
   const theme = useTheme();
@@ -59,7 +67,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
 
   const canSend = text.trim().length > 0 && !disabled && !isSending;
   const sendColor = accent || theme.colors.primary;
-  const sendInk = readableOn(sendColor);
+  const sendInk = accentInk || readableOn(sendColor);
 
   const handleSend = useCallback(async () => {
     const trimmed = text.trim();
@@ -98,7 +106,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
           </TouchableOpacity>
         )}
         {/* Pill-shaped input with subtle border */}
-        <View style={styles.inputPill}>
+        <View style={[styles.inputPill, fieldRadius !== undefined && { borderRadius: Math.min(fieldRadius, 25) }, fieldColor ? { backgroundColor: fieldColor } : null]}>
           <TextInput
             style={styles.textInput}
             value={text}
