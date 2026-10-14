@@ -127,6 +127,8 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   captureLeadEmail: (email: string) => void;
   submitRating: (value: number | boolean, feedback?: string) => void;
   sendLiveFile: (url: string, file?: { name?: string; type?: string; size?: number }) => void;
+  /** "Not now" on leave a message: the flow carries on. */
+  skipLeaveMessage: () => void;
   dismissCsat: () => void;
   dismissFileRequest: () => void;
 }
