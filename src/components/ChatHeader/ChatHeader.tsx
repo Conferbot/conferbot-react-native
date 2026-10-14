@@ -37,6 +37,12 @@ export interface ChatHeaderProps {
   subtitle?: string;
   agent?: Agent;
   botAvatarUrl?: string;
+  /** The bot's header logo (the web shows the logo here, not the avatar). */
+  logoUrl?: string | null;
+  /** The owner hid the logo. */
+  hideLogo?: boolean;
+  /** The green "Online" line under the title (off with hideOnlineStatus or a tagline). */
+  showOnline?: boolean;
   showConnectionStatus?: boolean;
   onClose?: () => void;
   onAvatarPress?: () => void;
@@ -69,6 +75,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   subtitle,
   agent,
   botAvatarUrl,
+  logoUrl,
+  hideLogo = false,
+  showOnline = false,
   showConnectionStatus = true,
   onClose,
   onAvatarPress,
@@ -96,7 +105,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       }
       testID={testID}
     >
-      {/* Avatar — always shown (bot avatar or agent avatar) */}
+      {/* The agent's photo, else the bot's logo (none when the owner hid it). */}
+      {(agent || !hideLogo) && (
       <TouchableOpacity
         onPress={onAvatarPress}
         disabled={!onAvatarPress}
@@ -106,11 +116,16 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         testID={`${testID}-avatar`}
       >
         <Avatar
-          source={agent?.avatar || botAvatarUrl}
+          // A person's photo or initials; the bot's logo only for the bot.
+          source={agent ? agent.avatar : logoUrl || botAvatarUrl}
           name={agent?.name || displayTitle}
-          size={32}
+          size={38}
+          // Initials on the header: a soft disc in the header text colour, not brand on brand.
+          backgroundColor={`${theme.colors.headerText}33`}
+          textColor={theme.colors.headerText}
         />
       </TouchableOpacity>
+      )}
 
       {/* Title and subtitle */}
       <View style={styles.titleContainer}>
@@ -128,6 +143,13 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <Text style={styles.tagline} numberOfLines={1}>
             {tagline}
           </Text>
+        )}
+
+        {!tagline && !displaySubtitle && showOnline && (
+          <View style={styles.onlineRow} accessible accessibilityLabel="Online">
+            <View style={styles.onlineDot} />
+            <Text style={styles.subtitle}>Online</Text>
+          </View>
         )}
 
         {displaySubtitle && (
@@ -193,6 +215,7 @@ const createStyles = (theme: ConferBotTheme) =>
     },
     title: {
       fontSize: 16,
+      letterSpacing: -0.16,
       fontWeight: theme.typography.fontWeight.semibold,
       color: theme.colors.headerText,
       marginBottom: 1,
@@ -205,6 +228,20 @@ const createStyles = (theme: ConferBotTheme) =>
     subtitle: {
       fontSize: 11,
       color: theme.colors.headerText + 'BF', // 75% opacity
+    },
+    onlineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    // The web's 7px green dot with a soft white ring.
+    onlineDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+      backgroundColor: '#22c55e',
+      borderWidth: 2,
+      borderColor: 'rgba(255,255,255,0.35)',
     },
     actionsContainer: {
       flexDirection: 'row',
