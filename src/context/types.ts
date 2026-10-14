@@ -105,6 +105,30 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   decideAction: (token: string, accept: boolean) => Promise<{ ok: boolean; code?: string }>;
   /** A tapped answer button or quick action, as a goal. */
   trackGoal: (goalId: string, conversionEvent: string) => void;
+  // Live chat extras (core/liveChat.ts)
+  botId: string;
+  queue: import('../core/liveChat').QueueStatus | null;
+  handoverWaiting: import('../core/liveChat').HandoverWaiting | null;
+  noAgentsAvailable: boolean;
+  lockedBy: string | null;
+  visitorInputEnabled: boolean;
+  agentConnectionLost: string | null;
+  fileRequestedBy: string | null;
+  receiptMarks: import('../core/liveChat').ReceiptMarks;
+  leadCardOpen: boolean;
+  csatConfig: import('../core/liveChat').CsatConfig | null;
+  csatOpen: boolean;
+  /** Sent from the cards: the leave a message email, the lead email, a rating. */
+  leftMessageTo: string | null;
+  leadEmail: string | null;
+  csatSent: boolean;
+  leaveMessage: (email: string, message: string) => Promise<boolean>;
+  shareEmailForReply: (email: string) => Promise<boolean>;
+  captureLeadEmail: (email: string) => void;
+  submitRating: (value: number | boolean, feedback?: string) => void;
+  sendLiveFile: (url: string, file?: { name?: string; type?: string; size?: number }) => void;
+  dismissCsat: () => void;
+  dismissFileRequest: () => void;
 }
 
 // ********** Extended Config Types ********** //
