@@ -22,6 +22,7 @@ import { useFlowEngine } from './hooks/useFlowEngine';
 import { useSocketListeners } from './hooks/useSocketListeners';
 import { useLiveChat } from './hooks/useLiveChat';
 import { useThemeOverride } from './hooks/useThemeOverride';
+import { useAgentBot } from './hooks/useAgentBot';
 
 // ********** Context Creation ********** //
 const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
@@ -104,6 +105,13 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
   // ********** Live Chat Hook ********** //
   const readReceiptsEnabled = config?.enableReadReceipts !== false;
+  // AI agent bot: its silent handover is not accepted yet (live sends wait).
+  const agentPendingRef = useRef(false);
+  // Late-bound: the agent hook needs the live chat setters and the live
+  // chat hook calls back into the agent hook.
+  const agentHooks = useRef<{ engage: () => void; sent: () => void }>({ engage: () => {}, sent: () => {} });
+  const onBeforeLiveSend = useCallback(() => agentHooks.current.engage(), []);
+  const onLiveSent = useCallback(() => agentHooks.current.sent(), []);
   const {
     isLiveChatMode, setIsLiveChatMode,
     agentTyping, setAgentTyping,
@@ -116,7 +124,48 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setRecord,
     persistMessages,
     readReceiptsEnabled,
+    agentPendingRef,
+    onBeforeLiveSend,
+    onLiveSent,
   });
+
+  // ********** AI Agent Bot Hook ********** //
+  const {
+    agentBot, setAgentBot,
+    agentStream, suggestions, awaitingReply,
+    startAgentBotChat, engageAgent,
+    onAgentAccepted, onAgentMessage, noteVisitorMessage,
+    sendAnswerFeedback, decideAction, trackGoal,
+    setupAgentListeners, resetAgent,
+  } = useAgentBot({
+    socketClient,
+    chatStateRef,
+    setRecord,
+    setCurrentAgent,
+    setIsLiveChatMode,
+    setAgentTyping,
+    agentPendingRef,
+  });
+  agentHooks.current = { engage: engageAgent, sent: noteVisitorMessage };
+
+  // The agent chat is greeted when the visitor opens the chat, never at
+  // connect (fetched-chatbot-data arrives at every app start).
+  const agentStartRef = useRef<{ sessionId: string; bot: any; nodes: any[] } | null>(null);
+  const [agentStartTick, setAgentStartTick] = useState(0);
+  const onAgentBotReady = useCallback((sessionId: string, bot: any, nodes: any[]) => {
+    agentStartRef.current = { sessionId, bot, nodes };
+    setAgentStartTick((n) => n + 1);
+  }, []);
+  useEffect(() => {
+    const pending = agentStartRef.current;
+    if (!isOpen || !pending || !chatStateRef.current) return;
+    agentStartRef.current = null;
+    // A restored session already has its conversation: rejoin only.
+    const resumed = (chatStateRef.current.getRecord() || []).some(
+      (r: any) => r?.type === 'human-handover-node' || r?.shape === 'user-live-message'
+    ) || record.some((r: any) => String(r?._id || '').startsWith('agent-greeting-') || r?.shape === 'user-live-message');
+    startAgentBotChat(pending.sessionId, pending.bot, pending.nodes, resumed);
+  }, [isOpen, agentStartTick]);
 
   // ********** Read Receipts Hook ********** //
   const readReceiptConfig: ReadReceiptConfig = {
@@ -166,6 +215,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     persistSession,
     initializeFlowEngine,
     lastUserChoiceRef,
+    setAgentBot,
+    onAgentBotReady,
+    onAgentAccepted,
+    onAgentMessage,
+    setupAgentListeners,
   });
 
   // ********** Reset Conversation ********** //
@@ -178,6 +232,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setIsNodeProcessing(false);
     setIsLiveChatMode(false);
     setAgentTyping(false);
+    resetAgent();
 
     flowEngineRef.current?.reset();
     flowEngineRef.current = null;
@@ -222,13 +277,17 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
         }
 
         setChatSessionId(sessionId);
+        // The listeners' fetched-chatbot-data uses the socket's session.
+        if (socketClient.current) socketClient.current.chatSessionId = sessionId;
 
+        // The device's own messages first: they are what was on screen (the
+        // server's record is in its own shapes and has no AI replies).
         const serverRecord = historyResponse.data?.record || [];
-        if (serverRecord.length > 0) {
+        if (persistedState.messages.length > 0) {
+          setRecord(deduplicateMessages(trimMessages(persistedState.messages)));
+        } else if (serverRecord.length > 0) {
           setRecord(deduplicateMessages(trimMessages(serverRecord)));
           await persistMessages(serverRecord);
-        } else if (persistedState.messages.length > 0) {
-          setRecord(deduplicateMessages(trimMessages(persistedState.messages)));
         }
 
         initializeFlowEngine(sessionId, persistedState);
@@ -269,6 +328,15 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
         setupSocketListeners();
 
+        // Restore before connecting: fetched-chatbot-data arrives on connect
+        // and would otherwise start a new session over the saved one.
+        if (persistedState?.session) {
+          const restored = await restoreSession(persistedState);
+          if (!restored) {
+            setIsRestoring(false);
+          }
+        }
+
         if (config?.autoConnect !== false) {
           await socketClient.current.connect(user?.id || persistedState?.user?.userId);
           setIsConnected(true);
@@ -276,13 +344,6 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
         if (user) {
           await persistUserData(user);
-        }
-
-        if (persistedState?.session) {
-          const restored = await restoreSession(persistedState);
-          if (!restored) {
-            setIsRestoring(false);
-          }
         }
 
         setIsRestoring(false);
@@ -313,6 +374,20 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, botId]);
+
+  // ********** Keep the conversation on the device ********** //
+  // The session, whichever path created it (openChat, or the socket's
+  // fetched-chatbot-data), and the messages as they change.
+  useEffect(() => {
+    if (!chatSessionId || !storageService.current?.isReady()) return;
+    persistSession({ chatSessionId, isActive: true });
+    setHasPersistedSession(true);
+  }, [chatSessionId]);
+  useEffect(() => {
+    if (!chatSessionId || !record.length || !storageService.current?.isReady()) return;
+    const t = setTimeout(() => persistMessages(record), 400);
+    return () => clearTimeout(t);
+  }, [record, chatSessionId]);
 
   // ********** Chat Actions ********** //
   const openChat = useCallback(async () => {
@@ -462,6 +537,15 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     isLiveChatMode,
     agentTyping,
     sendVisitorTyping,
+    // AI agent bots (Agent Studio)
+    agentBot,
+    agentStream,
+    suggestions,
+    awaitingReply,
+    engageAgent,
+    sendAnswerFeedback,
+    decideAction,
+    trackGoal,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
