@@ -11,6 +11,7 @@ import type { ConferBotUser, RecordItem } from '../../types';
 import type { ChatState } from '../../core';
 import type { ExtendedConferBotConfig } from '../types';
 import { deduplicateMessages, trimMessages } from '../types';
+import { asyncStorageFor } from '../../utils/deviceStorage';
 
 interface UsePersistenceParams {
   botId: string;
@@ -25,18 +26,19 @@ export function usePersistence({ botId, config, user, chatStateRef }: UsePersist
 
   const storageService = useRef<StorageService | null>(null);
 
-  const persistenceEnabled = config?.enablePersistence !== false && !!config?.asyncStorage;
+  const asyncStorage = asyncStorageFor(config);
+  const persistenceEnabled = config?.enablePersistence !== false && !!asyncStorage;
 
   // ********** Storage Service Initialization ********** //
   const initializeStorage = useCallback(async (): Promise<PersistedState | null> => {
-    if (!persistenceEnabled || !config?.asyncStorage) {
+    if (!persistenceEnabled || !asyncStorage) {
       setIsRestoring(false);
       return null;
     }
 
     try {
       storageService.current = new StorageService(botId, config.persistenceConfig);
-      await storageService.current.initialize(config.asyncStorage);
+      await storageService.current.initialize(asyncStorage);
 
       const persistedState = await storageService.current.loadAll();
 
@@ -52,7 +54,7 @@ export function usePersistence({ botId, config, user, chatStateRef }: UsePersist
       console.error('[ConferBot] Failed to initialize storage:', error);
       return null;
     }
-  }, [botId, config?.asyncStorage, config?.persistenceConfig, persistenceEnabled]);
+  }, [botId, asyncStorage, config?.persistenceConfig, persistenceEnabled]);
 
   // ********** Persistence Helpers ********** //
   const persistSession = useCallback(async (sessionData: Partial<PersistedSessionData>) => {
