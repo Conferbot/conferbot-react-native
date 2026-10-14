@@ -40,7 +40,8 @@ export const buildHandoverPayload = (
       location: chatMetaData.location,
     },
     priority: str(data.priority, 'normal'),
-    maxWaitTime: typeof data.maxWaitTime === 'number' ? data.maxWaitTime : 2,
+    // Minutes as the builder wrote them ("0.5" is half a minute), as the web sends it.
+    maxWaitTime: Number(data.maxWaitTime) > 0 ? Number(data.maxWaitTime) : 2,
     assignmentType: str(data.assignmentType, 'auto'),
     assignmentStrategy: str(data.agentAssignmentStrategy),
     assignedAgents: arr(data.assignedAgents),
