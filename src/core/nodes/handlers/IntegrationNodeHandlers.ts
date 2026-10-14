@@ -89,6 +89,7 @@ import type {
 } from '../../utils/IntegrationTypes';
 
 import { IntegrationSocketEvents } from '../../utils/IntegrationTypes';
+import { buildHandoverPayload } from '../../handoverPayload';
 
 // ========================================
 // ADDITIONAL TYPES
@@ -876,22 +877,6 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
     // Show the handover message as a bot message (matches web widget behavior)
     state.addBotMessage(resolvedMessage, nodeId, 'human-handover-node');
 
-    // Build chatMetaData matching the web widget format exactly
-    const workspaceId = state.getVariable('_workspaceId') || '';
-    const chatMetaData = {
-      version: 'v2',
-      workspaceId,
-      chatSessionId: state.sessionId,
-      botId: state.botId,
-      botName: state.getVariable('_botName') || '',
-      chatDate: new Date().toISOString(),
-      deviceInfo: 'ReactNative',
-      location: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      record: state.getRecord(),
-      answerVariables: state.getAnswerVariables(),
-      transcript: state.getTranscript(),
-    };
-
     // Ensure visitor socket is in the chat room before handover
     // (covers edge cases: restart, reconnect, or late room join)
     if (this.socketClient) {
@@ -904,30 +889,10 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
       this.emitSocketEvent('response-record', responseData);
     }
 
-    // No artificial delay needed: socket.io preserves emit order on a single
-    // connection, so response-record is processed before initiate-handover.
-
-    // Emit initiate-handover via socket (matches web widget's socket.emit("initiate-handover", ...))
-    const maxWaitTime = this.getNumber(data, 'maxWaitTime', 2);
-    this.emitSocketEvent('initiate-handover', {
-      workspaceId,
-      chatbotId: state.botId,
-      chatbotName: chatMetaData.botName,
-      chatSessionId: state.sessionId,
-      chatMetaData,
-      metaData: {
-        visitorId: state.sessionId,
-        chatDate: chatMetaData.chatDate,
-        deviceInfo: chatMetaData.deviceInfo,
-        location: chatMetaData.location,
-      },
-      priority: this.getString(data, 'priority', 'normal'),
-      maxWaitTime,
-      assignmentType: this.getString(data, 'assignmentType', 'auto'),
-      assignmentStrategy: this.getString(data, 'agentAssignmentStrategy'),
-      assignedAgents: this.getArray(data, 'assignedAgents'),
-      assignedAIAgents: this.getArray(data, 'assignedAIAgents'),
-    });
+    // socket.io preserves emit order on a single connection, so
+    // response-record is processed before initiate-handover.
+    // Payload matches the web widget's socket.emit("initiate-handover", ...)
+    this.emitSocketEvent('initiate-handover', buildHandoverPayload(state, data));
 
     state.setVariable('_handoverInitiated', true);
     state.setVariable('_handoverStartTime', new Date().toISOString());
