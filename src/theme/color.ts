@@ -33,3 +33,15 @@ export const mix = (color: string, toward: string, amount: number): string => {
   const ch = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
   return `#${[0, 1, 2].map((i) => hex2(ch(a, i) + (ch(b, i) - ch(a, i)) * amount)).join('')}`;
 };
+
+/** Black or white, whichever reads on the given colour (WCAG relative luminance). */
+export const readableOn = (color: string): '#000000' | '#ffffff' => {
+  const hex = toHex6(color);
+  if (!hex) return '#ffffff';
+  const ch = [1, 3, 5].map((i) => {
+    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  const lum = 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  return lum > 0.5 ? '#000000' : '#ffffff';
+};
