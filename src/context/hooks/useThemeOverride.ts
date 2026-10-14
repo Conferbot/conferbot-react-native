@@ -30,8 +30,10 @@ export function useThemeOverride(serverCustomizations: Record<string, any> | nul
       override.colors.botBubbleText = botText;
       override.colors.agentBubbleText = botText;
     }
-    set('userBubble', c.userMsgColor);
-    set('userBubbleText', c.userTextColor);
+    // The visitor's bubble: light grey with dark text by default; an owner's
+    // bubble colour with no text colour gets white text, as on the web.
+    set('userBubble', c.userMsgColor || '#f0f0f0');
+    set('userBubbleText', c.userTextColor || (c.userMsgColor ? '#ffffff' : '#000000'));
     // Choices: the option colours, else the bot's (as the web chains them).
     set('optionBubble', c.optionBubbleMsgColor || c.botMsgColor);
     set('optionBubbleText', c.optionBubbleTextColor || c.botTextColor);
