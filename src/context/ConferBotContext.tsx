@@ -23,6 +23,7 @@ import { useSocketListeners } from './hooks/useSocketListeners';
 import { useLiveChat } from './hooks/useLiveChat';
 import { useThemeOverride } from './hooks/useThemeOverride';
 import { useAgentBot } from './hooks/useAgentBot';
+import { useLiveChatExtras } from './hooks/useLiveChatExtras';
 
 // ********** Context Creation ********** //
 const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
@@ -148,6 +149,18 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   });
   agentHooks.current = { engage: engageAgent, sent: noteVisitorMessage };
 
+  // ********** Live Chat Extras Hook ********** //
+  // Queue, nobody available, receipts, locks, file requests, follow-up
+  // email, post-chat rating (core/liveChat.ts).
+  const liveChatExtras = useLiveChatExtras({
+    socketClient,
+    chatStateRef,
+    record,
+    setRecord,
+    isOpen,
+    waitingForPerson: currentUIState?.type === 'humanHandover' && !isLiveChatMode,
+  });
+
   // The agent chat is greeted when the visitor opens the chat, never at
   // connect (fetched-chatbot-data arrives at every app start).
   const agentStartRef = useRef<{ sessionId: string; bot: any; nodes: any[] } | null>(null);
@@ -216,10 +229,17 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     initializeFlowEngine,
     lastUserChoiceRef,
     setAgentBot,
+    onChatbotData: (chatbotData: any) => {
+      liveChatExtras.setChatbotData(chatbotData);
+      setChatbotConfig((prev) => ({ ...(prev || {}), id: botId, name: chatbotData?.name, csatConfig: chatbotData?.csatConfig } as any));
+    },
     onAgentBotReady,
     onAgentAccepted,
     onAgentMessage,
-    setupAgentListeners,
+    setupAgentListeners: () => {
+      setupAgentListeners();
+      liveChatExtras.setupLiveChatListeners();
+    },
   });
 
   // ********** Reset Conversation ********** //
@@ -233,6 +253,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setIsLiveChatMode(false);
     setAgentTyping(false);
     resetAgent();
+    liveChatExtras.resetLiveChatExtras();
 
     flowEngineRef.current?.reset();
     flowEngineRef.current = null;
@@ -546,6 +567,29 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     sendAnswerFeedback,
     decideAction,
     trackGoal,
+    // Live chat extras
+    botId,
+    queue: liveChatExtras.queue,
+    handoverWaiting: liveChatExtras.waiting,
+    noAgentsAvailable: liveChatExtras.noAgents,
+    lockedBy: liveChatExtras.lockedBy,
+    visitorInputEnabled: liveChatExtras.inputEnabled,
+    agentConnectionLost: liveChatExtras.agentLost,
+    fileRequestedBy: liveChatExtras.fileRequestedBy,
+    receiptMarks: liveChatExtras.receiptMarks,
+    leadCardOpen: liveChatExtras.leadCardOpen,
+    csatConfig: liveChatExtras.csatConfig,
+    csatOpen: liveChatExtras.csatOpen,
+    leftMessageTo: liveChatExtras.leftMessageTo,
+    leadEmail: liveChatExtras.leadEmail,
+    csatSent: liveChatExtras.csatSent,
+    leaveMessage: liveChatExtras.leaveMessage,
+    shareEmailForReply: liveChatExtras.shareEmailForReply,
+    captureLeadEmail: liveChatExtras.captureLeadEmail,
+    submitRating: liveChatExtras.submitRating,
+    sendLiveFile: liveChatExtras.sendLiveFile,
+    dismissCsat: liveChatExtras.dismissCsat,
+    dismissFileRequest: liveChatExtras.dismissFileRequest,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
