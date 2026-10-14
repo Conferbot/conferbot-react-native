@@ -125,6 +125,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const conferBot = useContext(ConferBotContext);
   const botAvatarUrl = conferBot?.botAvatarUrl ?? null;
   const botName = conferBot?.botName ?? null;
+  // The owner's bubble and avatar settings (core/customizations), when a bot is loaded.
+  const look = conferBot?.serverCustomizations ? conferBot.customizations : null;
   const styles = createStyles(theme);
 
   // State for reaction picker
@@ -144,7 +146,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const rSmall = theme.borderRadius.bubbleSmall;
 
   // Get colors and radius based on message type
+  const corners = (c: { topLeft: number; topRight: number; bottomRight: number; bottomLeft: number }) => ({
+    borderTopLeftRadius: c.topLeft,
+    borderTopRightRadius: c.topRight,
+    borderBottomRightRadius: c.bottomRight,
+    borderBottomLeftRadius: c.bottomLeft,
+  });
+
   const getBubbleStyle = () => {
+    if (look && !isSystem) {
+      const base = isUser
+        ? { backgroundColor: theme.colors.userBubble, alignSelf: 'flex-end' as const }
+        : { backgroundColor: isAgent ? theme.colors.agentBubble : theme.colors.botBubble, alignSelf: 'flex-start' as const };
+      return { ...base, ...corners(isUser ? look.userBubble : look.botBubble) };
+    }
     if (isUser) {
       return {
         backgroundColor: theme.colors.userBubble,
@@ -365,12 +380,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const bubbleContent = (
     <View style={[styles.container, isUser && { alignSelf: 'flex-end' }]}>
       {/* Avatar for non-user messages */}
-      {!isUser && !isSystem && showAvatar && (
+      {!isUser && !isSystem && showAvatar && !look?.hideAvatar && (
         <View style={styles.avatarContainer}>
           <Avatar
-            source={agentDetails?.avatar || botAvatarUrl || undefined}
+            source={agentDetails && !agentDetails.isAIAgent ? agentDetails.avatar : agentDetails?.avatar || look?.avatar || botAvatarUrl || undefined}
             name={agentDetails?.name || botName || 'Bot'}
-            size={theme.layout.avatarSize}
+            size={look ? look.avatarSize : theme.layout.avatarSize}
+            shape={look?.avatarShape}
           />
         </View>
       )}
