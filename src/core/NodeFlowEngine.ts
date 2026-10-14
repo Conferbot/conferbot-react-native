@@ -592,15 +592,21 @@ export class NodeFlowEngine {
     }
 
     // Find matching edge for default case
-    for (const edge of this.edges) {
-      if (edge.source === currentNodeId) {
-        if (!portName) {
-          // Default edge (no port requirement)
-          if (!edge.sourceHandle || edge.sourceHandle === 'default' || edge.sourceHandle === 'out' || edge.sourceHandle === 'source') {
-            return edge.target;
-          }
-        }
-      }
+    if (!portName) {
+      const fromHere = this.edges.filter((edge) => edge.source === currentNodeId);
+      // Default edge (no port requirement). The builder names a single
+      // output "source-1" on most nodes (as often as "source").
+      const byDefault = fromHere.find(
+        (edge) =>
+          !edge.sourceHandle ||
+          edge.sourceHandle === 'default' ||
+          edge.sourceHandle === 'out' ||
+          edge.sourceHandle === 'source' ||
+          edge.sourceHandle === 'source-1'
+      );
+      if (byDefault) return byDefault.target;
+      // One way out, whatever its handle is called: take it.
+      if (fromHere.length === 1) return fromHere[0].target;
     }
 
     // Try to find any edge from this node as fallback
