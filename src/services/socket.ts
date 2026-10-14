@@ -37,6 +37,10 @@ export const FORWARDED_SERVER_EVENTS = [
   'handover-queue',
   'handover-waiting',
   'queue-status',
+  'queue-help',
+  'queue-left',
+  'agent-connection-lost',
+  'agent-connection-restored',
 ] as const;
 
 // Socket connection options
