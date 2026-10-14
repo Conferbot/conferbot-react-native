@@ -696,6 +696,17 @@ export class NodeFlowEngine {
   /**
    * Gets the current engine state
    */
+  /** A node of the loaded flow by id. */
+  getNode(nodeId: string): BaseNode | undefined {
+    return this.nodes.get(nodeId);
+  }
+
+  /** Waiting on its handover step (for a person, or after nobody came). */
+  isAtHandover(): boolean {
+    const node = this._currentNodeId ? this.nodes.get(this._currentNodeId) : undefined;
+    return node?.type === 'human-handover-node';
+  }
+
   getState(): EngineState {
     return {
       isProcessing: this._isProcessing,
