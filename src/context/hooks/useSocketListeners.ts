@@ -8,6 +8,7 @@ import type { Agent, Reaction } from '../../types';
 import { stripHtml, deduplicateMessages, trimMessages } from '../types';
 import { parseAgentBot, type AgentBot } from '../../core/agentBot';
 import { htmlToMarkdown } from '../../utils/chatMarkdown';
+import { agentTranslationOf } from '../../core/liveChat';
 
 interface UseSocketListenersParams {
   socketClient: React.MutableRefObject<ConferBotSocket | null>;
@@ -37,6 +38,8 @@ interface UseSocketListenersParams {
   lastUserChoiceRef: React.MutableRefObject<string | null>;
   // AI agent bots (useAgentBot)
   setAgentBot: (bot: AgentBot | null) => void;
+  /** The bot's data beyond the flow (post-chat rating settings, name). */
+  onChatbotData: (chatbotData: any) => void;
   onAgentBotReady: (sessionId: string, bot: AgentBot, nodes: any[]) => void;
   onAgentAccepted: (data: any) => boolean;
   onAgentMessage: (data: any) => Record<string, unknown>;
@@ -66,6 +69,7 @@ export function useSocketListeners({
   initializeFlowEngine,
   lastUserChoiceRef,
   setAgentBot,
+  onChatbotData,
   onAgentBotReady,
   onAgentAccepted,
   onAgentMessage,
@@ -122,6 +126,7 @@ export function useSocketListeners({
       // No-flow AI agent bot (Agent Studio)? null for every flow bot.
       const agentBot = parseAgentBot(chatbotData);
       setAgentBot(agentBot);
+      onChatbotData(chatbotData);
 
       // Parse elements (nodes and edges)
       const elements = Array.isArray(chatbotData.elements) && chatbotData.elements.length > 0
@@ -164,45 +169,6 @@ export function useSocketListeners({
               }, 1000);
             }
 
-            // Add a ChatState listener to sync bot messages to UI record
-            if (chatStateRef.current) {
-              let lastTranscriptLength = 0;
-              chatStateRef.current.addListener((state) => {
-                const transcript = state.getTranscript();
-                if (transcript.length > lastTranscriptLength) {
-                  const newEntries = transcript.slice(lastTranscriptLength);
-                  lastTranscriptLength = transcript.length;
-
-                  const newRecordItems: RecordItem[] = [];
-                  for (const entry of newEntries) {
-                    if (entry.type === 'bot' && entry.text) {
-                      newRecordItems.push({
-                        _id: `bot_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-                        type: 'bot-message',
-                        shape: 'bot-text-message',
-                        text: entry.text,
-                        time: entry.timestamp || new Date().toISOString(),
-                      } as any);
-                    }
-                    // Standalone bot image (e.g. welcome node image/GIF),
-                    // rendered below the text bubble like the web widget
-                    if (entry.type === 'bot' && entry.data?.imageUrl) {
-                      newRecordItems.push({
-                        _id: `bot_img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-                        type: 'bot-message',
-                        shape: 'bot-image-message',
-                        url: entry.data.imageUrl,
-                        time: entry.timestamp || new Date().toISOString(),
-                      } as any);
-                    }
-                  }
-
-                  if (newRecordItems.length > 0) {
-                    setRecord((prev) => deduplicateMessages(trimMessages([...prev, ...newRecordItems])));
-                  }
-                }
-              });
-            }
           }
 
           // Start flow engine with parsed data
@@ -362,6 +328,8 @@ export function useSocketListeners({
           text: htmlToMarkdown(data.message),
           agentDetails,
           ...extras,
+          // Sent in the visitor's language: the original kept for "See original".
+          ...(agentTranslationOf(data) ? { translation: agentTranslationOf(data) } : {}),
           time: new Date().toISOString(),
         } as any;
       } else if (data.isFileInput) {
@@ -501,7 +469,7 @@ export function useSocketListeners({
       const noAgentsRecord: RecordItem = {
         _id: `no-agents-${Date.now()}`,
         type: 'system-message',
-        text: 'No agents are available at the moment. Please try again later.',
+        text: 'No agents are available at the moment.',
         time: new Date().toISOString(),
       } as any;
 
