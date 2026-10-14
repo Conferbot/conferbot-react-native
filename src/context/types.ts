@@ -1,5 +1,6 @@
 // @ts-nocheck
 import type { ResolvedCustomizations } from '../core/customizations';
+import type { ResolvedWidgetTheme } from '../core/widgetTheme';
 import type {
   ConferBotConfig,
   ConferBotUser,
@@ -72,6 +73,8 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   serverThemeOverride: Record<string, any> | null;
   /** The bot's settings as the web widget applies them (core/customizations). */
   customizations: ResolvedCustomizations;
+  /** The widget theme in force: tokens, shape, scheme (core/widgetTheme). */
+  widgetTheme: ResolvedWidgetTheme;
   botName: string | null;
   botAvatarUrl: string | null;
   // Persistence methods
