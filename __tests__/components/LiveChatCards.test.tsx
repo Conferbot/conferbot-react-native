@@ -62,7 +62,7 @@ describe('LiveChatCards', () => {
     const queue = { status: 'waiting', position: 2, ahead: 1, agentsOnline: 1, estimateLabel: '3 min' };
     const a = withContext(<QueueCard />, { queue });
     expect(a.getByText("You're 2nd in line")).toBeTruthy();
-    expect(a.getByText('About 3 min')).toBeTruthy();
+    expect(a.getByText('3 min')).toBeTruthy();
     const b = withContext(<QueueCard />, { queue, currentUIState: { type: 'humanHandover' } });
     expect(b.queryByText("You're 2nd in line")).toBeNull();
   });
