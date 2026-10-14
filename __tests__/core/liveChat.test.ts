@@ -17,6 +17,8 @@ import {
   visitorReceiptOf,
   visitorUploadsOn,
   agentTranslationOf,
+  knownEmail,
+  lastQuestion,
 } from '../../src/core/liveChat';
 
 describe('liveChat', () => {
@@ -147,5 +149,14 @@ describe('liveChat', () => {
       expect(fileNameOf({ fileName: 'Invoice.pdf' }, '/media/1')).toBe('Invoice.pdf');
       expect(fileNameOf({}, 'https://x/My%20File.pdf?sig=1')).toBe('My File.pdf');
     });
+  });
+
+  it('prefills leave a message as the web widget does', () => {
+    expect(knownEmail('jo@example.com', [])).toBe('jo@example.com');
+    expect(knownEmail('', [{ key: 'email', value: 'old@a.co' }, { key: 'e2', value: 'new@a.co' }])).toBe('new@a.co');
+    expect(knownEmail(undefined, { email: { value: 'x@y.co' } })).toBe('x@y.co');
+    expect(knownEmail('', [])).toBe('');
+    expect(lastQuestion([{ shape: 'user-live-message', text: 'Do you ship to <b>Oman</b>?' }, { shape: 'user-input-response', text: 'Jo' }])).toBe('Do you ship to Oman ?');
+    expect(lastQuestion([{ shape: 'user-live-message', text: 'jo@example.com' }])).toBe('');
   });
 });
