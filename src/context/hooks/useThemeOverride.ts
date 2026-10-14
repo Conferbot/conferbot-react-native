@@ -32,17 +32,18 @@ export function useThemeOverride(serverCustomizations: Record<string, any> | nul
     }
     set('userBubble', c.userMsgColor);
     set('userBubbleText', c.userTextColor);
-    set('optionBubble', c.optionBubbleMsgColor);
-    set('optionBubbleText', c.optionBubbleTextColor);
+    // Choices: the option colours, else the bot's (as the web chains them).
+    set('optionBubble', c.optionBubbleMsgColor || c.botMsgColor);
+    set('optionBubbleText', c.optionBubbleTextColor || c.botTextColor);
     set('background', c.chatBgColor);
 
-    // Font size
-    if (c.fontSize) {
-      const size = parseInt(c.fontSize, 10);
-      if (!isNaN(size)) {
-        override.typography = { fontSize: { md: size } };
-      }
-    }
+    // 14 is the unset default: AI and visitor bubbles are 14.5 on the web.
+    const size = parseFloat(c.fontSize);
+    override.typography = { fontSize: { md: Number.isFinite(size) && size !== 14 ? size : 14.5 } };
+
+    // Choice buttons: the owner's radius (10, the server's default, is the web's 10 too).
+    const optionRadius = parseFloat(c.optionBubbleBorderRadius);
+    override.borderRadius = { button: Number.isFinite(optionRadius) ? optionRadius : 10 };
 
     return Object.keys(override.colors).length > 0 ? override : null;
   }, [serverCustomizations]);
