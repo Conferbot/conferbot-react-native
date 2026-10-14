@@ -13,6 +13,15 @@ interface UseLiveChatParams {
   setRecord: React.Dispatch<React.SetStateAction<RecordItem[]>>;
   persistMessages: (messages: RecordItem[]) => Promise<void>;
   readReceiptsEnabled: boolean;
+  /**
+   * AI agent bot: true until its silent handover is accepted - the message
+   * is shown and recorded but sent with the record once the agent is on.
+   */
+  agentPendingRef?: React.MutableRefObject<boolean>;
+  /** Before a live message is recorded (an agent bot's engagement). */
+  onBeforeLiveSend?: () => void;
+  /** After a live message is recorded (chips go, the reply wait starts). */
+  onLiveSent?: () => void;
 }
 
 export function useLiveChat({
@@ -23,6 +32,9 @@ export function useLiveChat({
   setRecord,
   persistMessages,
   readReceiptsEnabled,
+  agentPendingRef,
+  onBeforeLiveSend,
+  onLiveSent,
 }: UseLiveChatParams) {
   const [isLiveChatMode, setIsLiveChatMode] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
@@ -52,6 +64,7 @@ export function useLiveChat({
 
         if (isLiveChatMode) {
           // *** LIVE CHAT MODE ***
+          onBeforeLiveSend?.();
           const userLiveRecord: RecordItem = {
             _id: messageId,
             type: 'user-message',
@@ -70,11 +83,12 @@ export function useLiveChat({
               text,
             });
 
-            if (socketClient.current?.isConnected()) {
+            if (socketClient.current?.isConnected() && !agentPendingRef?.current) {
               const responseData = chatStateRef.current.buildResponseData();
               socketClient.current.sendResponseRecord(responseData);
             }
           }
+          onLiveSent?.();
 
           // Stop visitor typing indicator
           if (socketClient.current?.isConnected()) {
@@ -128,7 +142,7 @@ export function useLiveChat({
         throw error;
       }
     },
-    [chatSessionId, record, persistMessages, readReceiptsEnabled, isLiveChatMode]
+    [chatSessionId, record, persistMessages, readReceiptsEnabled, isLiveChatMode, onBeforeLiveSend, onLiveSent]
   );
 
   return {
