@@ -36,7 +36,9 @@ const fakeState = () => {
   };
 };
 
+let continueFlow = jest.fn();
 const setup = (overrides: any = {}) => {
+  continueFlow = jest.fn();
   const socket = fakeSocket();
   const state = fakeState();
   const setRecord = jest.fn();
@@ -47,6 +49,7 @@ const setup = (overrides: any = {}) => {
     setRecord,
     isOpen: true,
     waitingForPerson: false,
+    continueFlow,
     ...overrides,
   };
   const hook = renderHook((p: any) => useLiveChatExtras(p), { initialProps: props });
@@ -151,6 +154,15 @@ describe('useLiveChatExtras', () => {
     expect(state.addRecord).toHaveBeenCalledWith(expect.objectContaining({ via: 'email', text: 'Need a quote' }));
     expect(hook.result.current.noAgents).toBe(false);
     expect(hook.result.current.leftMessageTo).toBe('jo@example.com');
+    expect(continueFlow).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries the flow on when leave a message is skipped', () => {
+    const { hook, socket } = setup();
+    act(() => socket.fire('no-agents-available'));
+    act(() => hook.result.current.skipLeaveMessage());
+    expect(hook.result.current.noAgents).toBe(false);
+    expect(continueFlow).toHaveBeenCalledTimes(1);
   });
 
   it('records the visitor file as the web widget does', () => {
