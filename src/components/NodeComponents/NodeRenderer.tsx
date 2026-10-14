@@ -5,11 +5,13 @@
  * Acts as a router to render the correct component for each node type.
  */
 
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, StyleSheet } from 'react-native';
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import ConferBotContext from '../../context/ConferBotContext';
+import { HandoverWaitCard } from '../LiveChat/LiveChatCards';
 
 import {
   MessageBubble,
@@ -79,6 +81,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
   customRenderer,
 }) => {
   const theme = useTheme();
+  // Optional: the renderer also works standalone (tests, previews).
+  const conferBot = useContext(ConferBotContext);
 
   if (!uiState) {
     return null;
@@ -161,6 +165,11 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
 
     // Special components
     case 'humanHandover':
+      // Waiting for a person: the compact card with their place in line
+      // (the handover message is already in the chat above it).
+      if (uiState.stage === 'waiting' && !uiState.showPreChatForm && conferBot) {
+        return <HandoverWaitCard onCancel={() => onSubmit({ action: 'cancel' })} />;
+      }
       return <HumanHandoverView {...uiState} onSubmit={onSubmit} />;
 
     case 'gptResponse':
