@@ -102,6 +102,40 @@ export function useFlowEngine({
         });
       }
 
+      // The bot's messages, as the flow writes them, onto the screen. On
+      // every path that starts the flow (a new chat, a restored one).
+      let shownTranscript = chatStateRef.current.getTranscript().length;
+      chatStateRef.current.addListener((state) => {
+        const transcript = state.getTranscript();
+        if (transcript.length <= shownTranscript) return;
+        const newEntries = transcript.slice(shownTranscript);
+        shownTranscript = transcript.length;
+        const items: RecordItem[] = [];
+        for (const entry of newEntries) {
+          if (entry.type === 'bot' && entry.text) {
+            items.push({
+              _id: `bot_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: 'bot-message',
+              shape: 'bot-text-message',
+              text: entry.text,
+              time: entry.timestamp || new Date().toISOString(),
+            } as any);
+          }
+          // Standalone bot image (e.g. welcome node image/GIF), below the
+          // text bubble like the web widget
+          if (entry.type === 'bot' && entry.data?.imageUrl) {
+            items.push({
+              _id: `bot_img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: 'bot-message',
+              shape: 'bot-image-message',
+              url: entry.data.imageUrl,
+              time: entry.timestamp || new Date().toISOString(),
+            } as any);
+          }
+        }
+        if (items.length > 0) setRecord((prev) => deduplicateMessages(trimMessages([...prev, ...items])));
+      });
+
       // Add listener to persist state changes
       chatStateRef.current.addListener(() => {
         persistAnswerVariables();
