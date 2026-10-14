@@ -31,6 +31,8 @@ export interface TypingIndicatorProps {
 
   // Styling
   backgroundColor?: string;
+  /** The owner's typing style (typingStyle): dots, wave or shimmer; pencil and mascot draw dots. */
+  variant?: 'dots' | 'wave' | 'shimmer' | 'pencil' | 'mascot';
   textColor?: string;
   size?: 'small' | 'medium' | 'large';
   style?: 'bubble' | 'minimal' | 'text';
@@ -55,7 +57,7 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   avatar,
   showAvatar = true,
   dotColor,
-  dotSize = 8,
+  dotSize = 6,
   dotCount = 3,
   animated = true,
   animationSpeed = 600,
@@ -65,6 +67,7 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   textColor,
   size = 'medium',
   style = 'bubble',
+  variant = 'dots',
   accessibilityLabel = 'Agent is typing',
   testID,
 }) => {
@@ -123,7 +126,10 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
     return null;
   }
 
-  const color = dotColor || theme.colors.typing;
+  // In the bot's text colour on the bot's bubble, as on the web.
+  const color = dotColor || theme.colors.botBubbleText;
+  const wave = variant === 'wave';
+  const shimmer = variant === 'shimmer';
   const resolvedTextColor = textColor || theme.colors.textSecondary;
 
   const containerStyle = [
@@ -152,13 +158,18 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
         </Text>
       ) : null}
 
-      {style !== 'text' &&
-        Array.from({ length: effectiveDotCount }, (_, index) => (
+      {shimmer && (
+        <Animated.Text style={[styles.shimmer, { color, opacity: animated ? dotOpacities[0] : 0.8 }]}>Typing...</Animated.Text>
+      )}
+
+      {style !== 'text' && !shimmer &&
+        Array.from({ length: wave ? 5 : effectiveDotCount }, (_, index) => (
           <Animated.View
             key={index}
             style={[
-              styles.dot,
+              wave ? styles.bar : styles.dot,
               { backgroundColor: color, opacity: animated ? dotOpacities[index] : 0.6 },
+              wave && animated && { transform: [{ scaleY: dotOpacities[index] }] },
             ]}
           />
         ))}
@@ -174,15 +185,30 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
 
 const createStyles = (theme: ConferBotTheme, dotSize: number) =>
   StyleSheet.create({
+    // The web's typing bubble: 36 tall, at least 54 wide, 18/18/18/6 corners.
     container: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: theme.spacing.xs,
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.sm,
+      justifyContent: 'center',
+      gap: 4,
+      height: 36,
+      minWidth: 54,
+      paddingHorizontal: 12,
       backgroundColor: theme.colors.botBubble,
-      borderRadius: theme.borderRadius.lg,
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      borderBottomRightRadius: 18,
+      borderBottomLeftRadius: 6,
       alignSelf: 'flex-start',
+    },
+    bar: {
+      width: 3,
+      height: 16,
+      borderRadius: 3,
+    },
+    shimmer: {
+      fontSize: 13,
+      fontWeight: '600',
     },
     containerMinimal: {
       backgroundColor: 'transparent',
