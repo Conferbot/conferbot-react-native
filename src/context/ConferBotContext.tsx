@@ -159,6 +159,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setRecord,
     isOpen,
     waitingForPerson: currentUIState?.type === 'humanHandover' && !isLiveChatMode,
+    // Nobody came and the visitor left a message (or skipped it): the flow
+    // carries on from the handover step, as the web widget does.
+    continueFlow: () => {
+      if (flowEngineRef.current?.isAtHandover()) flowEngineRef.current.submitResponse({ action: 'continue' });
+    },
   });
 
   // The agent chat is greeted when the visitor opens the chat, never at
@@ -588,6 +593,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     captureLeadEmail: liveChatExtras.captureLeadEmail,
     submitRating: liveChatExtras.submitRating,
     sendLiveFile: liveChatExtras.sendLiveFile,
+    skipLeaveMessage: liveChatExtras.skipLeaveMessage,
     dismissCsat: liveChatExtras.dismissCsat,
     dismissFileRequest: liveChatExtras.dismissFileRequest,
   };
