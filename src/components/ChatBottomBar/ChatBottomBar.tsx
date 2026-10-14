@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { readableOn } from '../../theme/color';
 import type { ConferBotTheme } from '../../theme/types';
 
 const CONFERBOT_URL = 'https://www.conferbot.com';
@@ -25,6 +26,8 @@ export interface ChatBottomBarProps {
   disabled?: boolean;
   hideBrand?: boolean;
   customBrand?: string;
+  /** The send button's colour: the bot's header colour, as on the web. */
+  accent?: string;
   /** The paperclip: shown when given (a live chat that takes visitor files). */
   onAttach?: () => void;
   testID?: string;
@@ -43,6 +46,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
   disabled = false,
   hideBrand = false,
   customBrand,
+  accent,
   onAttach,
   testID,
 }) => {
@@ -54,6 +58,8 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
   const typingTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canSend = text.trim().length > 0 && !disabled && !isSending;
+  const sendColor = accent || theme.colors.primary;
+  const sendInk = readableOn(sendColor);
 
   const handleSend = useCallback(async () => {
     const trimmed = text.trim();
@@ -109,7 +115,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
               }
             }}
             placeholder={placeholder}
-            placeholderTextColor="#4D4D4D"
+            placeholderTextColor={theme.colors.textSecondary}
             multiline
             maxLength={5000}
             editable={!disabled}
@@ -128,17 +134,15 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
           style={[
             styles.sendButton,
             {
-              backgroundColor: canSend
-                ? theme.colors.primary
-                : `${theme.colors.primary}59`, // 35% opacity
+              backgroundColor: canSend ? sendColor : `${sendColor}59`, // 35% opacity
             },
           ]}
           testID={testID ? `${testID}-send` : undefined}
         >
           {isSending ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={sendInk} />
           ) : (
-            <Text style={styles.sendIcon}>➤</Text>
+            <Text style={[styles.sendIcon, { color: sendInk }]}>➤</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -146,7 +150,8 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
       {/* Powered-by footer — same white background, no separator */}
       {!hideBrand && (
         <TouchableOpacity
-          onPress={handleOpenUrl}
+          onPress={customBrand ? undefined : handleOpenUrl}
+          disabled={!!customBrand}
           activeOpacity={0.7}
           style={styles.footerContainer}
         >
@@ -176,7 +181,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
 const createStyles = (theme: ConferBotTheme) =>
   StyleSheet.create({
     container: {
-      backgroundColor: '#fff',
+      backgroundColor: theme.colors.surface,
       ...Platform.select({
         ios: {
           shadowColor: '#636363',
@@ -204,13 +209,13 @@ const createStyles = (theme: ConferBotTheme) =>
       maxHeight: 100,
       borderRadius: 25,
       borderWidth: 1,
-      borderColor: '#E0E0E0',
-      backgroundColor: '#fff',
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
       justifyContent: 'center',
     },
     textInput: {
       fontSize: 16,
-      color: '#000',
+      color: theme.colors.text,
       paddingHorizontal: 16,
       paddingVertical: Platform.OS === 'ios' ? 10 : 6,
       maxHeight: 100,
@@ -232,7 +237,6 @@ const createStyles = (theme: ConferBotTheme) =>
       alignItems: 'center',
     },
     sendIcon: {
-      color: '#fff',
       fontSize: 18,
       fontWeight: '600',
     },
@@ -248,7 +252,7 @@ const createStyles = (theme: ConferBotTheme) =>
     poweredByText: {
       fontSize: 13,
       fontWeight: '600',
-      color: '#56595B',
+      color: theme.colors.textSecondary,
     },
     logo: {
       height: 18,
@@ -259,12 +263,13 @@ const createStyles = (theme: ConferBotTheme) =>
     conferbotText: {
       fontSize: 13,
       fontWeight: '700',
-      color: '#4A4A4A',
+      color: theme.colors.textSecondary,
     },
+    // The owner's footer text: weight 600 in the footer grey, as on the web.
     customBrandText: {
-      fontSize: 12,
-      fontWeight: '500',
-      color: '#687882',
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.textSecondary,
     },
   });
 
