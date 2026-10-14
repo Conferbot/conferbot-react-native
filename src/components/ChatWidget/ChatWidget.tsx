@@ -46,6 +46,8 @@ import type { VoiceRecordingResult } from '../VoiceRecorder';
 import type { ConferBotTheme } from '../../theme/types';
 import type { SocketEvents, RecordItem } from '../../types';
 import { resolveCustomizations } from '../../core/customizations';
+import { resolveChatBackground } from '../../core/chatBackground';
+import { ChatBackgroundView } from '../ChatBackground';
 
 // Maximum file size for attachments (5MB)
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
@@ -237,6 +239,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   } = useConferBot();
   // The bot's settings as the web applies them; the defaults until it loads.
   const customizations = resolvedCustomizations || resolveCustomizations(serverCustomizations);
+  const chatBackground = useMemo(() => resolveChatBackground(serverCustomizations), [serverCustomizations]);
 
   // Typing in the composer: a person is here (an agent bot's conversation
   // starts now), and the agent sees that they are typing.
@@ -929,8 +932,12 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           testID={`${testID}-header`}
         />
 
+        {/* The bot's chat background behind the messages (core/chatBackground) */}
+        <View style={styles.messagesArea}>
+        {serverCustomizations && <ChatBackgroundView background={chatBackground} testID={`${testID}-background`} />}
         {/* Message List — interactive node renders inline at the end */}
         <MessageList
+          transparent={!!serverCustomizations}
           messages={record}
           showTypingIndicator={isAgentTyping || isNodeProcessing || awaitingReply}
           showTimestamps={showTimestamps}
@@ -957,6 +964,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
             csatOpen,
           ].join(':')}
         />
+        </View>
 
         {lockedBy ? <SystemLine text="This conversation has been locked" testID={`${testID}-locked`} /> : null}
         {agentConnectionLost ? (
@@ -993,6 +1001,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
 const createStyles = (theme: ConferBotTheme) =>
   StyleSheet.create({
+    messagesArea: {
+      flex: 1,
+    },
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
