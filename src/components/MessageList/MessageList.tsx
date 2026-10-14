@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useRef, useEffect, useCallback, useContext } from 'react';
+import React, { useRef, useEffect, useCallback, useContext, useMemo } from 'react';
 import {
   FlatList,
   View,
@@ -20,6 +20,7 @@ import { AgentReplyExtras, RichAgentMessage, SuggestionChips } from '../AgentRep
 import ConferBotContext from '../../context/ConferBotContext';
 import { htmlToMarkdown } from '../../utils/chatMarkdown';
 import { isAIAgentDetails } from '../../core/agentBot';
+import { visitorReceiptOf } from '../../core/liveChat';
 import type { NodeUIState } from '../../core/nodes/NodeHandler';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Reaction, ReactionEmoji, MessageStatusEntry } from '../../types';
@@ -95,6 +96,10 @@ export interface MessageListProps {
   onNodeSubmit?: (response: any, portName?: string) => void;
   /** Whether the node is currently loading */
   isNodeLoading?: boolean;
+  /** Live chat cards below the messages (queue, leave a message, rating...). */
+  footerExtras?: React.ReactNode;
+  /** Changes when those cards change, to keep them in view. */
+  footerExtrasKey?: string;
 }
 
 /**
@@ -144,12 +149,15 @@ export const MessageList: React.FC<MessageListProps> = ({
   activeNodeUI,
   onNodeSubmit,
   isNodeLoading,
+  footerExtras,
+  footerExtrasKey = '',
 }) => {
   const theme = useTheme();
   // Optional: the list also renders standalone (tests, previews).
   const conferBot = useContext(ConferBotContext);
   const styles = createStyles(theme);
   const flatListRef = useRef<any>(null);
+  const atEndRef = useRef(true);
   const visibleMessageIdsRef = useRef<Set<string | number>>(new Set());
 
   // Opened on an existing conversation: start at its latest message.
@@ -169,7 +177,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   // ...and while a reply is written, or new suggestions or a node appear
   // below the last message.
-  const footerKey = `${conferBot?.agentStream?.text?.length || 0}:${(conferBot?.suggestions || []).length}:${!!activeNodeUI}:${showTypingIndicator}`;
+  const footerKey = `${conferBot?.agentStream?.text?.length || 0}:${(conferBot?.suggestions || []).length}:${!!activeNodeUI}:${showTypingIndicator}:${footerExtrasKey}`;
   useEffect(() => {
     if (messages.length > 0 && flatListRef.current) {
       const t = setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 60);
@@ -312,6 +320,15 @@ export const MessageList: React.FC<MessageListProps> = ({
     [theme]
   );
 
+  // "Sent / Delivered / Seen" under the visitor's latest live message, while
+  // a person (not the AI) is on the other end.
+  const agent: any = conferBot?.currentAgent;
+  const humanAgent = !!agent && agent.isAIAgent !== true && !String(agent.id || '').startsWith('ai-agent-');
+  const liveReceipt = useMemo(
+    () => (humanAgent && conferBot?.receiptMarks ? visitorReceiptOf(messages as any[], conferBot.receiptMarks) : null),
+    [humanAgent, messages, conferBot?.receiptMarks]
+  );
+
   // Render individual message
   const renderMessage = useCallback(
     ({ item }: { item: RecordItem }) => {
@@ -342,6 +359,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
       // An AI agent's reply: its sources, buttons, cards and "Helpful?" below.
       const isAIReply = item.type === 'agent-message' && isAIAgentDetails((item as any).agentDetails) && !(item as any).deleted;
+      const receipt = liveReceipt && String(item._id) === liveReceipt.id ? liveReceipt.state : null;
 
       const bubble = (
         <MessageBubble
@@ -365,6 +383,16 @@ export const MessageList: React.FC<MessageListProps> = ({
           showReadReceipt={showReadReceipts}
         />
       );
+      if (receipt) {
+        return (
+          <View>
+            {bubble}
+            <Text style={styles.receiptLine} testID={`${testID}-receipt`}>
+              {receipt === 'seen' ? 'Seen' : receipt === 'delivered' ? 'Delivered' : 'Sent'}
+            </Text>
+          </View>
+        );
+      }
       if (!isAIReply) return bubble;
       return (
         <View>
@@ -388,6 +416,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       showReadReceipts,
       renderFrozenChoiceButtons,
       renderBotImage,
+      liveReceipt,
     ]
   );
 
@@ -398,9 +427,10 @@ export const MessageList: React.FC<MessageListProps> = ({
     // The live reply replaces the dots once it is writing.
     const hasTyping = showTypingIndicator && !stream;
     const suggestions = !stream && !hasTyping ? conferBot?.suggestions || [] : [];
-    if (!hasNode && !hasTyping && !stream && !suggestions.length) return null;
+    if (!hasNode && !hasTyping && !stream && !suggestions.length && !footerExtras) return null;
     return (
       <View>
+        {footerExtras}
         {stream && (
           <MessageBubble
             message={{ _id: `stream-${stream.id}`, type: 'agent-message', text: htmlToMarkdown(stream.text), agentDetails: stream.agentDetails, time: new Date().toISOString() } as any}
@@ -468,7 +498,11 @@ export const MessageList: React.FC<MessageListProps> = ({
       data={messages}
       renderItem={renderMessage}
       keyExtractor={keyExtractor}
-      ListFooterComponent={renderListFooter}
+      // An element, not the function: a new function each render would
+      // remount the footer and wipe what the visitor is typing in a card.
+      ListFooterComponent={renderListFooter()}
+      // A tap on a card button (Send, a star) works with the keyboard up.
+      keyboardShouldPersistTaps="handled"
       ListEmptyComponent={renderEmpty}
       style={styles.container}
       contentContainerStyle={[
@@ -476,6 +510,16 @@ export const MessageList: React.FC<MessageListProps> = ({
         messages.length === 0 && styles.emptyContent,
       ]}
       showsVerticalScrollIndicator={true}
+      // A card below the messages grew (a rating opened its feedback box,
+      // a reply streamed in): kept in view while the visitor is at the end.
+      onScroll={(e: any) => {
+        const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+        atEndRef.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 160;
+      }}
+      scrollEventThrottle={100}
+      onContentSizeChange={() => {
+        if (atEndRef.current) flatListRef.current?.scrollToEnd({ animated: true });
+      }}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       refreshControl={
@@ -522,6 +566,14 @@ const createStyles = (theme: ConferBotTheme) =>
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    receiptLine: {
+      alignSelf: 'flex-end',
+      marginRight: theme.spacing.chatContentPadding ?? theme.spacing.md,
+      marginTop: -2,
+      marginBottom: theme.spacing.xs,
+      fontSize: theme.typography.fontSize.xs,
+      color: theme.colors.textSecondary,
     },
     typingContainer: {
       paddingHorizontal: theme.spacing.md,
