@@ -126,4 +126,13 @@ describe('agent bots', () => {
     });
     expect(p.chatMetaData).toMatchObject({ version: 'v2', botId: 'b1', chatSessionId: 's1' });
   });
+
+  it('sends the handover wait time as the builder wrote it', () => {
+    const state = new ChatState('s1', 'b1');
+    const wait = (v: unknown) => buildHandoverPayload(state, { maxWaitTime: v } as any).maxWaitTime;
+    expect(wait('0.5')).toBe(0.5);
+    expect(wait(3)).toBe(3);
+    expect(wait(undefined)).toBe(2);
+    expect(wait('soon')).toBe(2);
+  });
 });
