@@ -169,7 +169,7 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
   /** "Leave a message" when nobody is available: by email. */
   const leaveMessage = useCallback(async (email: string, message: string): Promise<boolean> => {
     const id = sid();
-    const entryId = `left-message-${Date.now()}`;
+    const entryId = `leave-message-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const visitorId = chatStateRef.current?.getVariable?.('_visitorId');
     const res = await socketClient.current?.emitWithAck('leave-message', { chatSessionId: id, email, message, entryId, visitorId });
     if (!res?.ok) return false;
@@ -183,7 +183,7 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
   /** The email the team replies to when nobody could join (handover-waiting). */
   const shareEmailForReply = useCallback(async (email: string): Promise<boolean> => {
     const id = sid();
-    const entryId = `handover-email-${Date.now()}`;
+    const entryId = `handover-email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const visitorId = chatStateRef.current?.getVariable?.('_visitorId');
     const res = await socketClient.current?.emitWithAck('handover-email', { chatSessionId: id, email, entryId, visitorId });
     if (!res?.ok) return false;
