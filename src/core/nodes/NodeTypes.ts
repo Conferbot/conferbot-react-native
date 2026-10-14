@@ -218,6 +218,9 @@ const userInteractionNodes = new Set<string>([
   // Calendar
   DisplayNodes.CALENDAR,
 
+  // Waits on the team: agent-accepted / no-agents-available move it on
+  IntegrationNodes.HUMAN_HANDOVER,
+
   // Legacy
   DisplayNodes.USER_INPUT_NODE,
   DisplayNodes.USER_RANGE_NODE,
@@ -274,7 +277,6 @@ const autoContinueNodes = new Set<string>([
   IntegrationNodes.ZOHO_CRM,
   IntegrationNodes.STRIPE,
   IntegrationNodes.DELAY,
-  IntegrationNodes.HUMAN_HANDOVER,
 
   // Flow nodes
   FlowNodes.GOAL,
