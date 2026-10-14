@@ -11,7 +11,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Linking, ActivityI
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
 import { conversionEventOf, isAIAgentDetails, quickActionsOf } from '../../core/agentBot';
-import { backAtLabel, isEmail, queueLine, type CsatConfig } from '../../core/liveChat';
+import { backAtLabel, isEmail, knownEmail, lastQuestion, queueLine, type CsatConfig } from '../../core/liveChat';
 
 const TALK_TO_PERSON_ASK = "I'd like to talk to a person, please.";
 
@@ -35,10 +35,12 @@ const EmailField: React.FC<{
   button: string;
   onSubmit: (email: string) => Promise<boolean> | boolean | void;
   extraField?: { placeholder: string };
-}> = ({ placeholder = 'you@example.com', button, onSubmit, extraField }) => {
+  initialEmail?: string;
+  initialExtra?: string;
+}> = ({ placeholder = 'you@example.com', button, onSubmit, extraField, initialEmail = '', initialExtra = '' }) => {
   const { theme, s } = useStyles();
-  const [email, setEmail] = useState('');
-  const [extra, setExtra] = useState('');
+  const [email, setEmail] = useState(initialEmail);
+  const [extra, setExtra] = useState(initialExtra);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
@@ -241,8 +243,14 @@ export const LeaveMessageCard: React.FC = () => {
           <EmailField
             button="Send"
             extraField={{ placeholder: 'How can we help?' }}
+            // Their email if known, and what they last asked in their own words.
+            initialEmail={knownEmail(ctx.chatState?.getUserMetadata?.()?.email, ctx.chatState?.getAnswerVariables?.())}
+            initialExtra={lastQuestion(ctx.chatState?.getRecord?.())}
             onSubmit={(email, message) => ctx.leaveMessage(email, message)}
           />
+          <TouchableOpacity onPress={ctx.skipLeaveMessage} accessibilityRole="button" style={{ marginTop: 8, alignSelf: 'flex-start' }}>
+            <Text style={s.sub}>Not now</Text>
+          </TouchableOpacity>
         </>
       )}
     </Card>
