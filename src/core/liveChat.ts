@@ -170,6 +170,24 @@ export const ratingPayload = (chatSessionId: string, type: CsatConfig['ratingTyp
   ...(feedback && feedback.trim() ? { feedback: feedback.trim().slice(0, 1000) } : {}),
 });
 
+/**
+ * The handover step's own post-chat survey as submit-chat-rating (the
+ * server has no handover:survey): thumbs up is 1, numbers are an NPS 0-10,
+ * stars and emojis a 1-5 score. null when there is no rating to send.
+ */
+export const surveyRatingPayload = (
+  chatSessionId: string,
+  style: string | undefined,
+  response: { rating?: number; feedback?: string; comment?: string } | null | undefined
+) => {
+  const rating = Number(response?.rating);
+  if (!chatSessionId || !Number.isFinite(rating)) return null;
+  const feedback = response?.feedback ?? response?.comment;
+  if (style === 'thumbs') return ratingPayload(chatSessionId, 'thumbs', rating === 1, feedback);
+  if (style === 'numbers') return ratingPayload(chatSessionId, 'nps', rating, feedback);
+  return ratingPayload(chatSessionId, 'stars', rating, feedback);
+};
+
 // "See original" / "See translation" in the visitor's language (they are
 // reading a translation, so an English label would be the one untranslated
 // line). The web widget's list (ts/chat/translatedMessage.ts).
