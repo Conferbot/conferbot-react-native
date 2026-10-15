@@ -299,6 +299,7 @@ Identify the visitor so conversations and answer variables are attributed to a k
     name: 'Jane Doe',
     email: 'jane@example.com',
     phone: '+15551234567',
+    hash: userHashFromYourServer, // identity verification (below)
     metadata: { plan: 'pro' },
   }}
 >
@@ -306,7 +307,18 @@ Identify the visitor so conversations and answer variables are attributed to a k
 </ConferBotProvider>
 ```
 
-`ConferBotUser` requires `id`; `name`, `email`, `phone`, and `metadata` are optional. With persistence enabled, the identified user is stored locally (`PersistedUser`) so returning visitors resume their session.
+`ConferBotUser` requires `id`; `name`, `email`, `phone`, `hash` and `metadata` are optional. The user (with `metadata`) is sent with every conversation record, as the web widget's `user`, so dashboard contacts and greeting rules ("signed in") see it. With persistence enabled, the identified user is stored locally (`PersistedUser`) so returning visitors resume their session.
+
+### Identity verification
+
+Without it, anyone could claim any id or email. Turn it on in the dashboard (Settings > Security), keep the secret on your server, and sign each user there:
+
+```js
+// Node, on your server - never ship the secret in the app
+const hash = crypto.createHmac('sha256', IDENTITY_SECRET).update(String(user.id || user.email)).digest('hex');
+```
+
+Pass it as `user.hash`. A matching hash files the chat under that user (contacts link and merge); a missing or wrong one is treated as an unverified visitor, or as anonymous when the workspace requires verification.
 
 ## Theming and Flow-Builder Customizations
 
