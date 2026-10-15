@@ -9,7 +9,7 @@ const party = icons.find((i) => i.anim === 'party');
 const msrc = fs.readFileSync(`${W}/motion.ts`, 'utf8');
 const CSS = JSON.parse(msrc.slice(msrc.indexOf('/* MOTION:BEGIN */') + 18, msrc.indexOf('/* MOTION:END */'))).join('\n');
 (async () => {
-  const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+  const b = await puppeteer.launch({ executablePath: require('../chrome'), args: ['--no-sandbox'] });
   const p = await b.newPage();
   await p.setContent(`<style>${CSS}</style><svg class="cbl cbl--party" data-cbl="idle" viewBox="0 0 24 24" width="96" fill="none"><g class="cbl-r">${party.body.replace(/\{uid\}/g, 'x')}</g></svg>`);
   console.log(await p.evaluate(() => [...document.querySelectorAll('.cbl-conf > *')].map((e) => [e.getAttribute('class'), getComputedStyle(e).animationDelay, getComputedStyle(e).animationName, getComputedStyle(e).transformOrigin])));
