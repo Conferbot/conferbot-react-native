@@ -467,4 +467,24 @@ describe('MessageBubble', () => {
       expect(UNSAFE_root).toBeTruthy();
     });
   });
+
+  describe('handover lines (#28, #31)', () => {
+    it('a pending Connecting line shows its dots; a settled one its outcome, still', () => {
+      const pending: any = { _id: 'l1', type: 'agent-left-chat', handover: true, name: 'Ava', text: 'x', time: new Date().toISOString() };
+      const a = render(<MessageBubble message={pending} />);
+      expect(a.getByText('Connecting you with the team…')).toBeTruthy();
+      expect(a.getByTestId('cb-handover-dots', { includeHiddenElements: true })).toBeTruthy();
+      expect(a.queryByText(/has left/)).toBeNull();
+      const b = render(<MessageBubble message={{ ...pending, settled: 'cancelled' }} />);
+      expect(b.getByText('You left the queue')).toBeTruthy();
+      expect(b.queryByTestId('cb-handover-dots', { includeHiddenElements: true })).toBeNull();
+    });
+
+    it('a join after an AI handover carries its note', () => {
+      const join: any = { _id: 'j1', type: 'agent-joined-message', text: 'Sam joined the chat', afterAI: true, time: new Date().toISOString() };
+      const v = render(<MessageBubble message={join} />);
+      expect(v.getByText('Sam joined the chat')).toBeTruthy();
+      expect(v.getByText('They can see your conversation so far')).toBeTruthy();
+    });
+  });
 });
