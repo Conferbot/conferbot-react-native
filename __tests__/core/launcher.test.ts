@@ -30,6 +30,8 @@ describe('launcher as the web draws it on a phone', () => {
     expect(resolveLauncher({ launcherShape: 'squircle', widgetSize: 50 }).corners.topLeft).toBe(15);
     const tab = resolveLauncher({ launcherShape: 'tab', widgetSize: 50 });
     expect([tab.width, tab.side, tab.tucked]).toEqual([41, 0, 0]);
+    expect(tab.glyph).toBe(25);
+    expect(resolveLauncher({ widgetSize: 50 }).glyph).toBe(35);
     expect(tab.corners).toEqual({ topLeft: 15, topRight: 0, bottomRight: 0, bottomLeft: 15 });
     expect(resolveLauncher({ launcherShape: 'peek', widgetSize: 50 }).tucked).toBe(17);
   });
