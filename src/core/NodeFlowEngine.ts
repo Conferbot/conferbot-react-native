@@ -1,29 +1,97 @@
 /**
  * NodeFlowEngine.ts
  *
- * Core engine for orchestrating chatbot node flow in the React Native SDK.
- * Handles node processing, flow navigation, and state management.
+ * Runs a bot flow the way the web widget does. The reference is the shared
+ * flow-node spec (scripts/parity/flows/nodes.spec.json, "engine"), made by
+ * running conferbot-widget's own code; __tests__/parity/flows.test.ts runs
+ * every fixture through this engine.
+ *
+ * - start: the FIRST welcome-node in nodes[].
+ * - next: a step that does not branch leaves by the FIRST edge from it,
+ *   whatever its handle. No edge, or a target that does not exist: the chat
+ *   ends.
+ * - port: a branching step leaves by an exact handle. No such edge: the chat
+ *   ends - never another edge. A wired edge to a missing node stops the chat
+ *   where it is (the web throws). Rich steps may name a fallback handle,
+ *   taken when only it is wired (web goPort).
+ * - unknown step types (and a welcome-node reached mid-flow) show nothing
+ *   and continue along their first edge on the next tick.
+ * - jump: to the target node; a missing target ends the chat.
+ * - end: a sub-flow call returns to its caller; otherwise the chat is over
+ *   ("chat-flow-completed").
+ * - pacing: typing dots before each displayed step for paceFor(), unless a
+ *   fixed typingDelay is configured.
  */
 
 import { ChatState } from './state/ChatState';
 import { NodeHandlerRegistry, FallbackNodeHandler } from './nodes/NodeHandlerRegistry';
 import { NodeResult, NodeUIState, NodeHandler } from './nodes/NodeHandler';
 import { BaseNode, NodeEdge, FlowDefinition, requiresUserInteraction } from './nodes/NodeTypes';
+import { getApiOrigin } from '../config/constants';
+import { FlowContext, postBotApi, uploadBotMedia } from './flow/context';
+import { visitorTimeZone } from './flow/calendar';
+import {
+  bubbleText,
+  plainText,
+  followsAutoAdvanceStep,
+  isEmptyContentStep,
+  paceFor,
+  renderedTextFor,
+} from './flow/text';
+import {
+  FlowControlState,
+  LOOP_TYPE,
+  RUN_ERROR_HANDLE,
+  RUN_SUBFLOW_TYPE,
+  SUBFLOW_RETURN_TYPE,
+  SUBFLOW_TYPE,
+  callSubflow,
+  emptyFlowControl,
+  loopTrailText,
+  returnFromSubflow,
+  stepLoop,
+  subflowName,
+} from './flow/flowControl';
 
 // ========================================
 // TYPES
 // ========================================
 
+/** What the engine did, step by step (the flow-node spec's `expect`). */
+export type FlowTraceEvent =
+  | { kind: 'enter'; node: string; type: string; via: string }
+  | { kind: 'shown'; node: string }
+  | { kind: 'port'; node: string; handle: string; wired: boolean }
+  | { kind: 'unsupported'; node: string; type: string }
+  | { kind: 'error'; node: string; message: string }
+  | { kind: 'end' }
+  | { kind: 'crash'; node: string; reason: string };
+
 /** Flow engine configuration */
 export interface NodeFlowEngineConfig {
-  /** Typing delay in ms before showing bot messages */
+  /**
+   * A fixed typing delay (ms) before each displayed step. Unset: the web
+   * widget's pacing (nodeLogic paceFor), by the length of what is said.
+   */
   typingDelay?: number;
   /** Enable debug logging */
   debug?: boolean;
-  /** Maximum nodes to process in one cycle (prevents infinite loops) */
+  /** Steps run without the visitor before the engine stops (a runaway loop guard) */
   maxNodesPerCycle?: number;
-  /** Timeout in ms for processing a single node (HIGH FIX 1) */
+  /** Timeout in ms for processing a single node */
   nodeProcessingTimeout?: number;
+  /** How long an image or video step waits for its media at most (ms, web: 4000) */
+  mediaAdvanceMs?: number;
+  /** The bot server origin for /api/v1/bot/:id/* (default: the configured endpoint) */
+  apiOrigin?: string;
+  /** The bot's customizations (redactSensitive, chatLeaveMessage...) */
+  customizations?: Record<string, any>;
+  /** The page the chat runs on, when the host app has one (hidden-fields) */
+  page?: { url?: string; referrer?: string };
+  /** The visitor's IANA time zone (default: the device's) */
+  visitorTimeZone?: string;
+  /** The random source (random-flow) */
+  random?: () => number;
   /** Callback when UI needs to update */
   onUIStateChange?: (uiState: NodeUIState | null) => void;
   /** Callback when waiting for user input */
@@ -32,6 +100,10 @@ export interface NodeFlowEngineConfig {
   onFlowComplete?: (reason?: string) => void;
   /** Callback on error */
   onError?: (error: Error, nodeId?: string) => void;
+  /** A refused answer (the step keeps waiting) */
+  onValidationError?: (nodeId: string, message: string) => void;
+  /** Every step entered, port taken, step passed and the end */
+  onTrace?: (event: FlowTraceEvent) => void;
   /** Socket client for emitting events */
   socketClient?: any;
 }
@@ -45,21 +117,112 @@ export interface EngineState {
   error: Error | null;
 }
 
+/** Steps that draw something, after the typing dots (web nodeTypeCategories DISPLAY_NODE_TYPES). */
+export const DISPLAY_NODE_TYPES = new Set<string>([
+  'two-choices-node',
+  'three-choices-node',
+  'select-option-node',
+  'user-rating-node',
+  'quiz-node',
+  'user-input-node',
+  'user-range-node',
+  'welcome-node',
+  'message-node',
+  'image-node',
+  'video-node',
+  'audio-node',
+  'file-node',
+  'ask-name-node',
+  'ask-email-node',
+  'ask-phone-number-node',
+  'ask-number-node',
+  'ask-url-node',
+  'ask-file-node',
+  'ask-location-node',
+  'ask-custom-question-node',
+  'ask-multiple-questions-node',
+  'calendar-node',
+  'n-select-option-node',
+  'n-check-options-node',
+  'n-choices-node',
+  'image-choice-node',
+  'carousel-node',
+  'rating-choice-node',
+  'yes-or-no-choice-node',
+  'opinion-scale-choice-node',
+  'user-redirect-node',
+  'html-node',
+  'navigate-node',
+  'dynamic-choices-node',
+  'consent-node',
+  'product-card-node',
+  'slider-node',
+  'datetime-node',
+  'ranking-node',
+  'otp-node',
+  'address-node',
+  'matrix-node',
+  'ai-extract-node',
+  'ai-route-node',
+  'kb-answer-node',
+  'signature-node',
+  'payment-node',
+]);
+
+/** Question steps that register data.answerVariable when shown (web _nodeCategorizeHelper). */
+const REGISTERS_ANSWER = new Set<string>([
+  'ask-name-node',
+  'ask-email-node',
+  'ask-phone-number-node',
+  'ask-number-node',
+  'ask-url-node',
+  'ask-location-node',
+  'ask-custom-question-node',
+  'ask-file-node',
+  'calendar-node',
+  'n-select-option-node',
+  'n-check-options-node',
+  'n-choices-node',
+  'image-choice-node',
+  'rating-choice-node',
+  'yes-or-no-choice-node',
+  'opinion-scale-choice-node',
+  'carousel-node',
+  // rich steps (richNodesView categorizeRichNode)
+  'dynamic-choices-node',
+  'consent-node',
+  'product-card-node',
+  'slider-node',
+  'datetime-node',
+  'ranking-node',
+  'otp-node',
+  'address-node',
+  'matrix-node',
+  'ai-extract-node',
+  'ai-route-node',
+  'kb-answer-node',
+  'signature-node',
+  'payment-node',
+]);
+
+/** Steps whose media decides when the flow moves on (load, or the cap). */
+const MEDIA_TYPES = new Set(['image-node', 'video-node']);
+
+const FLOW_CONTROL = new Set([LOOP_TYPE, SUBFLOW_TYPE, RUN_SUBFLOW_TYPE, SUBFLOW_RETURN_TYPE]);
+
 // ========================================
 // NODE FLOW ENGINE
 // ========================================
 
-/**
- * NodeFlowEngine orchestrates the chatbot conversation flow.
- * It processes nodes, handles transitions, and manages state.
- */
 export class NodeFlowEngine {
   private chatState: ChatState;
   private registry: NodeHandlerRegistry;
-  private config: Required<NodeFlowEngineConfig>;
+  private config: Required<Omit<NodeFlowEngineConfig, 'typingDelay' | 'page' | 'random' | 'apiOrigin' | 'visitorTimeZone'>> &
+    Pick<NodeFlowEngineConfig, 'typingDelay' | 'page' | 'random' | 'apiOrigin' | 'visitorTimeZone'>;
 
   // Flow definition
   private nodes: Map<string, BaseNode> = new Map();
+  private nodeList: BaseNode[] = [];
   private edges: NodeEdge[] = [];
   private startNodeId: string | null = null;
 
@@ -69,41 +232,58 @@ export class NodeFlowEngine {
   private _currentNodeId: string | null = null;
   private _currentUIState: NodeUIState | null = null;
   private _error: Error | null = null;
+  private _ended: boolean = false;
+
+  /** Every step entered, in order (pacing reads the one before). */
+  private steps: BaseNode[] = [];
+  /** Bumped whenever the flow moves: a stale timer or reply does nothing. */
+  private moveToken: number = 0;
+  /** Steps whose "shown" was already reported for this visit. */
+  private shownToken: number = -1;
+  /** Media that finished loading: the step moves on before the cap. */
+  private mediaWaiters: Map<string, () => void> = new Map();
+  private flowControl: FlowControlState = emptyFlowControl();
 
   // Listeners
   private stateListeners: Set<(state: EngineState) => void> = new Set();
-
-  // Processing control
-  private processingPromise: Promise<void> | null = null;
   private nodesProcessedInCycle: number = 0;
 
-  // Cycle detection (HIGH FIX 2)
-  private visitedNodes: Set<string> = new Set();
-  private readonly MAX_NODE_VISITS = 100;
-
-  constructor(
-    chatState: ChatState,
-    registry?: NodeHandlerRegistry,
-    config?: NodeFlowEngineConfig
-  ) {
+  constructor(chatState: ChatState, registry?: NodeHandlerRegistry, config?: NodeFlowEngineConfig) {
     this.chatState = chatState;
     this.registry = registry || NodeHandlerRegistry.getInstance();
 
-    // Set default configuration
     this.config = {
-      typingDelay: config?.typingDelay ?? 500,
+      typingDelay: config?.typingDelay,
       debug: config?.debug ?? false,
-      maxNodesPerCycle: config?.maxNodesPerCycle ?? 100,
-      nodeProcessingTimeout: config?.nodeProcessingTimeout ?? 30000,
+      maxNodesPerCycle: config?.maxNodesPerCycle ?? 500,
+      nodeProcessingTimeout: config?.nodeProcessingTimeout ?? 90000,
+      mediaAdvanceMs: config?.mediaAdvanceMs ?? 4000,
+      apiOrigin: config?.apiOrigin,
+      customizations: config?.customizations ?? {},
+      page: config?.page,
+      visitorTimeZone: config?.visitorTimeZone,
+      random: config?.random,
       onUIStateChange: config?.onUIStateChange ?? (() => {}),
       onWaitingForInput: config?.onWaitingForInput ?? (() => {}),
       onFlowComplete: config?.onFlowComplete ?? (() => {}),
       onError: config?.onError ?? (() => {}),
+      onValidationError: config?.onValidationError ?? (() => {}),
+      onTrace: config?.onTrace ?? (() => {}),
       socketClient: config?.socketClient ?? null,
     };
 
+    if (config?.customizations && 'redactSensitive' in config.customizations) {
+      this.chatState.setRedactSensitive(config.customizations.redactSensitive !== false);
+    }
+
     // Set fallback handler
     this.registry.setFallbackHandler(new FallbackNodeHandler());
+  }
+
+  /** The bot's customizations (redactSensitive, chatLeaveMessage...). */
+  setCustomizations(customizations: Record<string, any> | null | undefined): void {
+    this.config.customizations = customizations || {};
+    this.chatState.setRedactSensitive(this.config.customizations.redactSensitive !== false);
   }
 
   // ========================================
@@ -115,30 +295,30 @@ export class NodeFlowEngine {
    */
   loadFlow(flow: FlowDefinition): void {
     this.nodes.clear();
-    this.edges = flow.edges || [];
+    this.nodeList = Array.isArray(flow.nodes) ? flow.nodes : [];
+    this.edges = Array.isArray(flow.edges) ? flow.edges : [];
 
-    // Index nodes by ID
-    for (const node of flow.nodes) {
-      this.nodes.set(node.id, node);
+    for (const node of this.nodeList) {
+      if (node && node.id !== undefined && node.id !== null) this.nodes.set(String(node.id), node);
     }
 
-    // Determine start node
-    this.startNodeId = flow.startNodeId || this.findStartNode();
-
+    this.startNodeId = this.findStartNode(flow.startNodeId);
     this.log('Flow loaded', { nodeCount: this.nodes.size, startNodeId: this.startNodeId });
   }
 
   /**
-   * Finds the start node (node with no incoming edges)
+   * The first welcome-node in nodes[] starts the chat (web index.ts
+   * _findAndDisplayNode). A flow without one (a partial flow, a test) starts
+   * at the given start node, else at a node no edge leads to.
    */
-  private findStartNode(): string | null {
+  private findStartNode(given?: string): string | null {
+    const welcome = this.nodeList.find((n) => n?.type === 'welcome-node');
+    if (welcome) return String(welcome.id);
+    if (given && this.nodes.has(given)) return given;
     const targetIds = new Set(this.edges.map((e) => e.target));
     for (const [id] of this.nodes) {
-      if (!targetIds.has(id)) {
-        return id;
-      }
+      if (!targetIds.has(id)) return id;
     }
-    // Fallback to first node
     const firstNode = this.nodes.keys().next().value;
     return firstNode ?? null;
   }
@@ -155,10 +335,9 @@ export class NodeFlowEngine {
       this.handleError(new Error('No start node found'));
       return;
     }
-
-    this.nodesProcessedInCycle = 0;
     this.resetFlow();
-    await this.processNode(this.startNodeId);
+    const node = this.nodes.get(this.startNodeId)!;
+    await this.enter(node, 'start');
   }
 
   /**
@@ -166,277 +345,469 @@ export class NodeFlowEngine {
    */
   async resumeFrom(nodeId: string): Promise<void> {
     this.nodesProcessedInCycle = 0;
+    this._ended = false;
     await this.processNode(nodeId);
   }
 
   /**
-   * Processes a node handler with a timeout wrapper (HIGH FIX 1)
-   */
-  private async processNodeWithTimeout(
-    handler: NodeHandler,
-    nodeWithContext: Record<string, any>,
-    timeoutMs: number = 30000
-  ): Promise<NodeResult> {
-    return Promise.race([
-      handler.handle(nodeWithContext, this.chatState),
-      new Promise<NodeResult>((_, reject) =>
-        setTimeout(() => reject(new Error(`Node processing timed out after ${timeoutMs}ms`)), timeoutMs)
-      ),
-    ]).catch((error) => {
-      console.warn('[ConferBot] Node timeout:', error.message);
-      return { type: 'error', message: 'Node processing timed out', recoverable: true } as NodeResult;
-    });
-  }
-
-  /**
-   * Checks for flow cycle detection (HIGH FIX 2)
-   */
-  private checkCycleDetection(nodeId: string): boolean {
-    if (this.visitedNodes.size >= this.MAX_NODE_VISITS) {
-      console.error('[ConferBot] Flow cycle detected after', this.MAX_NODE_VISITS, 'nodes');
-      return true; // cycle detected
-    }
-    this.visitedNodes.add(nodeId);
-    return false;
-  }
-
-  /**
-   * Resets visited node tracking when starting a new flow (HIGH FIX 2)
+   * Resets per-run state when starting a new flow
    */
   public resetFlow(): void {
-    this.visitedNodes.clear();
+    this.steps = [];
+    this._ended = false;
+    this.nodesProcessedInCycle = 0;
+    this.flowControl = emptyFlowControl();
+    this.mediaWaiters.clear();
   }
 
   /**
-   * Finds an edge for a given node and port with validation logging (HIGH FIX 5)
-   */
-  private findEdge(nodeId: string, port: string): NodeEdge | null {
-    const edge = this.edges.find(
-      (e) => e.source === nodeId && (
-        e.sourceHandle === port ||
-        e.sourceHandle === `source-${port}` ||
-        e.data?.port === port
-      )
-    );
-    if (!edge) {
-      console.warn(`[ConferBot] No edge found for port: ${port} on node: ${nodeId}`);
-    }
-    return edge || null;
-  }
-
-  /**
-   * Processes a node and handles the result
+   * Runs a node by id (entered as along an edge)
    */
   async processNode(nodeId: string): Promise<void> {
-    // Prevent infinite loops
-    this.nodesProcessedInCycle++;
-    if (this.nodesProcessedInCycle > this.config.maxNodesPerCycle) {
-      this.handleError(new Error(`Max nodes per cycle exceeded (${this.config.maxNodesPerCycle})`));
-      return;
-    }
-
-    // Cycle detection (HIGH FIX 2)
-    if (this.checkCycleDetection(nodeId)) {
-      this.handleError(new Error(`Flow cycle detected after ${this.MAX_NODE_VISITS} visited nodes`));
-      return;
-    }
-
     const node = this.nodes.get(nodeId);
     if (!node) {
       this.handleError(new Error(`Node not found: ${nodeId}`));
       return;
     }
+    await this.enter(node, 'edge');
+  }
 
-    this.log('Processing node', { nodeId, type: node.type });
+  /** The handler registered for a type (not the fallback). */
+  private handlerFor(type: string): NodeHandler | null {
+    return this.registry.hasHandler(type) ? this.registry.getHandler(type) : null;
+  }
 
-    // Update state
+  /** Enter a step: record it, pace it, run its handler. */
+  private async enter(node: BaseNode, via: string): Promise<void> {
+    if (this._ended) return;
+
+    this.nodesProcessedInCycle++;
+    if (this.nodesProcessedInCycle > this.config.maxNodesPerCycle) {
+      this.handleError(new Error(`Max nodes per cycle exceeded (${this.config.maxNodesPerCycle})`), node.id);
+      return;
+    }
+
+    const token = ++this.moveToken;
+    this._currentNodeId = node.id;
+    this._isWaitingForInput = false;
     this._isProcessing = true;
-    this._currentNodeId = nodeId;
     this._error = null;
-    this.chatState.setCurrentNode(nodeId);
+    this.chatState.setCurrentNode(node.id);
+    this.steps.push(node);
+    this.trace({ kind: 'enter', node: node.id, type: node.type, via });
+    this.log('Processing node', { nodeId: node.id, type: node.type, via });
+
+    // The step on the record, with its text as the visitor saw it (web _nodeRecord)
+    const renderedText = renderedTextFor(node, (k) => this.chatState.lookupVariable(k));
+    this.chatState.appendRecord({
+      ...(node as any),
+      _id: node.id,
+      id: node.id,
+      type: node.type,
+      data: { ...(node.data || {}) },
+      ...(renderedText !== undefined ? { renderedText } : {}),
+      time: new Date().toISOString(),
+    });
     this.notifyStateListeners();
 
-    try {
-      // Get handler
-      const handler = this.registry.getHandler(node.type);
-      if (!handler) {
-        this.handleError(new Error(`No handler for node type: ${node.type}`));
+    // A welcome reached again is not a display step there: passed.
+    if (node.type === 'welcome-node' && via !== 'start') {
+      await this.passUnknown(node, token);
+      return;
+    }
+
+    if (FLOW_CONTROL.has(node.type)) {
+      await this.runFlowControl(node, token);
+      return;
+    }
+
+    const handler = this.handlerFor(node.type);
+    if (!handler) {
+      await this.passUnknown(node, token);
+      return;
+    }
+
+    if (DISPLAY_NODE_TYPES.has(node.type)) {
+      // A message with no text or an image with no picture: straight on.
+      if (isEmptyContentStep(node)) {
+        await this.next(node, token);
         return;
       }
-
-      // Prepare node data with socket client
-      const nodeWithContext = {
-        ...node,
-        data: {
-          ...node.data,
-          socketClient: this.config.socketClient,
-        },
-      };
-
-      // Handle the node with timeout (HIGH FIX 1)
-      const result = await this.processNodeWithTimeout(
-        handler,
-        nodeWithContext,
-        this.config.nodeProcessingTimeout
-      );
-
-      // Process result
-      await this.handleNodeResult(result, node, handler);
-    } catch (error) {
-      this.handleError(error as Error, nodeId);
+      this.registerAnswerVariables(node);
+      const previous = this.steps[this.steps.length - 2];
+      const pace =
+        this.config.typingDelay !== undefined
+          ? this.config.typingDelay
+          : paceFor(previous, node, followsAutoAdvanceStep(previous?.type));
+      if (pace > 0) {
+        this.config.onUIStateChange?.(NodeUIState.loading(node.id, 'Typing...'));
+        await this.delay(pace);
+        if (token !== this.moveToken || this._ended) return;
+      }
+      // Drawn now (web: the message sound plays as the step is drawn).
+      this.shownToken = token;
+      this.trace({ kind: 'shown', node: node.id });
     }
+
+    let result: NodeResult;
+    try {
+      result = await this.runHandler(handler, node, via, token);
+    } catch (error) {
+      this.handleError(error as Error, node.id);
+      return;
+    }
+    if (token !== this.moveToken || this._ended) return;
+    await this.handleNodeResult(result, node, token);
+  }
+
+  /** A question step registers {nodeId, key, value: null} when shown. */
+  private registerAnswerVariables(node: BaseNode): void {
+    const d: any = node.data || {};
+    if (node.type === 'ask-multiple-questions-node') {
+      (Array.isArray(d.questions) ? d.questions : []).forEach((q: any, i: number) => {
+        if (q?.answerVariable) this.chatState.registerAnswerVariable(`${node.id}${i}`, q.answerVariable);
+      });
+      return;
+    }
+    if (REGISTERS_ANSWER.has(node.type) && d.answerVariable) {
+      this.chatState.registerAnswerVariable(node.id, d.answerVariable);
+    }
+  }
+
+  /** Runs a step's handler with the engine's context, under the step timeout. */
+  private runHandler(handler: NodeHandler, node: BaseNode, via: string, token: number): Promise<NodeResult> {
+    const withCtx = this.nodeWithContext(node, via, token);
+    const timeoutMs = this.config.nodeProcessingTimeout;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    return Promise.race([
+      handler.handle(withCtx, this.chatState),
+      new Promise<NodeResult>((resolve) => {
+        timer = setTimeout(
+          () => resolve(NodeResult.error(`Node processing timed out after ${timeoutMs}ms`, true)),
+          timeoutMs
+        );
+      }),
+    ]).finally(() => {
+      if (timer !== undefined) clearTimeout(timer);
+    });
+  }
+
+  private nodeWithContext(node: BaseNode, via: string, token: number): Record<string, any> {
+    return {
+      ...node,
+      data: { ...(node.data || {}), socketClient: this.config.socketClient },
+      ctx: this.contextFor(node, via, token),
+    };
+  }
+
+  /** What a handler may use: the bot API, the socket, timers, this step's edges. */
+  private contextFor(node: BaseNode, via: string, token: number): FlowContext {
+    const origin = this.config.apiOrigin || getApiOrigin();
+    const state = this.chatState;
+    return {
+      botId: state.botId,
+      sessionId: state.sessionId,
+      api: (path, body, options) => postBotApi(origin, state.botId, path, body, options?.timeoutMs),
+      upload: (file) =>
+        uploadBotMedia(origin, state.botId, state.sessionId, String(state.getVariable('_visitorId') || state.sessionId), file),
+      emit: (event, payload) => this.emit(event, payload),
+      on: (event, listener) => this.onSocket(event, listener),
+      typing: async (ms) => {
+        if (ms > 0) {
+          this.config.onUIStateChange?.(NodeUIState.loading(node.id, 'Typing...'));
+          await this.delay(ms);
+        }
+      },
+      delay: (ms) => this.delay(ms),
+      edges: () => this.edges.filter((e) => e.source === node.id),
+      edgesOf: (id) => this.edges.filter((e) => e.source === id),
+      wired: (handle) => this.edges.some((e) => e.source === node.id && e.sourceHandle === handle),
+      via,
+      stepIndex: Math.max(0, this.steps.lastIndexOf(node)),
+      random: () => (this.config.random ? this.config.random() : Math.random()),
+      now: () => new Date(),
+      customizations: this.config.customizations || {},
+      page: this.config.page,
+      visitorTimeZone: this.config.visitorTimeZone || visitorTimeZone(),
+      respond: (response) => {
+        if (this._currentNodeId === node.id && this._isWaitingForInput) void this.submitResponse(response);
+      },
+      shown: () => {
+        if (this.shownToken !== token && token === this.moveToken) {
+          this.shownToken = token;
+          this.trace({ kind: 'shown', node: node.id });
+        }
+      },
+      isStale: () => token !== this.moveToken && this._currentNodeId !== node.id,
+      node: (id) => this.nodes.get(id),
+    };
   }
 
   /**
    * Handles the result of processing a node
    */
-  private async handleNodeResult(
-    result: NodeResult,
-    node: BaseNode,
-    handler: NodeHandler
-  ): Promise<void> {
+  private async handleNodeResult(result: NodeResult, node: BaseNode, token: number): Promise<void> {
     this.log('Node result', { type: result.type, nodeId: node.id });
-
     switch (result.type) {
       case 'displayUI':
-        await this.handleDisplayUI(result.uiState, node, handler);
+        await this.handleDisplayUI(result.uiState, node, token);
         break;
-
       case 'proceed':
-        await this.handleProceed(result.nextNodeId, result.data, node);
+        await this.handleProceed(result.nextNodeId, result.data, node, token);
         break;
-
       case 'delayedProceed':
-        await this.handleDelayedProceed(result.nextNodeId, result.delayMs, result.data, node);
+        await this.delay(result.delayMs);
+        if (token !== this.moveToken || this._ended) return;
+        await this.handleProceed(result.nextNodeId, result.data, node, token);
         break;
-
       case 'jumpTo':
-        await this.handleJumpTo(result.targetNodeId, result.data);
+        this.sendResponseToServer();
+        await this.jump(result.targetNodeId, token);
         break;
-
+      case 'invalid':
+        await this.handleInvalid(result.message, node, token, result.uiState, result.inCard);
+        break;
+      case 'end':
+        await this.end('completed');
+        break;
       case 'error':
         this.handleError(new Error(result.message), node.id);
         break;
     }
   }
 
-  /**
-   * Handles display UI result
-   */
-  private async handleDisplayUI(
-    uiState: NodeUIState,
-    node: BaseNode,
-    handler: NodeHandler
-  ): Promise<void> {
+  /** Whether the step waits for the visitor once drawn. */
+  private awaitsInput(node: BaseNode, uiState: NodeUIState): boolean {
+    return uiState?.awaitInput === true || requiresUserInteraction(node.type);
+  }
+
+  private handleDisplayUI = async (uiState: NodeUIState, node: BaseNode, token: number): Promise<void> => {
     this._currentUIState = uiState;
     this._isProcessing = false;
-
-    // Push node to record (matching web widget format)
-    // Web widget pushes the entire node object {...node, time} into record,
-    // so the admin dashboard expects record entries with full node data
-    this.chatState.addRecord({
-      _id: node.id,
-      id: node.id,
-      type: node.type,
-      data: {
-        ...node.data,
-      },
-      time: new Date().toISOString(),
-    });
-
-    // Add typing delay if needed
-    if (uiState.typing && this.config.typingDelay > 0) {
-      this.config.onUIStateChange?.(NodeUIState.loading(node.id, 'Typing...'));
-      await this.delay(this.config.typingDelay);
+    if (this.shownToken !== token && DISPLAY_NODE_TYPES.has(node.type)) {
+      this.shownToken = token;
+      this.trace({ kind: 'shown', node: node.id });
     }
-
-    // Show the UI state
     this.config.onUIStateChange?.(uiState);
     this.notifyStateListeners();
 
-    // Check if this node requires user input
-    if (requiresUserInteraction(node.type)) {
+    if (this.awaitsInput(node, uiState)) {
       this._isWaitingForInput = true;
       this.config.onWaitingForInput?.(node.id, uiState);
       this.notifyStateListeners();
+      return;
+    }
+
+    // Shown and moving on by itself
+    this.sendResponseToServer();
+    if (MEDIA_TYPES.has(node.type)) {
+      await this.waitForMedia(node.id, this.config.mediaAdvanceMs);
+      if (token !== this.moveToken || this._ended) return;
+    }
+    await this.next(node, token);
+  };
+
+  /** Resolves when the media loads (mediaSettled) or after `capMs`. */
+  private waitForMedia(nodeId: string, capMs: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const timers: Array<ReturnType<typeof setTimeout>> = [];
+      const done = () => {
+        timers.forEach((t) => clearTimeout(t));
+        this.mediaWaiters.delete(nodeId);
+        resolve();
+      };
+      this.mediaWaiters.set(nodeId, done);
+      timers.push(setTimeout(done, Math.max(0, capMs)));
+    });
+  }
+
+  /**
+   * An image or video step's media loaded (or failed): the flow moves on
+   * now instead of at the cap (web: load / loadedmetadata / error).
+   */
+  mediaSettled(nodeId: string): void {
+    this.mediaWaiters.get(nodeId)?.();
+  }
+
+  private async handleProceed(
+    nextNodeId: string | null,
+    data: Record<string, any> | undefined,
+    node: BaseNode,
+    token: number
+  ): Promise<void> {
+    this._isProcessing = false;
+
+    if (data?.flowComplete) {
+      await this.end(data.completionStatus || 'completed');
+      return;
+    }
+
+    this.sendResponseToServer();
+
+    // Legacy __targetPort (old two/three-choices callers)
+    const effective = nextNodeId || (data?.__targetPort ? `__port:${data.__targetPort}` : null);
+    if (effective === null) {
+      await this.next(node, token);
+    } else if (effective.startsWith('__port:')) {
+      await this.port(node, effective.substring(7), data?.fallbackPort, token);
     } else {
-      // Auto-continue for non-interactive display nodes
-      this.sendResponseToServer();
-      const nextNodeId = this.resolveNextNode(node.id, null);
-      if (nextNodeId) {
-        await this.delay(this.config.typingDelay);
-        await this.processNode(nextNodeId);
+      await this.jump(effective, token);
+    }
+  }
+
+  // ========================================
+  // ROUTING
+  // ========================================
+
+  /** The FIRST edge from the step, whatever its handle; none ends the chat. */
+  private async next(node: BaseNode, token: number): Promise<void> {
+    if (this._ended || token !== this.moveToken) return;
+    const edge = this.edges.find((e) => e.source === node.id);
+    if (edge) this.chatState.appendRecord({ ...(edge as any), _id: edge.id, time: new Date().toISOString() });
+    const target = edge ? this.nodes.get(edge.target) : undefined;
+    if (edge && target) {
+      await this.enter(target, edge.sourceHandle ? `edge:${edge.sourceHandle}` : 'edge');
+    } else {
+      await this.end('no_next_node');
+    }
+  }
+
+  /** The edge from exactly this handle; none ends the chat. */
+  private async port(node: BaseNode, handle: string, fallback: string | undefined, token: number): Promise<void> {
+    if (this._ended || token !== this.moveToken) return;
+    const wired = (h: string) => this.edges.some((e) => e.source === node.id && e.sourceHandle === h);
+    const h = fallback && !wired(handle) && wired(fallback) ? fallback : handle;
+    const edge = this.edges.find((e) => e.source === node.id && e.sourceHandle === h);
+    this.trace({ kind: 'port', node: node.id, handle: h, wired: !!edge });
+    if (!edge) {
+      await this.end('no_next_node');
+      return;
+    }
+    this.chatState.appendRecord({ ...(edge as any), _id: edge.id, time: new Date().toISOString() });
+    const target = this.nodes.get(edge.target);
+    if (!target) {
+      // The web throws on nextNode.type here: the chat stops where it is.
+      this.trace({ kind: 'crash', node: node.id, reason: 'edge target missing' });
+      this._isProcessing = false;
+      this._isWaitingForInput = false;
+      this.handleError(new Error(`Edge ${edge.id} leads to a missing node (${edge.target})`), node.id);
+      return;
+    }
+    await this.enter(target, `port:${h}`);
+  }
+
+  /** To a node by id; a missing target ends the chat. */
+  private async jump(targetNodeId: string, token: number): Promise<void> {
+    if (this._ended || token !== this.moveToken) return;
+    const target = targetNodeId ? this.nodes.get(String(targetNodeId)) : undefined;
+    if (!target) {
+      await this.end('jump_target_missing');
+      return;
+    }
+    await this.enter(target, 'jump');
+  }
+
+  /** A step type this engine does not run: nothing shown, then its first edge. */
+  private async passUnknown(node: BaseNode, token: number): Promise<void> {
+    console.warn(`[ConferBot] step "${node.type}" is not supported here; continuing the flow`);
+    this.trace({ kind: 'unsupported', node: node.id, type: node.type });
+    await this.delay(0);
+    if (token !== this.moveToken || this._ended) return;
+    await this.next(node, token);
+  }
+
+  // ========================================
+  // LOOPS AND SUB-FLOWS (web flowControlRun.ts)
+  // ========================================
+
+  private flowLookup = (key: string) => this.chatState.lookupVariable(key);
+
+  private setVars(vars: Record<string, any>): void {
+    Object.entries(vars).forEach(([k, v]) => this.chatState.saveVariableByName(k, v));
+  }
+
+  /** A trail entry on the step's latest record ("Loop 3 of 5"). */
+  private trail(node: BaseNode, extra: Record<string, any>): void {
+    const record = this.chatState.getRecord();
+    for (let i = record.length - 1; i >= 0; i--) {
+      const r: any = record[i];
+      if (r && r.id === node.id && r.type === node.type && !r.shape) {
+        this.chatState.addRecord({ ...r, ...extra });
+        return;
+      }
+    }
+  }
+
+  private async runFlowControl(node: BaseNode, token: number): Promise<void> {
+    const d: any = node.data || {};
+    switch (node.type) {
+      case LOOP_TYPE: {
+        const step = stepLoop(String(node.id), d, this.flowControl, this.flowLookup);
+        this.setVars(step.vars);
+        this.trail(node, { loop: { ...step.trail, text: loopTrailText(step.trail) } });
+        this.sendResponseToServer();
+        await this.delay(0);
+        if (token !== this.moveToken || this._ended) return;
+        await this.port(node, step.handle, undefined, token);
+        return;
+      }
+      case RUN_SUBFLOW_TYPE: {
+        const call = callSubflow(node, this.nodeList, this.flowControl, this.flowLookup);
+        if (!call.ok) {
+          this.trail(node, { subflow: { name: call.name || '', error: call.error } });
+          this.sendResponseToServer();
+          await this.delay(0);
+          if (token !== this.moveToken || this._ended) return;
+          const wiredError = this.edges.some((e) => e.source === node.id && e.sourceHandle === RUN_ERROR_HANDLE);
+          await this.port(node, wiredError ? RUN_ERROR_HANDLE : 'source', undefined, token);
+          return;
+        }
+        this.setVars(call.vars);
+        this.trail(node, { subflow: { name: call.name, inputs: call.vars, depth: call.frame?.depth, text: `Ran sub-flow ${call.name}` } });
+        this.sendResponseToServer();
+        await this.delay(0);
+        if (token !== this.moveToken || this._ended) return;
+        await this.jump(call.startId!, token);
+        return;
+      }
+      case SUBFLOW_TYPE: {
+        this.trail(node, { subflow: { name: subflowName(node), entered: true } });
+        await this.delay(0);
+        if (token !== this.moveToken || this._ended) return;
+        await this.port(node, 'source', undefined, token);
+        return;
+      }
+      case SUBFLOW_RETURN_TYPE: {
+        if (await this.returnFromSubflowPath(token)) return;
+        await this.delay(0);
+        if (token !== this.moveToken || this._ended) return;
+        await this.next(node, token);
+        return;
       }
     }
   }
 
   /**
-   * Handles proceed result
+   * The end of a path inside a sub-flow: copy the outputs back and carry on
+   * from Run sub-flow's "source" edge (or one with no handle). True when it
+   * carried on.
    */
-  private async handleProceed(
-    nextNodeId: string | null,
-    data: Record<string, any> | undefined,
-    node: BaseNode
-  ): Promise<void> {
-    this._isProcessing = false;
-
-    // Check for flow completion
-    if (data?.flowComplete) {
-      this.handleFlowComplete(data.completionStatus || 'completed');
-      return;
+  private async returnFromSubflowPath(token: number): Promise<boolean> {
+    let ret = returnFromSubflow(this.flowControl, this.flowLookup);
+    while (ret) {
+      this.setVars(ret.vars);
+      const runNodeId = ret.frame.runNodeId;
+      const edge = this.edges.find((e) => e.source === runNodeId && (e.sourceHandle === 'source' || !e.sourceHandle));
+      if (edge?.target) {
+        this.sendResponseToServer();
+        await this.delay(0);
+        if (token !== this.moveToken || this._ended) return true;
+        await this.jump(edge.target, token);
+        return true;
+      }
+      ret = returnFromSubflow(this.flowControl, this.flowLookup);
     }
-
-    // Send state to server before proceeding
-    this.sendResponseToServer();
-
-    // Support __targetPort from legacy choice nodes (two-choices, three-choices)
-    const effectiveNextNodeId = nextNodeId || (data?.__targetPort ? `__port:${data.__targetPort}` : null);
-
-    // Resolve actual next node ID
-    const resolvedNextId = this.resolveNextNode(node.id, effectiveNextNodeId);
-
-    if (resolvedNextId) {
-      await this.processNode(resolvedNextId);
-    } else {
-      // No next node - flow ends
-      this.handleFlowComplete('no_next_node');
-    }
-  }
-
-  /**
-   * Handles delayed proceed result
-   */
-  private async handleDelayedProceed(
-    nextNodeId: string | null,
-    delayMs: number,
-    data: Record<string, any> | undefined,
-    node: BaseNode
-  ): Promise<void> {
-    this.log('Delayed proceed', { delayMs, nextNodeId });
-
-    // Show loading state during delay
-    this.config.onUIStateChange?.(NodeUIState.loading(node.id, 'Please wait...'));
-
-    await this.delay(delayMs);
-    await this.handleProceed(nextNodeId, data, node);
-  }
-
-  /**
-   * Handles jump to result
-   */
-  private async handleJumpTo(
-    targetNodeId: string,
-    data: Record<string, any> | undefined
-  ): Promise<void> {
-    this.log('Jumping to node', { targetNodeId });
-
-    if (!this.nodes.has(targetNodeId)) {
-      this.handleError(new Error(`Jump target not found: ${targetNodeId}`));
-      return;
-    }
-
-    this.sendResponseToServer();
-    await this.processNode(targetNodeId);
+    return false;
   }
 
   // ========================================
@@ -451,13 +822,14 @@ export class NodeFlowEngine {
       this.log('Not waiting for input, ignoring response');
       return;
     }
+    // Typed text is trimmed; an empty send is ignored (web composer).
+    if (typeof response === 'string' && response.trim() === '') return;
 
     const node = this.nodes.get(this._currentNodeId);
     if (!node) {
       this.handleError(new Error(`Current node not found: ${this._currentNodeId}`));
       return;
     }
-
     const handler = this.registry.getHandler(node.type);
     if (!handler) {
       this.handleError(new Error(`Handler not found for: ${node.type}`));
@@ -466,239 +838,147 @@ export class NodeFlowEngine {
 
     this._isWaitingForInput = false;
     this._isProcessing = true;
+    this.nodesProcessedInCycle = 0;
     this.notifyStateListeners();
+    const token = this.moveToken;
 
     try {
-      // Push user response to record (matching web widget format)
-      // Web widget uses different shapes per node type
-      const responseText = typeof response === 'string'
-        ? response
-        : response?.text || response?.label || response?.selectedChoice || response?.value || String(response);
-
-      const choiceNodeTypes = [
-        'n-choices-node', 'two-choices-node', 'three-choices-node',
-        'yes-or-no-choice-node', 'image-choice-node',
-      ];
-      const selectNodeTypes = ['n-select-option-node', 'select-option-node'];
-      const checkNodeTypes = ['n-check-options-node'];
-
-      // Store last choice so message-nodes echoing ${selection} get skipped
-      if (choiceNodeTypes.includes(node.type) || selectNodeTypes.includes(node.type) || checkNodeTypes.includes(node.type)) {
-        this.chatState.setVariable('_lastUserChoice', responseText);
-        this.log('Set _lastUserChoice', { responseText, nodeType: node.type });
-      } else {
-        this.log('NOT setting _lastUserChoice', { nodeType: node.type, notInTypes: true });
-      }
-
-      if (choiceNodeTypes.includes(node.type)) {
-        // Choice nodes: shape=user-selected-choice, include choices data
-        this.chatState.addRecord({
-          _id: node.id,
-          id: node.id,
-          shape: 'user-selected-choice',
-          type: node.type,
-          choices: node.data,
-          selectedChoice: responseText,
-          time: new Date().toISOString(),
-        });
-      } else if (selectNodeTypes.includes(node.type)) {
-        // Select nodes: shape=user-selected-option, include options data
-        this.chatState.addRecord({
-          _id: node.id,
-          id: node.id,
-          shape: 'user-selected-option',
-          type: node.type,
-          options: node.data,
-          selectedOption: responseText,
-          time: new Date().toISOString(),
-        });
-      } else if (checkNodeTypes.includes(node.type)) {
-        // Check nodes: shape=user-selected-check-options
-        this.chatState.addRecord({
-          _id: node.id,
-          id: node.id,
-          shape: 'user-selected-check-options',
-          type: node.type,
-          options: node.data,
-          selectedOptions: responseText,
-          time: new Date().toISOString(),
-        });
-      } else {
-        // Text input and other nodes: shape=user-input-response
-        this.chatState.addRecord({
-          _id: node.id,
-          id: node.id,
-          shape: 'user-input-response',
-          type: node.data?.type || node.type,
-          text: responseText,
-          time: new Date().toISOString(),
-        });
-      }
-
-      // Send response to server after user interaction
-      this.sendResponseToServer();
-
-      // Handle response if handler supports it
+      let result: NodeResult;
       if (handler.handleResponse) {
-        const nodeWithContext = {
-          ...node,
-          data: {
-            ...node.data,
-            socketClient: this.config.socketClient,
-          },
-        };
-
-        const result = await handler.handleResponse(response, nodeWithContext, this.chatState);
-        await this.handleNodeResult(result, node, handler);
+        const withCtx = this.nodeWithContext(node, 'edge', token);
+        result = await handler.handleResponse(response, withCtx, this.chatState);
       } else {
-        // Default: proceed to next node based on port
-        const nextNodeId = this.resolveNextNode(node.id, portName ? `__port:${portName}` : null);
-        if (nextNodeId) {
-          await this.processNode(nextNodeId);
-        } else {
-          this.handleFlowComplete('response_no_next');
-        }
+        result = portName ? NodeResult.port(portName) : NodeResult.next();
       }
+      if (token !== this.moveToken || this._ended) return;
+      this.sendResponseToServer();
+      await this.handleNodeResult(result, node, token);
     } catch (error) {
-      this.handleError(error as Error, this._currentNodeId);
+      this.handleError(error as Error, node.id);
     }
   }
 
-  // ========================================
-  // EDGE RESOLUTION
-  // ========================================
-
   /**
-   * Resolves the next node ID from edges
+   * A refused answer: say why, keep waiting at the step. A typed answer's
+   * reason comes as a bot bubble after 700 ms of typing (web helpers
+   * _displayErrorMessage); a card shows its own at once.
    */
-  private resolveNextNode(currentNodeId: string, nextNodeId: string | null): string | null {
-    // If explicit next node provided
-    if (nextNodeId && !nextNodeId.startsWith('__port:')) {
-      return nextNodeId;
+  private async handleInvalid(message: string, node: BaseNode, token: number, uiState?: NodeUIState, inCard?: boolean): Promise<void> {
+    this.trace({ kind: 'error', node: node.id, message });
+    this._isProcessing = false;
+    if (message && !inCard) {
+      this.config.onUIStateChange?.(NodeUIState.loading(node.id, 'Typing...'));
+      await this.delay(700);
+      if (token !== this.moveToken || this._ended) return;
+      this.chatState.addBotMessage(bubbleText(message), node.id, 'validation-error');
     }
-
-    // Extract port name if specified
-    let portName: string | null = null;
-    if (nextNodeId && nextNodeId.startsWith('__port:')) {
-      portName = nextNodeId.substring(7);
+    this.config.onValidationError?.(node.id, message);
+    const ui = uiState || this._currentUIState;
+    if (ui) {
+      this._currentUIState = { ...(ui as any), errorMessage: plainText(message) };
+      this.config.onUIStateChange?.(this._currentUIState);
     }
-
-    // Use findEdge for port-based resolution with validation (HIGH FIX 5)
-    if (portName) {
-      const edge = this.findEdge(currentNodeId, portName);
-      if (edge) {
-        return edge.target;
-      }
-    }
-
-    // Find matching edge for default case
-    if (!portName) {
-      const fromHere = this.edges.filter((edge) => edge.source === currentNodeId);
-      // Default edge (no port requirement). The builder names a single
-      // output "source-1" on most nodes (as often as "source").
-      const byDefault = fromHere.find(
-        (edge) =>
-          !edge.sourceHandle ||
-          edge.sourceHandle === 'default' ||
-          edge.sourceHandle === 'out' ||
-          edge.sourceHandle === 'source' ||
-          edge.sourceHandle === 'source-1'
-      );
-      if (byDefault) return byDefault.target;
-      // One way out, whatever its handle is called: take it.
-      if (fromHere.length === 1) return fromHere[0].target;
-    }
-
-    // Try to find any edge from this node as fallback
-    if (portName) {
-      for (const edge of this.edges) {
-        if (edge.source === currentNodeId) {
-          console.warn(`[ConferBot] Falling back to first available edge for node: ${currentNodeId}`);
-          return edge.target;
-        }
-      }
-    }
-
-    return null;
+    this._isWaitingForInput = true;
+    if (this._currentUIState) this.config.onWaitingForInput?.(node.id, this._currentUIState);
+    this.notifyStateListeners();
   }
 
   // ========================================
   // SERVER COMMUNICATION
   // ========================================
 
+  private emit(event: string, payload: any): boolean {
+    const client = this.config.socketClient;
+    if (!client) return false;
+    try {
+      if (typeof client.emitToServer === 'function') client.emitToServer(event, payload);
+      else if (typeof client.emit === 'function') client.emit(event, payload);
+      else return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private onSocket(event: string, listener: (payload: any) => void): () => void {
+    const client = this.config.socketClient;
+    if (!client || typeof client.on !== 'function') return () => {};
+    const off = client.on(event, listener);
+    return typeof off === 'function' ? off : () => client.off?.(event, listener);
+  }
+
   /**
    * Sends current chat state to server via socket.
-   * Matches web widget's `response-record` event and Android/Flutter SDK behavior.
+   * Matches web widget's `response-record` event.
    */
   private sendResponseToServer(): void {
     if (!this.config.socketClient) return;
-
     const responseData = this.chatState.buildResponseData();
-
     // Never emit without a session id - the server would file the record
     // under a shared no-session document that leaks across devices
-    if (!responseData.chatSessionId) {
-      if (__DEV__) {
-        console.warn('[ConferBot] Skipping response-record - no chatSessionId yet');
-      }
-      return;
+    if (!responseData.chatSessionId) return;
+    if (typeof this.config.socketClient.sendResponseRecord === 'function') {
+      this.config.socketClient.sendResponseRecord(responseData);
     }
-
-    if (__DEV__) {
-      console.log('[ConferBot] Sending record to server, entries:', responseData.record?.length);
-      for (const r of (responseData.record || [])) {
-        console.log('[ConferBot]   record:', r.id || r._id, 'type:', r.type, 'shape:', r.shape);
-      }
-    }
-
-    this.config.socketClient.sendResponseRecord(responseData);
   }
 
   // ========================================
   // ERROR HANDLING
   // ========================================
 
-  /**
-   * Handles errors during flow execution
-   */
   private handleError(error: Error, nodeId?: string): void {
     console.error('[NodeFlowEngine] Error:', error.message, { nodeId });
-
     this._error = error;
     this._isProcessing = false;
     this.notifyStateListeners();
-
     this.config.onError?.(error, nodeId ?? undefined);
   }
 
   /**
-   * Handles flow completion
+   * The end of a path: a sub-flow returns to its caller; otherwise the chat
+   * is over (web index.ts: hasChatEnded, record sent, chat-flow-completed).
    */
-  private handleFlowComplete(reason: string): void {
-    this.log('Flow complete', { reason });
+  private async end(reason: string): Promise<void> {
+    if (this._ended) return;
+    if (this.flowControl.stack.length && (await this.returnFromSubflowPath(this.moveToken))) return;
+    this.handleFlowComplete(reason);
+  }
 
+  private handleFlowComplete(reason: string): void {
+    if (this._ended) return;
+    this.log('Flow complete', { reason });
+    this._ended = true;
     this._isProcessing = false;
     this._isWaitingForInput = false;
     this._currentUIState = null;
     this.chatState.markConversationComplete(reason);
-
-    // Send final state to server
     this.sendResponseToServer();
-
+    this.emit('chat-flow-completed', { chatSessionId: this.chatState.sessionId });
+    this.trace({ kind: 'end' });
     this.notifyStateListeners();
     this.config.onFlowComplete?.(reason);
+  }
+
+  private trace(event: FlowTraceEvent): void {
+    try {
+      this.config.onTrace?.(event);
+    } catch {
+      /* a listener's error never stops the flow */
+    }
   }
 
   // ========================================
   // STATE MANAGEMENT
   // ========================================
 
-  /**
-   * Gets the current engine state
-   */
   /** A node of the loaded flow by id. */
   getNode(nodeId: string): BaseNode | undefined {
     return this.nodes.get(nodeId);
+  }
+
+  /** Whether the chat has ended (the flow reached its end). */
+  isEnded(): boolean {
+    return this._ended;
   }
 
   /**
@@ -757,9 +1037,6 @@ export class NodeFlowEngine {
     return () => this.stateListeners.delete(listener);
   }
 
-  /**
-   * Notifies all state listeners
-   */
   private notifyStateListeners(): void {
     const state = this.getState();
     this.stateListeners.forEach((listener) => {
@@ -775,16 +1052,10 @@ export class NodeFlowEngine {
   // UTILITIES
   // ========================================
 
-  /**
-   * Delays execution
-   */
   private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
   }
 
-  /**
-   * Logs debug messages
-   */
   private log(message: string, data?: Record<string, any>): void {
     if (this.config.debug) {
       console.log(`[NodeFlowEngine] ${message}`, data || '');
@@ -795,13 +1066,13 @@ export class NodeFlowEngine {
    * Resets the engine state
    */
   reset(): void {
+    this.moveToken++;
     this._isProcessing = false;
     this._isWaitingForInput = false;
     this._currentNodeId = null;
     this._currentUIState = null;
     this._error = null;
-    this.nodesProcessedInCycle = 0;
-    this.visitedNodes.clear();
+    this.resetFlow();
     this.chatState.reset();
     this.notifyStateListeners();
   }
