@@ -19,6 +19,8 @@ export type NodeResult =
   | NodeResult.Proceed
   | NodeResult.DelayedProceed
   | NodeResult.JumpTo
+  | NodeResult.Invalid
+  | NodeResult.End
   | NodeResult.Error;
 
 export namespace NodeResult {
@@ -50,6 +52,23 @@ export namespace NodeResult {
     data?: Record<string, any>;
   }
 
+  /**
+   * The visitor's answer was refused: the message is shown and the step
+   * keeps waiting (nothing is recorded). `uiState` redraws the step.
+   */
+  export interface Invalid {
+    type: 'invalid';
+    message: string;
+    uiState?: NodeUIState;
+    /** Said inside the step's own card (no bot bubble), as rich steps do. */
+    inCard?: boolean;
+  }
+
+  /** The chat ends here (as when a path has no next step). */
+  export interface End {
+    type: 'end';
+  }
+
   /** Error during processing */
   export interface Error {
     type: 'error';
@@ -77,6 +96,28 @@ export namespace NodeResult {
 
   export function error(message: string, recoverable: boolean = true, details?: any): Error {
     return { type: 'error', message, recoverable, details };
+  }
+
+  export function invalid(message: string, uiState?: NodeUIState, inCard?: boolean): Invalid {
+    return { type: 'invalid', message, uiState, inCard };
+  }
+
+  export function end(): End {
+    return { type: 'end' };
+  }
+
+  /**
+   * Leave by an exact handle (`source-1`, `source-<id>`...). No edge from
+   * that handle ends the chat - except a rich step's `fallback`: taken when
+   * the handle has no edge and the fallback has one (web goPort).
+   */
+  export function port(handle: string, fallback?: string, data?: Record<string, any>): Proceed {
+    return { type: 'proceed', nextNodeId: `__port:${handle}`, data: fallback ? { ...(data || {}), fallbackPort: fallback } : data };
+  }
+
+  /** Move on along the step's FIRST edge, whatever its handle. */
+  export function next(data?: Record<string, any>): Proceed {
+    return { type: 'proceed', nextNodeId: null, data };
   }
 }
 
@@ -118,6 +159,10 @@ export namespace NodeUIState {
   interface BaseUIState {
     nodeId: string;
     typing?: boolean;
+    /** The step waits for the visitor even if its type usually moves on. */
+    awaitInput?: boolean;
+    /** Why the last answer was refused, shown with the step. */
+    errorMessage?: string;
   }
 
   /** Simple text message */
@@ -327,6 +372,10 @@ export namespace NodeUIState {
     acceptedTypes?: string[];
     maxSize?: number;
     multiple?: boolean;
+    /** A Skip button (the question is optional). */
+    optional?: boolean;
+    /** The allowed types in words ("PNG or PDF"). */
+    typesInWords?: string;
   }
 
   /** Location picker */
