@@ -12,7 +12,7 @@ for (const f of ['bubbles', 'faces', 'characters', 'playful', 'classic']) {
 }
 const icons = require('./icons.json');
 (async () => {
-  const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+  const b = await puppeteer.launch({ executablePath: require('../chrome'), args: ['--no-sandbox'] });
   const p = await b.newPage();
   const html = orig.map((o, i) => `<svg id="s${i}" viewBox="0 0 24 24" width="24" height="24" fill="none" style="color:#fff"><g class="cbl-r">${o.body.replace(/\{uid\}/g, 'x' + i)}</g></svg>`).join('');
   await p.setContent(`<html><body>${html}</body></html>`);
