@@ -880,8 +880,20 @@ export class ChatState {
    * Builds the response data payload for sending to the server via socket.
    * Matches the web widget's `response-record` format.
    */
+  /**
+   * The app's signed-in user, as the web widget's visitorContext: id, name,
+   * email, phone, hash (identity verification: HMAC-SHA256 of the user id,
+   * or email, with the workspace secret) and the app's own data. The server
+   * checks the hash, keeps the identity when it matches and drops the hash.
+   */
+  static visitorContext: Record<string, any> | null = null;
+
   buildResponseData(): Record<string, any> {
+    const ctx = ChatState.visitorContext;
     return {
+      ...(ctx ? { visitorContext: ctx } : {}),
+      ...(ctx?.name ? { visitorName: ctx.name } : {}),
+      ...(ctx?.email ? { visitorEmail: ctx.email } : {}),
       version: 'v2',
       chatSessionId: this._sessionId,
       visitorId: this.getVariable('_visitorId') || this._sessionId,
