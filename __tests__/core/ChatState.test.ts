@@ -402,9 +402,9 @@ describe('ChatState', () => {
       expect(result).toBe('Result: answer');
     });
 
-    it('should keep original placeholder for undefined variables', () => {
-      const result = chatState.resolveVariables('Unknown: {{unknown}}');
-      expect(result).toBe('Unknown: {{unknown}}');
+    it('shows nothing for an unknown variable and tidies the gap (web fillVariables)', () => {
+      expect(chatState.resolveVariables('Unknown: {{unknown}}')).toBe('Unknown:');
+      expect(chatState.resolveVariables('Hey ${nobody}, welcome')).toBe('Hey, welcome');
     });
 
     it('should handle multiple variables in text', () => {
