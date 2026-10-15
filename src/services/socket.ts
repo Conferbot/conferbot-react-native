@@ -41,6 +41,8 @@ export const FORWARDED_SERVER_EVENTS = [
   'queue-left',
   'agent-connection-lost',
   'agent-connection-restored',
+  // payment-node: the server's word on a Checkout (paid / failed / expired)
+  'payment-status',
 ] as const;
 
 // Socket connection options
