@@ -2,7 +2,7 @@
 
 This compares each SDK's flow engine, as it is today, against `nodes.spec.json` and the fixtures.
 
-- **How it was found:** by reading each SDK's code. The fixtures have not been run in any SDK yet; that is the next step. Paths are relative to each SDK repo.
+- **How it was found:** by reading each SDK's code. React Native now runs all 156 fixtures (`__tests__/parity/flows.test.ts`, all pass), so its section lists only what remains; Android, iOS and Flutter have not run them yet. Paths are relative to each SDK repo.
 - **Spot-checks:** I re-read the items marked ✓ myself.
 - **No SDK code was changed** for this report.
 - **Severity:**
@@ -12,7 +12,7 @@ This compares each SDK's flow engine, as it is today, against `nodes.spec.json` 
 
 ## All four SDKs
 
-The same gaps appear in every SDK. File these once per repo.
+The same gaps appeared in every SDK; React Native has fixed all of them (see its section). File these once per repo.
 
 | # | Area | Web (spec) | SDKs today | Fixtures |
 |---|---|---|---|---|
@@ -29,33 +29,16 @@ The same gaps appear in every SDK. File these once per repo.
 
 ## React Native
 
-The engine is in `src/core/NodeFlowEngine.ts`. The handlers are in `src/core/nodes/handlers/*`. The flow is loaded in `src/context/hooks/useSocketListeners.ts`.
+All 156 fixtures pass through `src/core/NodeFlowEngine.ts` and the handlers in `src/core/nodes/handlers/*` (`__tests__/parity/flows.test.ts`); none is pending. The A1-A10 and RN1-RN23 gaps found by reading are fixed (#33-#38, #52, #61-#63). What remains is outside what the fixtures check:
 
-| # | Node / area | Web | RN today (evidence) |
+| # | Area | Web | RN today |
 |---|---|---|---|
-| RN1 S1 | start | first `welcome-node` | `startNodeId: nodes[0]?.id` ✓ (`useSocketListeners.ts:231`) |
-| RN2 S1 | next / unknown | the first edge, whatever its handle | Prefers an edge with no handle or `default`/`out`/`source`/`source-1`, else the only edge. With several other edges the chat ends. On a missing port it falls back to the first edge from the node ✓ (`NodeFlowEngine.ts:595-619`) |
-| RN3 S1 | condition-node, boolean-logic-node | `leftValue`/`rightValue`/`operator`/`customLeftValue`/`customRightValue`/`isNumber`/`caseInsensitive`; true `source-0`, false `source-1` | Reads `variable`/`value`/`compareValue` and routes to `"true"`/`"false"` ✓ (`LogicNodeHandlers.ts:498,562`). No such edge exists, so it always takes the first edge: **every condition is bypassed** |
-| RN4 S1 | business-hours-node | `weeklyHours`/`excludeDays`/`excludeDates`/`timezone`; `source-0`/`source-1` | Reads `schedules`/`openTime`/`holidays` and routes `"open"`/`"closed"`, which never match (`LogicNodeHandlers.ts:1168-1226`) |
-| RN5 S1 | random-flow-node | `branches[{id,weight}]` -> `source-<id>` | Reads `paths`/`options`, then `port_N` (`LogicNodeHandlers.ts:794,851`) |
-| RN6 S1 | rating-choice / opinion-scale | `source-<v-1>` / `source-<v-from>` | Default edge (prefers `source-1`) (`ChoiceNodeHandlers.ts:788,886`) |
-| RN7 S1 | image-choice-node | `images` -> `source-<image.id>` | `getArray(data,'choices',[]) \|\| ...` returns `[]`, which is truthy, so `images` is never read and the step errors ✓ (`ChoiceNodeHandlers.ts:485-487`). Routing uses the default edge (`:567`) |
-| RN8 S1 | quiz / user-range | quiz: `source-1` wrong, `source-2` right; range: `source-1/2/3` | quiz reads `options[]`/`isCorrect`; range reads `min`/`max`; both use the default edge (legacy handlers `:275-537`) |
-| RN9 S1 | video / audio / file / user-redirect / navigate | `data.video`, `data.audio`, `data.file`, `data.link` + `redirectPrompt`, `navigateOptions` | Reads `url`/`src`/`videoUrl`... ✓ (`DisplayNodeHandlers.ts:166-173`). With no URL the step errors and the flow **stalls** (`:218-224, 263-269, 373-379, 437-441`) |
-| RN10 S1 | math-operation-node | `leftValue`/`operator`/`rightValue`, saved by `answerVariable` (default `math_operations`) | Reads `operation`/`operand1`/`resultVariable`; missing: error, then stalls (`LogicNodeHandlers.ts:611-618`) |
-| RN11 S2 | ask-* | `questionText`; variable = `data.answerVariable`, else none | Prompt from `question`/`text`/`message`; variable from `variableName`, defaulting to "name"/"email"... (`AskQuestionNodeHandlers.ts:52-64,111-114`). ask-custom-question is the exception and is right |
-| RN12 S2 | n-select-option-node | `selectPrompt`, `options[].optionText` | `question`/`text`; labels `label`/`text`/`name`, so "Option N" (`ChoiceNodeHandlers.ts:590-615`) |
-| RN13 S2 | n-choices-node | `choices[].choiceText`, `answerVariable`, blanks hidden | `buttons` first, then `options`, then `choices`; label prefers `choiceLabel`; variable "selection" (`ChoiceNodeHandlers.ts:94-121`). The port `source-<id>` is right (`:221`) |
-| RN14 S2 | yes-or-no / rating / opinion prompts | `questionText`; `ratingType`; `from`/`to`/`fromLabel`/`toLabel` | yes-no shows no question; rating uses `maxRating`/`max`/`stars`; opinion uses `min`/`max`/`minLabel` (`ChoiceNodeHandlers.ts:713-833,937`) |
-| RN15 S2 | n-check-options-node | list order, `checkOptionsPrompt` | Click order; no prompt (`ChoiceNodeHandlers.ts:1015-1061`) |
-| RN16 S2 | ask-multiple-questions-node | `message`, `questions[].questionText`/`answerVariable`, one at a time | `title`/`question`/`label`; variable `variableName`/`id`; one form (`AdvancedInputHandlers.ts:241-285`) |
-| RN17 S2 | calendar-node | `calendarPrompt`, `weeklyHours`, `slotDuration`, `timeZone` | `question`; `availableSlots`/`mode` (`AdvancedInputHandlers.ts:37-64`) |
-| RN18 S2 | validation | Phone normalised ("+1 (555)..." -> "+15551234567"); number "1,200" -> 1200 with `enableConditions` bounds; any name accepted | Phone kept as typed; `parseFloat("1,200")` = 1; name regex `^[a-zA-Z\s'-]{2,100}$` rejects accented names. A failed check is `NodeResult.error` and the flow halts (`AskQuestionNodeHandlers.ts:25-27,359,428`) |
-| RN19 S2 | display with no next edge / missing target | the chat ends (`chat-flow-completed`) | Never marked complete; stalls (`NodeFlowEngine.ts:245-247,365-369`) |
-| RN20 S2 | jump-to-node | `nodeId`, then `targetNodeId`, then `jumpTo`; a missing target ends the chat | Order `targetNodeId`, `targetId`, `jumpTo`, `goto`, `nodeId`; a missing target errors (`LogicNodeHandlers.ts:1082`) |
-| RN21 S2 | human-handover-node | `enablePreChatQuestions`/`preChatQuestions` | `showPreChatForm`/`preChatFields` (`IntegrationNodeHandlers.ts:853-861`) |
-| RN22 S2 | stripe-node | a link, then move on after 500 ms | Moves on right after the emit (same effect) |
-| RN23 S3 | message-node | always shown; blank skipped | Skips a message equal to the last choice, which web does not do (`DisplayNodeHandlers.ts:55`). Blank text is not skipped |
+| RN1 S3 | Rich step UI | Each rich step draws its own card (`richNodesView.ts`). | Drawn through the existing UI states: consent as two buttons (no checkbox), ranking as buttons tapped in order (no drag), matrix as the form (one select per row), OTP / AI / KB / signature in the text input, address in the location picker (the typed address is the street line). The handlers also take the card actions (OTP skip and resend, address search and pick, a drawn signature's image), but the default UI offers no Skip on OTP, no address suggestions list and no drawing pad. |
+| RN2 S3 | signature-node | A typed name is drawn on a canvas and uploaded as PNG. | Uploaded as an SVG of the typed name (`typedSignatureSvg`); a drawn signature needs the UI to hand over the image. |
+| RN3 S3 | hidden-fields-node | The page's query, URL and referrer. | An app has no page: nothing is captured unless the engine is given `page` (headless use). |
+| RN4 S2 | webhook-node | Called from the browser (spec `webOnly`: SDKs should leave it to the server). | Still called from the device, in the background, as before; the flow no longer waits for it. |
+| RN5 S3 | google-calendar-node "book" | A slot picker. | Waits for the server's result, then moves on (spec `webOnly`). |
+| RN6 S3 | Pacing | Media move on when they load. | Images move on at load through `engine.mediaSettled` (wired in `MessageList`); a video has no inline player, so it moves on at once. |
 
 ## Android
 
