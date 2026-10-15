@@ -174,6 +174,10 @@ export { NodeTypes, DisplayNodes, LogicNodes, IntegrationNodes, FlowNodes } from
 // Handler registration
 export { registerAllHandlers } from './core/nodes/handlers';
 
+// The handover's waiting signals (useConferBot().onWidgetSignal), as the web widget names them
+export { WAITING_FOR_HUMAN_EVENT, HUMAN_JOINED_EVENT, WAIT_OVER_EVENT } from './core/handoverWaiting';
+export type { WidgetSignalName, WidgetSignalDetail, WaitingForHumanDetail, HumanJoinedDetail, WaitOverDetail } from './core/handoverWaiting';
+
 // ========== Theme System ========== //
 export { ThemeProvider, useTheme, defaultTheme, darkTheme } from './theme';
 export type { ConferBotTheme, ConferBotThemeOverride } from './theme';
