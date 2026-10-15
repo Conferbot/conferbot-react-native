@@ -5,6 +5,12 @@
  * the phone rules in css/liveChat/responsive*.css). Pure: the floating
  * widget reads the result.
  */
+import { normalizeLauncherEntrance } from './launcherEntrance';
+import type { LauncherEntrance } from './launcherEntrance';
+import { normalizeLauncherAttention } from './launcherAttention';
+import type { LauncherAttention } from './launcherAttention';
+import { idleCallLine, normalizeIdleCallDelay, normalizeLauncherIdleCall } from './launcherIdleCall';
+import type { LauncherIdleCall } from './launcherIdleCall';
 
 export type LauncherShape = 'circle' | 'squircle' | 'bubble' | 'tab' | 'peek';
 export type LauncherStyle = 'icon' | 'label' | 'avatar' | 'mascot';
@@ -54,6 +60,12 @@ export interface ResolvedLauncher {
   /** Icon size inside the button (the glyph). */
   glyph: number;
   animation: LauncherAnimation;
+  /** How it arrives (core/launcherEntrance), its "look here" loop (core/launcherAttention) and the idle call (core/launcherIdleCall): classic / off by default. */
+  entrance: LauncherEntrance;
+  attention: LauncherAttention;
+  idleCall: LauncherIdleCall;
+  idleCallDelay: number;
+  idleCallText: string;
   /** The greeting next to the button, when the owner turned it on. */
   ctaText: string | null;
 }
@@ -175,6 +187,11 @@ export function resolveLauncher(raw: Record<string, any> | null | undefined, scr
     // The icon at 70% of the round button (css/liveChat/index.css), 50% of a tab.
     glyph: Math.round(size * (shape === 'tab' || shape === 'peek' ? 0.5 : 0.7)),
     animation: c.launcherAnimation === 'lively' || c.launcherAnimation === 'off' ? c.launcherAnimation : 'subtle',
+    entrance: normalizeLauncherEntrance(c.launcherEntrance),
+    attention: normalizeLauncherAttention(c.launcherAttention),
+    idleCall: normalizeLauncherIdleCall(c.launcherIdleCall),
+    idleCallDelay: normalizeIdleCallDelay(c.launcherIdleCallDelay),
+    idleCallText: idleCallLine(normalizeLauncherIdleCall(c.launcherIdleCall), c.launcherIdleCallText),
     ctaText,
   };
 }
