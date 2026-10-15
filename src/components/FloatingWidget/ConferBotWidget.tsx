@@ -8,6 +8,7 @@ import {
   Image,
   Text,
   useWindowDimensions,
+  Linking,
 } from 'react-native';
 import { useConferBot } from '../../context/ConferBotContext';
 import { ChatWidget } from '../ChatWidget/ChatWidget';
@@ -16,6 +17,8 @@ import { getBubbleIcon, CloseIcon } from './WidgetBubbleIcons';
 import { resolveLauncher } from '../../core/launcher';
 import { launcherIconSvg } from '../../core/launcherIcons';
 import { useLauncherMotion, noteLauncherOpened } from './useLauncherMotion';
+import { GreetingCard } from './GreetingCard';
+import { useGreeting } from './useGreeting';
 
 // react-native-svg draws a gradient launcher when the app has it; else its first colour.
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
@@ -163,10 +166,16 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   // Try to get server customizations from context
   let serverCustomizations: any = null;
   let unreadCount = 0;
+  let agentBot: any = null;
+  let sendMessage: ((text: string) => Promise<void>) | null = null;
+  let botId = '';
   try {
     const ctx = useConferBot();
     serverCustomizations = (ctx as any).serverCustomizations;
     unreadCount = (ctx as any).unreadCount || 0;
+    agentBot = (ctx as any).agentBot || null;
+    sendMessage = (ctx as any).sendMessage || null;
+    botId = (ctx as any).chatbotConfig?.botId || (ctx as any).botId || '';
   } catch {
     // Context not available — widget used outside provider, that's fine
   }
@@ -210,9 +219,11 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     enabled: !!serverCustomizations && !!SvgXml && !iconImageUrl && !avatarUrl,
   });
 
-  // CTA: only when the owner turned the greeting on; border radius capped at 20 (as the web).
-  const ctaText = widgetConfig.ctaText || look.ctaText || '';
+  // A host-app CTA text (widgetConfig.ctaText) keeps the simple tooltip; the
+  // bot's own greeting is the web's greeting card (core/greeting).
+  const ctaText = widgetConfig.ctaText || '';
   const ctaBorderRadius = Math.min(sc.widgetBorderRadius ?? 50, 20);
+  const greeting = useGreeting({ customizations: serverCustomizations, chatOpen: isChatOpen, botId, agentBot, enabled: !ctaText });
 
   // Show CTA after a short delay
   useEffect(() => {
@@ -396,6 +407,34 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
             borderRadius={ctaBorderRadius}
             visible={showCta && !isChatOpen}
             onDismiss={() => setShowCta(false)}
+          />
+        </View>
+      ) : null}
+
+      {/* The greeting card: 12 above the launcher, its edge in line with it. */}
+      {greeting.card && !isChatOpen ? (
+        <View
+          style={[styles.ctaWrapper, position === 'right' ? { right: Math.max(8, offsetX - look.tucked) } : { left: Math.max(8, offsetX - look.tucked) }, { bottom: offsetBottom + size + 12, maxWidth: screenWidth - 24 }]}
+          pointerEvents="box-none"
+        >
+          <GreetingCard
+            {...greeting.card}
+            onPress={() => {
+              greeting.closeForNow();
+              const g = greeting.card!;
+              if (g.click === 'link' && g.linkUrl) {
+                Linking.openURL(g.linkUrl).catch(() => {});
+                return;
+              }
+              if (!isChatOpen) toggleChat();
+              if (g.click === 'send' && sendMessage) setTimeout(() => sendMessage!(g.text).catch(() => {}), 400);
+            }}
+            onClose={greeting.dismiss}
+            onStarter={(text) => {
+              greeting.closeForNow();
+              if (!isChatOpen) toggleChat();
+              if (sendMessage) setTimeout(() => sendMessage!(text).catch(() => {}), 400);
+            }}
           />
         </View>
       ) : null}
