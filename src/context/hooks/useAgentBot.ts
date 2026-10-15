@@ -24,6 +24,7 @@ import {
   type AgentBot,
 } from '../../core/agentBot';
 import { buildHandoverPayload } from '../../core/handoverPayload';
+import { handoverPhase } from '../../core/handoverState';
 import { deduplicateMessages, trimMessages } from '../types';
 import { htmlToMarkdown } from '../../utils/chatMarkdown';
 
@@ -107,7 +108,10 @@ export function useAgentBot({
       startedFor.current = sessionId;
 
       const agentDetails = agentDetailsOf(bot);
-      setCurrentAgent({ id: agentDetails._id, name: agentDetails.name, avatar: agentDetails.avatar, isAIAgent: true });
+      // A restored chat a person has (the AI handed it on): not the AI.
+      if (!(resumed && handoverPhase(state.getRecord()) === 'joined')) {
+        setCurrentAgent({ id: agentDetails._id, name: agentDetails.name, avatar: agentDetails.avatar, isAIAgent: true });
+      }
       // Visitor messages go the live way from the start; they are held
       // (agentPendingRef) until the agent has accepted.
       setIsLiveChatMode(true);
