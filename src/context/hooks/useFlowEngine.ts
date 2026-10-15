@@ -14,6 +14,8 @@ import type { StorageService } from '../../services/StorageService';
 import type ConferBotSocket from '../../services/socket';
 import type { ConferBotUser } from '../../types';
 import { stripHtml, deduplicateMessages, trimMessages } from '../types';
+import { Linking } from 'react-native';
+import { redactText } from '../../core/privacy/redact';
 
 interface UseFlowEngineParams {
   botId: string;
@@ -129,8 +131,15 @@ export function useFlowEngine({
               type: 'bot-message',
               shape: 'bot-image-message',
               url: entry.data.imageUrl,
+              mediaNodeId: entry.data.mediaNodeId,
               time: entry.timestamp || new Date().toISOString(),
             } as any);
+          }
+          // A video step shows its link here (no player to wait for): the
+          // flow moves on now rather than at the 4 s cap.
+          if (entry.type === 'bot' && entry.data?.videoUrl && entry.data?.mediaNodeId) {
+            const id = entry.data.mediaNodeId;
+            setTimeout(() => flowEngine.current?.mediaSettled(id), 0);
           }
         }
         if (items.length > 0) setRecord((prev) => deduplicateMessages(trimMessages([...prev, ...items])));
@@ -191,7 +200,16 @@ export function useFlowEngine({
     // Then add the user's selection as a user message bubble
     // (matches web widget's _handleChoiceSelection → _displayUserInputMessage)
     const currentState = flowEngine.current.getState();
-    if (currentState.currentUIState && currentState.currentUIState.type === 'buttons') {
+    const ui: any = currentState.currentUIState;
+    // A button that opens a page (a navigate link, the payment's Checkout)
+    // opens it; the step keeps waiting, so nothing is frozen.
+    const pressed = ui?.type === 'buttons' ? (ui.buttons || []).find((b: any) => b.id === response?.buttonId) : null;
+    const link = typeof pressed?.value === 'string' && /^https?:\/\//i.test(pressed.value) ? pressed.value : null;
+    if (link) Linking.openURL(link).catch(() => undefined);
+    if (ui?.type === 'buttons' && ui.awaitInput) {
+      // Steps that stay on screen until they finish (navigate, consent,
+      // payment, ranking): no frozen copy, the step answers for itself.
+    } else if (currentState.currentUIState && currentState.currentUIState.type === 'buttons') {
       const choiceUI = currentState.currentUIState as any;
       const selectedLabel = response?.label || response?.text || response?.value || String(response);
       setRecord((prev) => [
@@ -229,7 +247,9 @@ export function useFlowEngine({
         {
           _id: `user_input_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           type: 'user-message',
-          text: answerText,
+          // Card numbers, ids and passwords hidden in the bubble too (web
+          // privacy startBubbleMasking), unless the owner turned it off.
+          text: chatStateRef.current?.redactSensitive === false ? answerText : redactText(answerText).text,
           time: new Date().toISOString(),
         } as any,
       ]);
