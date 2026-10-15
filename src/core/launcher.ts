@@ -172,7 +172,8 @@ export function resolveLauncher(raw: Record<string, any> | null | undefined, scr
     avatar,
     imageUrl,
     iconId,
-    glyph: Math.round(size * (shape === 'tab' || shape === 'peek' ? 0.5 : 0.6)),
+    // The icon at 70% of the round button (css/liveChat/index.css), 50% of a tab.
+    glyph: Math.round(size * (shape === 'tab' || shape === 'peek' ? 0.5 : 0.7)),
     animation: c.launcherAnimation === 'lively' || c.launcherAnimation === 'off' ? c.launcherAnimation : 'subtle',
     ctaText,
   };
