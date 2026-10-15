@@ -168,7 +168,13 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
       // Waiting for a person: the compact card with their place in line
       // (the handover message is already in the chat above it).
       if (uiState.stage === 'waiting' && !uiState.showPreChatForm && conferBot) {
-        return <HandoverWaitCard onCancel={() => onSubmit({ action: 'cancel' })} />;
+        // Cancel leaves the queue on the server too (queue-self-resolve),
+        // then the flow carries on.
+        return (
+          <HandoverWaitCard
+            onCancel={() => (conferBot.leaveQueue ? conferBot.leaveQueue() : onSubmit({ action: 'cancel' }))}
+          />
+        );
       }
       return <HumanHandoverView {...uiState} onSubmit={onSubmit} />;
 
