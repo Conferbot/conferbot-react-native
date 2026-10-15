@@ -90,6 +90,8 @@ import type {
 
 import { IntegrationSocketEvents } from '../../utils/IntegrationTypes';
 import { buildHandoverPayload } from '../../handoverPayload';
+import { queueSelfResolvePayload } from '../../handoverState';
+import { surveyRatingPayload } from '../../liveChat';
 import { stripHtml } from './DisplayNodeHandlers';
 
 // ========================================
@@ -952,6 +954,10 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
     switch (response.action) {
       case 'cancel':
         state.setVariable('_handoverCancelled', true);
+        // Out of the queue: the team must stop seeing the visitor waiting
+        // (web special.ts, queue-self-resolve). The provider sends it itself
+        // and waits for the answer (queueLeft); a headless caller gets it here.
+        if (response.queueLeft !== true) this.emitSocketEvent('queue-self-resolve', queueSelfResolvePayload(state.sessionId));
         return Promise.resolve(this.proceed(node, { handoverCancelled: true }));
 
       case 'retry':
@@ -961,11 +967,11 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
       case 'endChat':
         state.setVariable('_handoverEnded', true);
         state.setVariable('_handoverEndTime', new Date().toISOString());
-        this.emitSocketEvent('handover:end', {
-          sessionId: state.sessionId,
-          conversationId: state.getVariable('_handoverConversationId'),
-          reason: 'user_ended',
-        });
+        // The server has no visitor end-chat (only an agent ends a live
+        // chat, embed-server handoverHandler.js end-chat). Still in the
+        // queue: leave it (queue-self-resolve closes only a waiting ticket;
+        // with a person on it the server answers agent_joined and keeps it).
+        this.emitSocketEvent('queue-self-resolve', queueSelfResolvePayload(state.sessionId));
 
         if (surveyConfig.enabled) {
           const uiState: ExtendedHumanHandoverUIState = {
@@ -984,11 +990,13 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
         if (response.surveyResponse) {
           state.setVariable('_surveyResponse', response.surveyResponse);
           state.setVariable('_surveySubmitted', true);
-          this.emitSocketEvent('handover:survey', {
-            sessionId: state.sessionId,
-            conversationId: state.getVariable('_handoverConversationId'),
-            response: response.surveyResponse,
-          });
+          // The rating as the web widget sends it (submit-chat-rating).
+          const rating = surveyRatingPayload(
+            state.sessionId,
+            surveyConfig.ratingStyle,
+            response.surveyResponse as { rating?: number; feedback?: string; comment?: string }
+          );
+          if (rating) this.emitSocketEvent('submit-chat-rating', rating);
         }
         return Promise.resolve(this.proceed(node, { handoverEnded: true, surveySubmitted: true }));
 
