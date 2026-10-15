@@ -1,870 +1,331 @@
 /**
  * LegacyNodeHandlers.ts
  *
- * Legacy Node Handlers for the Conferbot React Native SDK.
- * Handles older node types that are still supported for backwards compatibility:
- * user-input-node, user-range-node, quiz-node.
+ * The v1 steps still found in live bots: two-choices, three-choices,
+ * select-option, user-input, user-range, user-rating and quiz. Fields and
+ * behaviour follow the flow-node spec and the web widget
+ * (ts/chat/handlers/_legacy.ts, flowOperations.ts, displayStep.ts).
+ * Legacy steps never register an answer variable.
  */
 
-import {
-  BaseNodeHandler,
-  NodeResult,
-  NodeUIState,
-  NodeHandler,
-} from '../NodeHandler';
+import { BaseNodeHandler, NodeResult, NodeUIState, NodeHandler } from '../NodeHandler';
 import { ChatState } from '../../state/ChatState';
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
 import { DisplayNodes } from '../NodeTypes';
+import { ctxOf } from '../../flow/context';
+import { nameGreetingHtml } from '../../flow/text';
+import { EN, isValidEmail, ownerTextOr, parseNumberInput } from '../../flow/inputs';
+import { botSay, pickedId, pushAnswer, savedText, shownLabel, shownText, typedText, userSay } from './flowKit';
+
+/** Numbered options (choiceText1.., option1..) as buttons, ids "1".."n". */
+const numberedButtons = (state: ChatState, data: any, key: string, count: number, hidden: (n: number) => boolean) => {
+  const buttons: NodeUIState.Buttons['buttons'] = [];
+  for (let n = 1; n <= count; n++) {
+    if (hidden(n)) continue;
+    buttons.push({ id: String(n), label: shownLabel(state, data?.[`${key}${n}`]), value: savedText(data?.[`${key}${n}`]) });
+  }
+  return buttons;
+};
 
 // ========================================
-// USER INPUT NODE HANDLER
+// TWO / THREE CHOICES
 // ========================================
+
+/** two-choices-node: choiceText1 -> source-1, choiceText2 -> source-2 (disableSecondChoice hides it). */
+export class TwoChoicesNodeHandler extends BaseNodeHandler {
+  readonly nodeType: string = DisplayNodes.TWO_CHOICES;
+  protected readonly count: number = 2;
+
+  protected hidden(data: any, n: number): boolean {
+    return n === 2 && !!data?.disableSecondChoice;
+  }
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Buttons {
+    const data = node.data || {};
+    return NodeUIState.buttons(
+      this.getNodeId(node),
+      shownText(state, data.choicePrompt),
+      numberedButtons(state, data, 'choiceText', this.count, (n) => this.hidden(data, n))
+    );
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const nodeId = this.getNodeId(node);
+    const n = Number(pickedId(response) ?? (Number(response?.index) + 1));
+    if (!Number.isInteger(n) || n < 1 || n > this.count || this.hidden(node.data, n)) return NodeResult.displayUI(this.ui(node, state));
+    const text = savedText(node.data?.[`choiceText${n}`]);
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-choice', choices: node.data, selectedChoice: text });
+    userSay(state, text, nodeId);
+    return NodeResult.port(`source-${n}`);
+  }
+}
+
+/** three-choices-node: choiceText1..3 -> source-1..3. */
+export class ThreeChoicesNodeHandler extends TwoChoicesNodeHandler {
+  readonly nodeType: string = DisplayNodes.THREE_CHOICES;
+  protected readonly count: number = 3;
+
+  protected hidden(): boolean {
+    return false;
+  }
+}
+
+// ========================================
+// SELECT OPTION
+// ========================================
+
+/** select-option-node: option1..option5 (disableOption3..5); the first edge 600 ms after the pick. */
+export class SelectOptionNodeHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.SELECT_OPTION;
+
+  private hidden(data: any, n: number): boolean {
+    return n >= 3 && !!data?.[`disableOption${n}`];
+  }
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Buttons {
+    const data = node.data || {};
+    return NodeUIState.buttons(this.getNodeId(node), shownText(state, data.selectPrompt), numberedButtons(state, data, 'option', 5, (n) => this.hidden(data, n)));
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const nodeId = this.getNodeId(node);
+    const n = Number(pickedId(response));
+    if (!Number.isInteger(n) || n < 1 || n > 5 || this.hidden(node.data, n)) return NodeResult.displayUI(this.ui(node, state));
+    const text = savedText(node.data?.[`option${n}`]);
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-option', options: node.data, selectedOption: text });
+    userSay(state, text, nodeId);
+    return NodeResult.delayedProceed(null, 600);
+  }
+}
+
+// ========================================
+// USER INPUT
+// ========================================
+
+const LEGACY_URL_RE = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i;
 
 /**
- * Handles 'user-input-node' - legacy text input node
- * This is the older version of ask-* nodes with more flexible configuration
+ * user-input-node: data.type name | email | number | url | date | file |
+ * phone | mobile. email / number / url are checked (incorrect*Response);
+ * name greets with nameGreet after 1000 ms of typing and moves on at 2000
+ * ms; others at 500 ms; a date or a file at once.
  */
 export class UserInputNodeHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.USER_INPUT_NODE;
 
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState {
+    const data = node.data || {};
+    const type = String(data.type || '');
+    const nodeId = this.getNodeId(node);
+    const question = shownText(state, data.inputPrompt);
+    if (type === 'file') return { type: 'fileUpload', nodeId, question, maxSize: 5000000 };
+    const inputType: NodeUIState.TextInput['inputType'] =
+      type === 'email' ? 'email' : type === 'number' ? 'number' : type === 'url' ? 'url' : type === 'date' ? 'date' : type === 'phone' || type === 'mobile' ? 'phone' : 'text';
+    return NodeUIState.textInput(nodeId, question, '', inputType);
+  }
+
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('User Input node has no data');
-    }
+    const ui = this.ui(node, state) as any;
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
 
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = node.data || {};
+    const type = data.type;
     const nodeId = this.getNodeId(node);
+    const ctx = ctxOf(node, state);
 
-    // Get question/prompt text
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'prompt') ||
-                   this.getString(data, 'text') ||
-                   this.getString(data, 'message') ||
-                   'Please enter your response';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         this.getString(data, 'name') ||
-                         'userInput';
-
-    // Determine input type from configuration
-    let inputType: NodeUIState.TextInput['inputType'] = 'text';
-    const inputTypeValue = this.getString(data, 'inputType') ||
-                           this.getString(data, 'type') ||
-                           this.getString(data, 'fieldType', 'text');
-
-    const typeMap: Record<string, NodeUIState.TextInput['inputType']> = {
-      text: 'text',
-      string: 'text',
-      email: 'email',
-      phone: 'phone',
-      tel: 'phone',
-      number: 'number',
-      numeric: 'number',
-      url: 'url',
-      link: 'url',
-      date: 'date',
-      address: 'address',
-    };
-
-    if (typeMap[inputTypeValue.toLowerCase()]) {
-      inputType = typeMap[inputTypeValue.toLowerCase()];
+    if (type === 'file') {
+      let url: string | undefined = response?.url;
+      if (!url && response?.file) {
+        if (Number(response.file.size) > 5000000) return NodeResult.invalid('Please upload a file smaller than 5MB', this.ui(node, state));
+        const up = await ctx.upload(response.file);
+        if (!up.ok) return NodeResult.invalid("Couldn't upload this file. Please try again.", this.ui(node, state));
+        url = up.url;
+      }
+      if (!url) return NodeResult.displayUI(this.ui(node, state));
+      pushAnswer(state, { id: nodeId, shape: 'user-input-response', type, url });
+      userSay(state, url, nodeId);
+      return NodeResult.next();
     }
 
-    // Get placeholder
-    let placeholder = this.getString(data, 'placeholder', '');
-    placeholder = placeholder ? this.resolveText(placeholder, state) : '';
-
-    // Get error message
-    let errorMessage = this.getString(data, 'errorMessage') ||
-                       this.getString(data, 'validationMessage', '');
-    errorMessage = errorMessage ? this.resolveText(errorMessage, state) : 'Please enter a valid value';
-
-    // Build validation rules
-    const validation: NodeUIState.TextInput['validation'] = {
-      required: this.getBoolean(data, 'required', true),
-    };
-
-    const minLength = this.getNumber(data, 'minLength', 0);
-    if (minLength > 0) validation.minLength = minLength;
-
-    const maxLength = this.getNumber(data, 'maxLength', 0);
-    if (maxLength > 0) validation.maxLength = maxLength;
-
-    const min = this.getNumber(data, 'min', 0);
-    if (data.min !== undefined) validation.min = min;
-
-    const max = this.getNumber(data, 'max', 0);
-    if (data.max !== undefined) validation.max = max;
-
-    const pattern = this.getString(data, 'pattern') ||
-                    this.getString(data, 'regex', '');
-    if (pattern) validation.pattern = pattern;
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.TextInput = {
-      type: 'textInput',
-      nodeId,
-      question,
-      placeholder,
-      variableName,
-      inputType,
-      validation,
-      errorMessage,
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         this.getString(data || {}, 'name') ||
-                         'userInput';
-
-    // Validate required
-    if ((response === undefined || response === null || response === '') &&
-        this.getBoolean(data || {}, 'required', true)) {
-      return NodeResult.error('This field is required', true);
+    const value = typedText(response);
+    if (!value) return NodeResult.displayUI(this.ui(node, state));
+    if (type === 'email' && !isValidEmail(value)) {
+      return NodeResult.invalid(ownerTextOr(data.incorrectEmailResponse, EN.emailInvalid, ['Please enter a valid email']), this.ui(node, state));
     }
-
-    // Type-specific validation and processing
-    const inputType = this.getString(data || {}, 'inputType') ||
-                      this.getString(data || {}, 'type', 'text');
-
-    let processedValue: any = response;
-    const validationResult = this.validateAndProcess(response, inputType.toLowerCase(), data || {});
-
-    if (!validationResult.valid) {
-      return NodeResult.error(validationResult.message || 'Invalid value', true);
+    if (type === 'number' && (value.trim() === '' || isNaN(Number(value.trim())))) {
+      return NodeResult.invalid(ownerTextOr(data.incorrectNumberResponse, 'Please enter a valid number'), this.ui(node, state));
     }
-
-    processedValue = validationResult.value;
-
-    // Store answer
-    state.setAnswer(nodeId, variableName, processedValue, nodeId);
-    state.addUserMessage(String(processedValue), nodeId);
-
-    // Update user metadata based on variable name or input type
-    this.updateMetadata(state, variableName, inputType.toLowerCase(), processedValue);
-
-    return this.proceed(node, { [variableName]: processedValue });
-  }
-
-  private validateAndProcess(
-    value: any,
-    inputType: string,
-    data: Record<string, any>
-  ): { valid: boolean; value?: any; message?: string } {
-    if (value === undefined || value === null || value === '') {
-      return { valid: true, value: '' };
+    if (type === 'url' && !LEGACY_URL_RE.test(value.toLowerCase())) {
+      return NodeResult.invalid(ownerTextOr(data.incorrectUrlResponse, 'Please enter a valid url'), this.ui(node, state));
     }
+    if (type === 'name') state.setUserName(value);
+    if (type === 'email') state.setUserEmail(value);
+    if (type === 'phone' || type === 'mobile') state.setUserPhone(value);
 
-    const strValue = String(value).trim();
+    pushAnswer(state, { id: nodeId, shape: 'user-input-response', type, text: value });
+    userSay(state, value, nodeId);
 
-    switch (inputType) {
-      case 'email':
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(strValue)) {
-          return { valid: false, message: 'Please enter a valid email address' };
-        }
-        return { valid: true, value: strValue.toLowerCase() };
-
-      case 'phone':
-      case 'tel':
-        const phonePattern = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
-        if (!phonePattern.test(strValue)) {
-          return { valid: false, message: 'Please enter a valid phone number' };
-        }
-        return { valid: true, value: strValue };
-
-      case 'number':
-      case 'numeric':
-        const num = parseFloat(strValue);
-        if (isNaN(num)) {
-          return { valid: false, message: 'Please enter a valid number' };
-        }
-        if (data.min !== undefined && num < data.min) {
-          return { valid: false, message: `Value must be at least ${data.min}` };
-        }
-        if (data.max !== undefined && num > data.max) {
-          return { valid: false, message: `Value must be at most ${data.max}` };
-        }
-        return { valid: true, value: num };
-
-      case 'url':
-      case 'link':
-        let url = strValue;
-        if (!url.match(/^https?:\/\//i)) {
-          url = 'https://' + url;
-        }
-        const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
-        if (!urlPattern.test(url)) {
-          return { valid: false, message: 'Please enter a valid URL' };
-        }
-        return { valid: true, value: url };
-
-      case 'date':
-        const date = new Date(strValue);
-        if (isNaN(date.getTime())) {
-          return { valid: false, message: 'Please enter a valid date' };
-        }
-        return { valid: true, value: date.toISOString().split('T')[0] };
-
-      default:
-        // Check length constraints
-        if (data.minLength && strValue.length < data.minLength) {
-          return { valid: false, message: `Minimum ${data.minLength} characters required` };
-        }
-        if (data.maxLength && strValue.length > data.maxLength) {
-          return { valid: false, message: `Maximum ${data.maxLength} characters allowed` };
-        }
-        // Check custom pattern
-        if (data.pattern) {
-          try {
-            const regex = new RegExp(data.pattern);
-            if (!regex.test(strValue)) {
-              return { valid: false, message: data.errorMessage || 'Invalid format' };
-            }
-          } catch {
-            // Invalid regex
-          }
-        }
-        return { valid: true, value: strValue };
+    if (type === 'date') return NodeResult.next();
+    if (type === 'name') {
+      const greeting = nameGreetingHtml(data.nameGreet || undefined, value);
+      await ctx.typing(1000);
+      if (greeting) botSay(state, shownText(state, greeting), nodeId, this.nodeType);
+      return NodeResult.delayedProceed(null, 1000);
     }
-  }
-
-  private updateMetadata(
-    state: ChatState,
-    variableName: string,
-    inputType: string,
-    value: any
-  ): void {
-    const lowerName = variableName.toLowerCase();
-
-    if (inputType === 'email' || lowerName.includes('email')) {
-      state.setUserEmail(String(value));
-    } else if (inputType === 'phone' || inputType === 'tel' || lowerName.includes('phone')) {
-      state.setUserPhone(String(value));
-    } else if (lowerName === 'name' || lowerName === 'firstname' || lowerName === 'fullname') {
-      state.setUserName(String(value));
-    }
+    return NodeResult.delayedProceed(null, 500);
   }
 }
 
 // ========================================
-// USER RANGE NODE HANDLER
+// USER RANGE
 // ========================================
 
-/**
- * Handles 'user-range-node' - legacy slider/range input
- */
+/** user-range-node: a number; below minVal -> source-1, within -> source-2, above maxVal -> source-3. */
 export class UserRangeNodeHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.USER_RANGE_NODE;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('User Range node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get question text
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   this.getString(data, 'message') ||
-                   'Please select a value';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'rangeValue';
-
-    // Range configuration
-    const min = this.getNumber(data, 'min', 0);
-    const max = this.getNumber(data, 'max', 100);
-    const step = this.getNumber(data, 'step', 1);
-    const defaultValue = this.getNumber(data, 'defaultValue') ||
-                         this.getNumber(data, 'default', Math.floor((min + max) / 2));
-
-    // Labels
-    let minLabel = this.getString(data, 'minLabel') ||
-                   this.getString(data, 'leftLabel', '');
-    let maxLabel = this.getString(data, 'maxLabel') ||
-                   this.getString(data, 'rightLabel', '');
-
-    minLabel = minLabel ? this.resolveText(minLabel, state) : '';
-    maxLabel = maxLabel ? this.resolveText(maxLabel, state) : '';
-
-    const showValue = this.getBoolean(data, 'showValue', true);
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state (using Slider type)
-    const uiState: NodeUIState.Slider = {
-      type: 'slider',
-      nodeId,
-      question,
-      min,
-      max,
-      step,
-      defaultValue,
-      variableName,
-      showValue,
-      minLabel: minLabel || undefined,
-      maxLabel: maxLabel || undefined,
-    };
-
-    return NodeResult.displayUI(uiState);
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.TextInput {
+    return NodeUIState.textInput(this.getNodeId(node), shownText(state, node.data?.rangePrompt), '', 'number');
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'rangeValue';
-
-    // Parse value
-    const value = parseFloat(String(response));
-
-    if (isNaN(value)) {
-      return NodeResult.error('Please select a valid value', true);
-    }
-
-    // Validate range
-    const min = this.getNumber(data || {}, 'min', 0);
-    const max = this.getNumber(data || {}, 'max', 100);
-
-    if (value < min || value > max) {
-      return NodeResult.error(`Please select a value between ${min} and ${max}`, true);
-    }
-
-    // Store answer
-    state.setAnswer(nodeId, variableName, value, nodeId);
-    state.addUserMessage(String(value), nodeId);
-
-    return this.proceed(node, { [variableName]: value });
+    const value = typedText(response);
+    const n = parseNumberInput(value);
+    if (n === null) return NodeResult.invalid(EN.numberLike, this.ui(node, state));
+    pushAnswer(state, { id: nodeId, shape: 'user-input-response-range', type: node.data?.type, text: value });
+    userSay(state, value, nodeId);
+    const handle = n < Number(node.data?.minVal) ? 'source-1' : n > Number(node.data?.maxVal) ? 'source-3' : 'source-2';
+    return NodeResult.port(handle);
   }
 }
 
 // ========================================
-// QUIZ NODE HANDLER
+// USER RATING
+// ========================================
+
+/** user-rating-node: type number (data.range buttons), star or smiley (five); the first edge. */
+export class UserRatingNodeHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.USER_RATING;
+
+  private count(data: any): number {
+    return data?.type === 'number' ? Math.max(1, Number(data?.range) || 5) : 5;
+  }
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Rating {
+    const data = node.data || {};
+    return {
+      type: 'rating',
+      nodeId: this.getNodeId(node),
+      question: shownText(state, data.ratingPrompt),
+      maxRating: this.count(data),
+      style: data.type === 'number' ? 'numbers' : data.type === 'smiley' ? 'thumbs' : 'stars',
+    };
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const nodeId = this.getNodeId(node);
+    const rating = Number(typeof response === 'object' && response !== null ? response.value ?? response.rating : response);
+    if (!Number.isInteger(rating) || rating < 1 || rating > this.count(node.data)) return NodeResult.displayUI(this.ui(node, state));
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-rating', type: node.data?.type, rating });
+    userSay(state, String(rating), nodeId);
+    return NodeResult.next();
+  }
+}
+
+// ========================================
+// QUIZ
 // ========================================
 
 /**
- * Handles 'quiz-node' - displays a quiz question with correct/incorrect feedback
+ * quiz-node: option1..5 (disableOption3..5), correctAnswer "optionN".
+ * Wrong -> source-1, right -> source-2. When source-2 leads to a
+ * variable-node, that step is not run: its value is ADDED to the flow
+ * variable (the score) and the flow jumps to the step after it.
  */
 export class QuizNodeHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.QUIZ_NODE;
 
+  private hidden(data: any, n: number): boolean {
+    return n >= 3 && !!data?.[`disableOption${n}`];
+  }
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Buttons {
+    const data = node.data || {};
+    return NodeUIState.buttons(this.getNodeId(node), shownText(state, data.quizPrompt), numberedButtons(state, data, 'option', 5, (n) => this.hidden(data, n)));
+  }
+
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Quiz node has no data');
-    }
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
 
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = node.data || {};
     const nodeId = this.getNodeId(node);
-
-    // Get question text
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   'Quiz question';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'quizAnswer';
-
-    // Get options
-    const optionsData = this.getArray<any>(data, 'options', []) ||
-                        this.getArray<any>(data, 'choices', []) ||
-                        this.getArray<any>(data, 'answers', []);
-
-    if (optionsData.length === 0) {
-      return this.createError('Quiz node has no options');
-    }
-
-    // Map options with correct answer flags
-    const options: NodeUIState.Quiz['options'] = optionsData.map((opt: any, index: number) => {
-      const id = opt.id || opt._id || `opt_${index}`;
-      let label = opt.label || opt.text || opt.answer || `Option ${index + 1}`;
-      label = this.resolveText(label, state);
-
-      // Determine if this is the correct answer
-      const isCorrect = opt.isCorrect === true ||
-                        opt.correct === true ||
-                        opt.isAnswer === true ||
-                        index === this.getNumber(data, 'correctIndex', -1);
-
-      return {
-        id,
-        label,
-        isCorrect,
-      };
+    const n = Number(pickedId(response));
+    if (!Number.isInteger(n) || n < 1 || n > 5 || this.hidden(data, n)) return NodeResult.displayUI(this.ui(node, state));
+    const option = `option${n}`;
+    const correctAnswer = data.correctAnswer;
+    pushAnswer(state, {
+      id: nodeId,
+      shape: 'user-selected-quiz-option',
+      options: data,
+      selectedOption: data[option],
+      correctAnswer,
+      correct: option === correctAnswer,
     });
+    userSay(state, savedText(data[option]), nodeId);
+    if (option !== correctAnswer) return NodeResult.port('source-1');
 
-    // Show correct answer after selection?
-    const showCorrectAnswer = this.getBoolean(data, 'showCorrectAnswer') ||
-                              this.getBoolean(data, 'showAnswer', true);
-
-    // Feedback messages
-    let correctFeedback = this.getString(data, 'correctFeedback') ||
-                          this.getString(data, 'correctMessage', '');
-    let incorrectFeedback = this.getString(data, 'incorrectFeedback') ||
-                            this.getString(data, 'incorrectMessage', '');
-
-    correctFeedback = correctFeedback ? this.resolveText(correctFeedback, state) : 'Correct!';
-    incorrectFeedback = incorrectFeedback ? this.resolveText(incorrectFeedback, state) : 'Incorrect.';
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Quiz = {
-      type: 'quiz',
-      nodeId,
-      question,
-      options,
-      variableName,
-      showCorrectAnswer,
-      feedback: {
-        correct: correctFeedback,
-        incorrect: incorrectFeedback,
-      },
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'quizAnswer';
-
-    if (!response) {
-      return NodeResult.error('Please select an answer', true);
+    const ctx = ctxOf(node, state);
+    const rightEdge = ctx.edges().find((e) => e.sourceHandle === 'source-2');
+    const nextNode = rightEdge ? ctx.node(rightEdge.target) : undefined;
+    if (nextNode?.type === 'variable-node') {
+      const name = nextNode.data?.name;
+      const current = state.getVariable(name);
+      const value = current ? Number(current) + Number(nextNode.data?.value) : Number(nextNode.data?.value);
+      state.setVariable(name, value);
+      const after = ctx.edgesOf(nextNode.id)[0];
+      if (after?.target) return NodeResult.jumpTo(after.target);
+      return NodeResult.port('source-1');
     }
-
-    // Get options to find the selected one
-    const optionsData = this.getArray<any>(data || {}, 'options', []) ||
-                        this.getArray<any>(data || {}, 'choices', []);
-
-    const selectedOption = optionsData.find((opt: any) =>
-      opt.id === response ||
-      opt._id === response ||
-      opt.label === response ||
-      opt.text === response
-    );
-
-    // Determine if answer is correct
-    const isCorrect = selectedOption?.isCorrect === true ||
-                      selectedOption?.correct === true ||
-                      response === optionsData.findIndex((opt: any) =>
-                        opt.isCorrect === true || opt.correct === true
-                      );
-
-    const selectedLabel = selectedOption?.label || selectedOption?.text || String(response);
-
-    // Add the selected answer to the transcript (matches web widget's
-    // _handleAddToTranscript("user", userMessage) on selection)
-    state.addUserMessage(selectedLabel, nodeId);
-
-    // Store answer with correctness info
-    const answerData = {
-      selected: response,
-      label: selectedLabel,
-      isCorrect,
-    };
-
-    state.setAnswer(nodeId, variableName, answerData, nodeId);
-
-    // Store correctness as separate variable
-    state.setVariable(`${variableName}_correct`, isCorrect);
-
-    // Track quiz score
-    const currentScore = state.getVariable('_quizScore') || 0;
-    const currentTotal = state.getVariable('_quizTotal') || 0;
-    state.setVariable('_quizScore', isCorrect ? currentScore + 1 : currentScore);
-    state.setVariable('_quizTotal', currentTotal + 1);
-
-    // Check for conditional routing based on correct/incorrect
-    const correctNextNodeId = this.getString(data || {}, 'correctNextNodeId') ||
-                              this.getString(data || {}, 'correctPath', '');
-    const incorrectNextNodeId = this.getString(data || {}, 'incorrectNextNodeId') ||
-                                this.getString(data || {}, 'incorrectPath', '');
-
-    if (isCorrect && correctNextNodeId) {
-      return NodeResult.jumpTo(correctNextNodeId, { [variableName]: answerData, isCorrect });
-    }
-
-    if (!isCorrect && incorrectNextNodeId) {
-      return NodeResult.jumpTo(incorrectNextNodeId, { [variableName]: answerData, isCorrect });
-    }
-
-    // Check for port-based routing
-    const portName = isCorrect ? 'correct' : 'incorrect';
-    const portNextNodeId = this.getNextNodeId(node, portName);
-    if (portNextNodeId && portNextNodeId.startsWith('__port:')) {
-      return NodeResult.proceed(portNextNodeId, { [variableName]: answerData, isCorrect });
-    }
-
-    return this.proceed(node, { [variableName]: answerData, isCorrect });
+    return NodeResult.port('source-2');
   }
 }
 
 // ========================================
-// TWO CHOICES NODE HANDLER
+// REGISTRATION
 // ========================================
 
-/**
- * Handles 'two-choices-node' - displays 2 choice buttons with port-based routing
- */
-export class TwoChoicesNodeHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.TWO_CHOICES;
-
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Two Choices node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    const choice1 = this.getString(data, 'choice1', 'Option 1');
-    const choice2 = this.getString(data, 'choice2', 'Option 2');
-    const disableSecond = this.getBoolean(data, 'disableSecondChoice', false);
-    const variableName = this.getString(data, 'answerVariable') ||
-                         this.getString(data, 'variableName') ||
-                         nodeId;
-
-    const buttons: NodeUIState.Buttons['buttons'] = [
-      { id: '0', label: choice1, value: choice1, style: 'primary' },
-    ];
-
-    if (!disableSecond) {
-      buttons.push({ id: '1', label: choice2, value: choice2, style: 'primary' });
-    }
-
-    state.addBotMessage('[Two Choices]', nodeId, this.nodeType);
-
-    const uiState: NodeUIState.Buttons = {
-      type: 'buttons',
-      nodeId,
-      question: '',
-      buttons,
-      variableName,
-      multiSelect: false,
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'answerVariable') ||
-                         this.getString(data || {}, 'variableName') ||
-                         nodeId;
-
-    let choiceId: string;
-    let choiceText: string;
-
-    if (typeof response === 'object' && response !== null) {
-      choiceId = String(response.id ?? '0');
-      choiceText = response.text || response.label || '';
-    } else {
-      choiceId = String(response);
-      choiceText = choiceId === '0'
-        ? this.getString(data || {}, 'choice1', 'Option 1')
-        : this.getString(data || {}, 'choice2', 'Option 2');
-    }
-
-    state.setAnswer(nodeId, variableName, choiceText, nodeId);
-
-    // Port-based routing: source-1 for choice 0, source-2 for choice 1
-    const portIndex = (parseInt(choiceId, 10) || 0) + 1;
-    const targetPort = `source-${portIndex}`;
-
-    return NodeResult.delayedProceed(null, 600, {
-      [variableName]: choiceText,
-      __targetPort: targetPort,
-    });
-  }
-}
-
-// ========================================
-// THREE CHOICES NODE HANDLER
-// ========================================
-
-/**
- * Handles 'three-choices-node' - displays 3 choice buttons with port-based routing
- */
-export class ThreeChoicesNodeHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.THREE_CHOICES;
-
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Three Choices node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    const choice1 = this.getString(data, 'choice1', 'Option 1');
-    const choice2 = this.getString(data, 'choice2', 'Option 2');
-    const choice3 = this.getString(data, 'choice3', 'Option 3');
-    const variableName = this.getString(data, 'answerVariable') ||
-                         this.getString(data, 'variableName') ||
-                         nodeId;
-
-    const buttons: NodeUIState.Buttons['buttons'] = [
-      { id: '0', label: choice1, value: choice1, style: 'primary' },
-      { id: '1', label: choice2, value: choice2, style: 'primary' },
-      { id: '2', label: choice3, value: choice3, style: 'primary' },
-    ];
-
-    state.addBotMessage('[Three Choices]', nodeId, this.nodeType);
-
-    const uiState: NodeUIState.Buttons = {
-      type: 'buttons',
-      nodeId,
-      question: '',
-      buttons,
-      variableName,
-      multiSelect: false,
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'answerVariable') ||
-                         this.getString(data || {}, 'variableName') ||
-                         nodeId;
-
-    let choiceId: string;
-    let choiceText: string;
-
-    if (typeof response === 'object' && response !== null) {
-      choiceId = String(response.id ?? '0');
-      choiceText = response.text || response.label || '';
-    } else {
-      choiceId = String(response);
-      const choiceMap: Record<string, string> = {
-        '0': this.getString(data || {}, 'choice1', 'Option 1'),
-        '1': this.getString(data || {}, 'choice2', 'Option 2'),
-        '2': this.getString(data || {}, 'choice3', 'Option 3'),
-      };
-      choiceText = choiceMap[choiceId] || 'Unknown';
-    }
-
-    state.setAnswer(nodeId, variableName, choiceText, nodeId);
-
-    const portIndex = (parseInt(choiceId, 10) || 0) + 1;
-    const targetPort = `source-${portIndex}`;
-
-    return NodeResult.delayedProceed(null, 600, {
-      [variableName]: choiceText,
-      __targetPort: targetPort,
-    });
-  }
-}
-
-// ========================================
-// SELECT OPTION NODE HANDLER (LEGACY)
-// ========================================
-
-/**
- * Handles 'select-option-node' - legacy dropdown with up to 5 options from option1-option5 fields
- */
-export class SelectOptionNodeHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.SELECT_OPTION;
-
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Select Option node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data, 'answerVariable') ||
-                         this.getString(data, 'variableName') ||
-                         nodeId;
-
-    // Build options from option1..option5 fields
-    const options: NodeUIState.Dropdown['options'] = [];
-    for (let i = 1; i <= 5; i++) {
-      const optionKey = `option${i}`;
-      const disableKey = `disableOption${i}`;
-
-      if (this.getBoolean(data, disableKey, false)) continue;
-
-      const optionText = this.getString(data, optionKey, '');
-      if (optionText) {
-        options.push({
-          id: String(i - 1),
-          label: optionText,
-          value: optionText,
-        });
-      }
-    }
-
-    if (options.length === 0) {
-      return this.createError('Select Option node has no options');
-    }
-
-    state.addBotMessage('[Select Option]', nodeId, this.nodeType);
-
-    const uiState: NodeUIState.Dropdown = {
-      type: 'dropdown',
-      nodeId,
-      question: '',
-      options,
-      variableName,
-      placeholder: 'Select an option',
-      searchable: false,
-      multiSelect: false,
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'answerVariable') ||
-                         this.getString(data || {}, 'variableName') ||
-                         nodeId;
-
-    let optionText: string;
-    if (typeof response === 'object' && response !== null) {
-      optionText = response.text || response.label || String(response.value ?? '');
-    } else {
-      optionText = String(response);
-    }
-
-    state.setAnswer(nodeId, variableName, optionText, nodeId);
-
-    return NodeResult.delayedProceed(this.getNextNodeId(node), 600, {
-      [variableName]: optionText,
-    });
-  }
-}
-
-// ========================================
-// USER RATING NODE HANDLER (LEGACY)
-// ========================================
-
-/**
- * Handles 'user-rating-node' - legacy 5-star rating, returns numeric value
- */
-export class UserRatingNodeHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.USER_RATING;
-
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('User Rating node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data, 'answerVariable') ||
-                         this.getString(data, 'variableName') ||
-                         'userRating';
-
-    state.addBotMessage('[Rating]', nodeId, this.nodeType);
-
-    const uiState: NodeUIState.Rating = {
-      type: 'rating',
-      nodeId,
-      question: '',
-      maxRating: 5,
-      variableName,
-      style: 'stars',
-      allowHalf: false,
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'answerVariable') ||
-                         this.getString(data || {}, 'variableName') ||
-                         'userRating';
-
-    const rating = typeof response === 'number' ? response : parseInt(String(response), 10) || 0;
-
-    state.setAnswer(nodeId, variableName, rating, nodeId);
-
-    return this.proceed(node, { [variableName]: rating });
-  }
-}
-
-// ========================================
-// LEGACY HANDLER COLLECTION
-// ========================================
-
-/**
- * Array of all legacy node handlers
- */
 export const legacyHandlers: NodeHandler[] = [
   new UserInputNodeHandler(),
   new UserRangeNodeHandler(),
@@ -875,9 +336,6 @@ export const legacyHandlers: NodeHandler[] = [
   new UserRatingNodeHandler(),
 ];
 
-/**
- * Registers all legacy node handlers with the registry
- */
 export function registerLegacyHandlers(registry: NodeHandlerRegistry): void {
   registry.registerAll(legacyHandlers);
 }
