@@ -825,8 +825,8 @@ describe('NodeFlowEngine Integration with ChatState', () => {
       const text = 'Hello {{unknownVar}}!';
       const resolved = chatState.resolveVariables(text);
 
-      // Should keep placeholder for unknown variables
-      expect(resolved).toBe('Hello {{unknownVar}}!');
+      // An unknown variable shows nothing; the gap is tidied (web fillVariables)
+      expect(resolved).toBe('Hello!');
     });
 
     it('should resolve variables from both answers and variables', () => {
