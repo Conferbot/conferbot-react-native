@@ -9,6 +9,7 @@ import { stripHtml, deduplicateMessages, trimMessages } from '../types';
 import { parseAgentBot, type AgentBot } from '../../core/agentBot';
 import { htmlToMarkdown } from '../../utils/chatMarkdown';
 import { agentTranslationOf } from '../../core/liveChat';
+import type { HandoverLifecycle } from './useHandoverLifecycle';
 
 interface UseSocketListenersParams {
   socketClient: React.MutableRefObject<ConferBotSocket | null>;
@@ -44,6 +45,8 @@ interface UseSocketListenersParams {
   onAgentAccepted: (data: any) => boolean;
   onAgentMessage: (data: any) => Record<string, unknown>;
   setupAgentListeners: () => void;
+  /** The handover's lines, signals and restore (useHandoverLifecycle). */
+  handover: HandoverLifecycle;
 }
 
 export function useSocketListeners({
@@ -74,6 +77,7 @@ export function useSocketListeners({
   onAgentAccepted,
   onAgentMessage,
   setupAgentListeners,
+  handover,
 }: UseSocketListenersParams) {
   // The session whose flow has been started: fetched-chatbot-data comes
   // again on every reconnect, and must not restart the conversation.
@@ -188,6 +192,12 @@ export function useSocketListeners({
             }
             setIsNodeProcessing(false);
             onAgentBotReady(startedSessionId, agentBot, nodes);
+            // Restored after a restart: a person (or the wait for one) is
+            // picked back up from the server (live-chat-state).
+            if (startedSessionId && handover.restoredSessionRef.current === startedSessionId) {
+              handover.restoredSessionRef.current = null;
+              handover.resumeRestored({ sessionId: startedSessionId, nodes, agentBot: true });
+            }
             return;
           }
 
@@ -220,11 +230,28 @@ export function useSocketListeners({
               edges,
               startNodeId: nodes[0]?.id || '',
             };
-            flowEngine.current.loadFlow(flowDefinition);
-            flowEngine.current.start().catch((error) => {
-              console.error('[ConferBot] Failed to start flow:', error);
-              setIsNodeProcessing(false);
-            });
+            const engine = flowEngine.current;
+            engine.loadFlow(flowDefinition);
+            const startFlow = () =>
+              engine.start().catch((error) => {
+                console.error('[ConferBot] Failed to start flow:', error);
+                setIsNodeProcessing(false);
+              });
+            // Restored after a restart: a live chat, or a handover still in
+            // the queue, is picked back up from the server (live-chat-state)
+            // instead of the flow running again.
+            if (startedSessionId && handover.restoredSessionRef.current === startedSessionId) {
+              handover.restoredSessionRef.current = null;
+              handover
+                .resumeRestored({ sessionId: startedSessionId, nodes, agentBot: false })
+                .then((step) => {
+                  if (step === 'start') startFlow();
+                  else setIsNodeProcessing(false);
+                })
+                .catch(() => startFlow());
+              return;
+            }
+            startFlow();
           }
         }
       }
@@ -264,6 +291,10 @@ export function useSocketListeners({
 
     // *** AGENT ACCEPTED *** //
     socketClient.current.on(SocketEvents.AGENT_ACCEPTED, (data: any) => {
+      // The wait is over: the Connecting line settles (joined, or
+      // unavailable when the AI takes the chat back), the waiting signal
+      // stops (core/handoverState.ts acceptedPlan).
+      const plan = handover.onAccepted(data);
       // An agent bot's own AI agent taking the chat it already greeted:
       // nothing to announce.
       if (onAgentAccepted(data)) {
@@ -284,24 +315,10 @@ export function useSocketListeners({
 
         setIsLiveChatMode(true);
 
-        const joinedRecord: RecordItem = {
-          _id: `agent-joined-${Date.now()}`,
-          type: 'agent-joined-message',
-          text: `${agentName} has joined the chat`,
-          name: agentName,
-          time: new Date().toISOString(),
-        } as any;
-
-        setRecord((prev) => deduplicateMessages(trimMessages([...prev, joinedRecord])));
-
-        if (chatStateRef.current) {
-          chatStateRef.current.addRecord({
-            id: data.agentDetails._id,
-            type: 'agent-joined-message',
-            time: new Date().toISOString(),
-            name: agentName,
-          });
-        }
+        // "<name> joined the chat" - not again for the same person (a
+        // repeat after a reconnect), with "They can see your conversation
+        // so far" after an AI handover.
+        if (plan.announce) handover.addJoin(data.agentDetails, plan);
 
         setCurrentUIState(null);
         setIsNodeProcessing(false);
@@ -401,31 +418,14 @@ export function useSocketListeners({
 
     // *** AGENT LEFT *** //
     socketClient.current.on(SocketEvents.AGENT_LEFT, (data: any) => {
-      const agentName = data?.agentDetails?.name || 'Agent';
-
-      const leftRecord: RecordItem = {
-        _id: `agent-left-${Date.now()}`,
-        type: 'agent-left-chat',
-        text: `${agentName} has left the chat`,
-        name: agentName,
-        time: new Date().toISOString(),
-      } as any;
-
-      setRecord((prev) => deduplicateMessages(trimMessages([...prev, leftRecord])));
-
-      if (chatStateRef.current) {
-        chatStateRef.current.addRecord({
-          id: data?.agentId || `agent-left-${Date.now()}`,
-          type: 'agent-left-chat',
-          time: new Date().toISOString(),
-          name: agentName,
-        });
-      }
-
-      setCurrentAgent(undefined);
+      // An AI handing the visitor to the team is not leaving them: the
+      // Connecting line, not "<name> left" (core/handoverState.ts
+      // agentLeftKind); an AI pausing an idle visitor draws nothing.
+      const kind = handover.onAgentLeft(data);
+      if (kind === 'left') setCurrentAgent(undefined);
 
       if (__DEV__) {
-        console.log('[ConferBot] Agent left:', agentName);
+        console.log('[ConferBot] Agent left:', kind, data?.agentDetails?.name || '');
       }
     });
 
@@ -530,7 +530,7 @@ export function useSocketListeners({
         });
       }
     });
-  }, [isOpen, persistMessages, persistSession, initializeFlowEngine, chatSessionId, setAgentBot, onAgentBotReady, onAgentAccepted, onAgentMessage, setupAgentListeners]);
+  }, [isOpen, persistMessages, persistSession, initializeFlowEngine, chatSessionId, setAgentBot, onAgentBotReady, onAgentAccepted, onAgentMessage, setupAgentListeners, handover]);
 
   return { setupSocketListeners };
 }
