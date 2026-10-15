@@ -221,6 +221,26 @@ const userInteractionNodes = new Set<string>([
   // Waits on the team: agent-accepted / no-agents-available move it on
   IntegrationNodes.HUMAN_HANDOVER,
 
+  // Choices with cards, links
+  'carousel-node',
+  DisplayNodes.NAVIGATE,
+
+  // Rich steps (web richNodes.ts)
+  'dynamic-choices-node',
+  'consent-node',
+  'product-card-node',
+  'slider-node',
+  'datetime-node',
+  'ranking-node',
+  'otp-node',
+  'address-node',
+  'matrix-node',
+  'ai-extract-node',
+  'ai-route-node',
+  'kb-answer-node',
+  'signature-node',
+  'payment-node',
+
   // Legacy
   DisplayNodes.USER_INPUT_NODE,
   DisplayNodes.USER_RANGE_NODE,
@@ -247,7 +267,6 @@ const autoContinueNodes = new Set<string>([
   DisplayNodes.FILE,
   DisplayNodes.HTML,
   DisplayNodes.REDIRECT,
-  DisplayNodes.NAVIGATE,
 
   // All logic nodes
   LogicNodes.CONDITION,
