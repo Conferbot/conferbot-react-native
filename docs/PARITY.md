@@ -16,6 +16,7 @@ This file tracks how far this SDK matches the web widget: what's done, what's le
 | #27 | Greeting card, all 11 styles checked on the Android emulator | `src/core/greeting.ts`, `FloatingWidget/useGreeting.ts`, `FloatingWidget/GreetingCard.tsx` |
 | #28-#32, #58, #59 | Handover lifecycle: the Connecting line and its 4 outcomes, the 20s waiting signal, "Talk to a person" only while nobody is coming, the header's reply time, leaving the queue on the server, a live chat picked back up after a restart. Checked against the local embed-server (`live-chat-state`, `queue-self-resolve`, `agent-accepted`, `agent-left`, `chat-ended`). | `src/core/handoverState.ts`, `handoverWaiting.ts`, `replyTime.ts`, `handoverPayload.ts`; `context/hooks/useHandoverLifecycle.ts`, `MessageBubble`, `LiveChatCards` |
 | #57 | Launcher entrance, attention and idle call. `keyframes.ts` evaluates the web's Web Animations tracks; checked against Chrome in 447 cases (19,275 samples). | `src/core/keyframes.ts`, `launcherEntrance.ts`, `launcherAttention.ts`, `launcherIdleCall.ts`, `mascotArt.ts`, `fxPaint.ts`; `FloatingWidget/useLauncherEntrance.ts`, `useLauncherAttention.ts`, `useLauncherIdleCall.ts`, `FxSprites.tsx`, `IdleCallView.tsx`, `fxAnimated.ts` |
+| #33-#38, #52, #61-#63 | Flow nodes: the engine and every node handler run the shared flow-node spec. **156 of 156 fixtures pass** (`__tests__/parity/flows.test.ts`); none pending. See "Flow nodes" below. | `src/core/NodeFlowEngine.ts`, `src/core/flow/*` (text, logic, flowControl, rich, inputs, calendar, context), `src/core/privacy/redact.ts`, `src/core/nodes/handlers/*` |
 
 ## Left in this SDK
 
@@ -67,6 +68,7 @@ Every web widget feature works the same in the 4 mobile SDKs: customization, lau
 | Launcher entrance / attention / idle call (#57) | done | todo | todo | todo |
 | Handover lifecycle: Connecting line + outcomes, 20s waiting signal, Talk to a person rules, leave queue on the server, restore after restart (#28-#31, #58) | done | todo | todo | todo |
 | Header: bot name + Online + reply time, Online again when a person joins (#32) | done | todo | todo | todo |
+| Flow nodes: shared spec, 156 fixtures (`scripts/parity/flows/`) | 156/156 | todo | todo | todo |
 | Home screen | todo | todo | todo | todo |
 | Mascots (incl. `mascotInGreeting`) | todo | todo | todo | todo |
 | `widgetLanguage` (i18n) | todo | todo | todo | todo |
@@ -93,6 +95,23 @@ All paths are under `conferbot-widget/src/`.
 - **Sounds:** `ts/chat/messageSound.ts`.
 - **Celebrations:** `ts/chat/delight/` (celebrate, reactions, rules) and `ts/chat/ratingFx.ts`.
 - **Reply time:** `ts/chat/replyTime.ts`, `replyTimeView.ts`, `headerPresence.ts`.
+
+## Flow nodes
+
+The flow engine follows `scripts/parity/flows/nodes.spec.json`, and `__tests__/parity/flows.test.ts` runs all 156 fixtures through the real `NodeFlowEngine` and `registerAllHandlers` registry: **156 pass, 0 pending** (the fixtures as of commit `2f0b2a6`, read in place).
+
+- **The driver** (`__tests__/parity/flowDriver.ts`): a virtual clock (`setTimeout` / `setInterval` / `Date`, 2026-10-15 10:00 UTC, as `web/env.js`), `fetch` scripted from `server.http`, a fake socket answering `execute-integration` and `initiate-handover` from `server.integration` / `server.handover`, and each visitor action played through `engine.submitResponse` with the answer the SDK's UI sends. The engine reports what it does through `config.onTrace` (enter, port, shown, unsupported, error, end, crash).
+- **Compared:** path (node, type, via), ports, variables (key + value), end, errors (count + node), answers (shape + value fields), rendered text, emits, unsupported, http (path + body keys), flowVariables, and the typing pace between shown steps within 50 ms.
+- **Not compared, on purpose:**
+  - The pace in 7 cases (`TIMING_SKIP`): the web harness plays the next action after its cards' own UI timers (focus 30-50 ms, the address search debounce, animations), which this SDK's native views don't have.
+  - Times the visitor acted at (`consent_at`, `signature_at`): compared as timestamps.
+  - Emits of `response-record` and `join-chat-room-visitor` (transport, not flow).
+- **Engine rules** (spec `engine`): start at the first `welcome-node`; a step that does not branch takes its first edge; a branch takes its exact handle or ends the chat; a wired edge to a missing node stops the chat where it is; unknown types (and a welcome reached again) pass along their first edge; a jump to a missing node ends; rich steps' `goPort` fallback; loops and sub-flows; answer variables registered per step and saved by name; `{var}` unknown shows nothing; masking (`redactSensitive`); typing pace (`paceFor`) unless a fixed `typingDelay` is set; images and videos move on when they load (`engine.mediaSettled`) or at 4000 ms.
+- **The rich steps** draw through the SDK's existing UI states: dynamic choices, consent, payment, ranking and navigate as buttons; product card as a one-card carousel; slider; date/time as the calendar; matrix as the form (one select per row); OTP, AI extract / route, KB answer and signature (typed) in the text input; address in the location picker. Each handler also takes the explicit actions in its comment (OTP skip and resend, address search and pick, a drawn signature's image), for custom renderers.
+
+### Porting the flow engine (from RN)
+
+Port `src/core/flow/*.ts` (pure; `logic.ts`, `flowControl.ts` and `rich.ts` are the web's files with only the i18n import changed), the engine's routing (`NodeFlowEngine.ts` `enter`, `next`, `port`, `jump`, `end`, `passUnknown`, `runFlowControl`) and the handlers, then a driver like `flowDriver.ts` in the SDK's test framework (the fixtures README lists one per platform). Start with the `engine.*`, `condition.*`, `interpolation.*` and choice cases.
 
 ### Porting the handover lifecycle (from RN, #28-#32, #58, #59)
 
