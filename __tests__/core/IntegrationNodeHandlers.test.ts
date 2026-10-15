@@ -60,407 +60,104 @@ describe('Integration Node Handlers', () => {
   // WEBHOOK HANDLER TESTS
   // ========================================
 
+  const handlers = () => require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
+
+  /** A stand-alone context: the socket, timers and the bot API for one step. */
+  const withCtx = (node: any, extra: Record<string, any> = {}) => {
+    const listeners = new Map<string, Set<(p: any) => void>>();
+    const emits: Array<{ event: string; payload: any }> = [];
+    const api = jest.fn(async (_path: string, _body: any) => ({ ok: true, status: 200, body: {} as any }));
+    const ctx = {
+      botId: 'test-bot',
+      sessionId: 'test-session',
+      api,
+      upload: jest.fn(),
+      emit: (event: string, payload: any) => {
+        emits.push({ event, payload });
+        return true;
+      },
+      on: (event: string, fn: (p: any) => void) => {
+        if (!listeners.has(event)) listeners.set(event, new Set());
+        listeners.get(event)!.add(fn);
+        return () => listeners.get(event)!.delete(fn);
+      },
+      typing: jest.fn(async () => undefined),
+      delay: jest.fn(async () => undefined),
+      edges: () => extra.edges || [],
+      edgesOf: () => [],
+      wired: (h: string) => (extra.edges || []).some((e: any) => e.sourceHandle === h),
+      via: extra.via || 'edge',
+      random: () => 0.5,
+      now: () => new Date(),
+      customizations: extra.customizations || {},
+      visitorTimeZone: 'UTC',
+      respond: jest.fn(),
+      shown: jest.fn(),
+      isStale: () => false,
+      node: () => undefined,
+    };
+    const fire = (event: string, payload: any) => [...(listeners.get(event) || [])].forEach((fn) => fn(payload));
+    return { node: { ...node, ctx }, ctx, emits, fire, api };
+  };
+
+  // ========================================
+  // WEBHOOK
+  // ========================================
+
   describe('WebhookHandler', () => {
-    let WebhookHandler: any;
-
-    beforeEach(() => {
-      const handlers = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      WebhookHandler = handlers.WebhookHandler;
+    it('registers its answerVariable and moves on at once (the call runs in the background)', async () => {
+      const { WebhookHandler } = handlers();
+      mockWebhookService.execute.mockReturnValue(new Promise(() => undefined));
+      const node = createNode('webhook-node', { url: 'https://api.example.com/hook', method: 'POST', answerVariable: 'webhookresponse' });
+      const result = await new WebhookHandler().handle(node, chatState);
+      expect(result).toEqual(NodeResult.next());
+      expect(chatState.getAnswerVariables().map((v) => [v.variableName, v.value])).toEqual([['webhookresponse', null]]);
     });
 
-    it('should have correct node type', () => {
-      const handler = new WebhookHandler();
-      expect(handler.nodeType).toBe('webhook-node');
-    });
-
-    it('should return error when URL is missing', async () => {
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        method: 'POST',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      expect(result.type).toBe('error');
-      if (result.type === 'error') {
-        expect(result.message).toContain('URL');
-      }
-    });
-
-    it('should make POST request with body', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: {
-          get: () => 'application/json',
-        },
-        json: () => Promise.resolve({ success: true, id: '123' }),
-      });
-
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/webhook',
-        method: 'POST',
-        body: { name: 'Test', value: 42 },
-        variableName: 'webhookResult',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      // The handler may use socket or API call depending on configuration
-      expect(['proceed', 'error']).toContain(result.type);
-    });
-
-    it('should support GET requests', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: {
-          get: () => 'application/json',
-        },
-        json: () => Promise.resolve({ data: 'test' }),
-      });
-
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/data',
-        method: 'GET',
-        variableName: 'apiResponse',
-      });
-
-      await handler.handle(node, chatState);
-      // Verification depends on handler implementation
-    });
-
-    it('should resolve variables in URL', async () => {
-      chatState.setVariable('userId', '12345');
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: {
-          get: () => 'application/json',
-        },
-        json: () => Promise.resolve({}),
-      });
-
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/users/{{userId}}',
-        method: 'GET',
-      });
-
-      await handler.handle(node, chatState);
-      // URL should have been resolved with variable
-    });
-
-    it('should handle bearer token authentication', async () => {
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/secure',
-        method: 'GET',
-        authentication: {
-          type: 'bearer',
-          token: 'test-token-123',
-        },
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should handle basic authentication', async () => {
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/secure',
-        method: 'GET',
-        authentication: {
-          type: 'basic',
-          username: 'user',
-          password: 'pass',
-        },
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should handle API key authentication', async () => {
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/secure',
-        method: 'GET',
-        authentication: {
-          type: 'apiKey',
-          key: 'X-API-Key',
-          value: 'secret-key-123',
-        },
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should extract response data into variables', async () => {
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/data',
-        method: 'GET',
-        responseExtract: {
-          path: 'data.result',
-          variableName: 'extractedValue',
-          storeFullResponse: true,
-          fullResponseVariableName: 'fullResponse',
-        },
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should proceed on error when configured', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
-
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/failing',
-        method: 'POST',
-        proceedOnError: true,
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      // Should proceed instead of erroring
-      expect(['proceed', 'error']).toContain(result.type);
-    });
-
-    it('should include answer variables when configured', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      chatState.setAnswer('q1', 'email', 'user@example.com');
-      chatState.setAnswer('q2', 'name', 'John Doe');
-
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        url: 'https://api.example.com/submit',
-        method: 'POST',
-        includeAnswerVariables: true,
-      });
-
-      const result = await handler.handle(node, chatState);
-      expect(['proceed', 'error']).toContain(result.type);
-    });
-
-    it('should use alternative URL field name', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      const handler = new WebhookHandler();
-      const node = createNode('webhook-node', {
-        webhookUrl: 'https://api.example.com/webhook',
-        method: 'POST',
-      });
-
-      const result = await handler.handle(node, chatState);
-      expect(['proceed', 'error']).toContain(result.type);
+    it('fills the variable with the reply once the call works', async () => {
+      const { WebhookHandler } = handlers();
+      mockWebhookService.execute.mockResolvedValue({ success: true, extractedVariables: {}, response: { statusCode: 200, data: { ok: 1 } }, shouldProceed: true });
+      const node = createNode('webhook-node', { url: 'https://api.example.com/hook', answerVariable: 'webhookresponse' });
+      await new WebhookHandler().handle(node, chatState);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(chatState.getAnswer('webhookresponse')).toEqual({ ok: 1 });
     });
   });
 
   // ========================================
-  // GPT HANDLER TESTS
+  // GPT (#33)
   // ========================================
 
   describe('GPTHandler', () => {
-    let GPTHandler: any;
-
-    beforeEach(() => {
-      const handlers = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      GPTHandler = handlers.GPTHandler;
-    });
-
-    it('should have correct node type', () => {
-      const handler = new GPTHandler();
-      expect(handler.nodeType).toBe('gpt-node');
-    });
-
-    it('should proceed silently when API key is missing', async () => {
-      const handler = new GPTHandler();
-      const node = createNode('gpt-node', {
-        prompt: 'Tell me about chatbots',
-        model: 'gpt-4',
+    it('asks the server (POST gpt {nodeId, transcript}), never OpenAI with a key from the node', async () => {
+      const { GPTHandler } = handlers();
+      chatState.addBotMessage('Hi', 'w', 'welcome-node');
+      chatState.addUserMessage('What is Conferbot?', 'q');
+      const { node, api } = withCtx(createNode('gpt-node', { context: 'x', apiKey: 'sk-should-not-be-used' }, { id: 'g' }));
+      api.mockResolvedValue({ ok: true, status: 200, body: { reply: 'A chatbot builder.' } });
+      const result = await new GPTHandler().handle(node, chatState);
+      expect(api).toHaveBeenCalledWith('gpt', {
+        nodeId: 'g',
+        transcript: [
+          { by: 'bot', message: 'Hi' },
+          { by: 'user', message: 'What is Conferbot?' },
+        ],
       });
-
-      const result = await handler.handle(node, chatState);
-
-      // No apiKey anywhere: record a gpt error and proceed (web behavior)
-      expect(result.type).toBe('proceed');
-      expect(chatState.getVariable('_gptSuccess')).toBe(false);
-      expect(chatState.getVariable('_gptError')).toBeDefined();
       expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    it('should call OpenAI directly and proceed with the response', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({
-          choices: [{ message: { content: 'AI response about chatbots' } }],
-        }),
-      });
-
-      const handler = new GPTHandler();
-      const node = createNode('gpt-node', {
-        apiKey: 'sk-test-key',
-        prompt: 'Tell me about chatbots',
-        variableName: 'gptResponse',
-      });
-
-      const result = await handler.handle(node, chatState);
-
       expect(result.type).toBe('proceed');
-      expect(chatState.getVariable('gptResponse')).toBe('AI response about chatbots');
-
-      // Calls the OpenAI chat completions API with the node's key
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.openai.com/v1/chat/completions',
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            Authorization: 'Bearer sk-test-key',
-          }),
-        })
-      );
+      expect(chatState.getTranscript().pop()?.text).toBe('A chatbot builder.');
     });
 
-    it('should resolve variables in prompt', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({
-          choices: [{ message: { content: 'Explanation of AI' } }],
-        }),
-      });
-
-      chatState.setVariable('topic', 'artificial intelligence');
-
-      const handler = new GPTHandler();
-      const node = createNode('gpt-node', {
-        apiKey: 'sk-test-key',
-        prompt: 'Explain {{topic}} in simple terms',
-        variableName: 'response',
-      });
-
-      const result = await handler.handle(node, chatState);
-      expect(result.type).toBe('proceed');
-
-      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(requestBody.messages[0].content).toContain('artificial intelligence');
-    });
-
-    it('should include conversation history', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({
-          choices: [{ message: { content: 'Response with context' } }],
-        }),
-      });
-
-      // Add some transcript entries
-      chatState.addBotMessage('Hello! How can I help?', 'node1', 'message');
-      chatState.addUserMessage('I need information about your product', 'node2');
-
-      const handler = new GPTHandler();
-      const node = createNode('gpt-node', {
-        apiKey: 'sk-test-key',
-        prompt: 'Respond to the user',
-        variableName: 'response',
-      });
-
-      const result = await handler.handle(node, chatState);
-      expect(result.type).toBe('proceed');
-
-      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-      const contents = requestBody.messages.map((m: any) => m.content);
-      expect(contents).toContain('Hello! How can I help?');
-      expect(contents).toContain('I need information about your product');
-    });
-
-    it('should proceed silently on API failure', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        statusText: 'Unauthorized',
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({ error: { message: 'Invalid key' } }),
-      });
-
-      const handler = new GPTHandler();
-      const node = createNode('gpt-node', {
-        apiKey: 'sk-bad-key',
-        prompt: 'How do I reset my password?',
-        variableName: 'response',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      // Records the error and proceeds (matches web widget behavior)
-      expect(result.type).toBe('proceed');
-      expect(chatState.getVariable('_gptSuccess')).toBe(false);
-      expect(chatState.getVariable('_gptError')).toBeDefined();
-    });
-
-    it('should handle GPT response', async () => {
-      const handler = new GPTHandler();
-      const node = createNode('gpt-node', {
-        prompt: 'Test',
-        variableName: 'gptAnswer',
-      });
-
-      const response = { text: 'This is the AI response.' };
-      const result = await handler.handleResponse(response, node, chatState);
-
-      expect(result.type).toBe('proceed');
-      expect(chatState.getVariable('gptAnswer')).toBe('This is the AI response.');
-    });
-
-    it('should handle GPT error response', async () => {
-      const handler = new GPTHandler();
-      const node = createNode('gpt-node', {
-        prompt: 'Test',
-        variableName: 'response',
-      });
-
-      const response = { error: 'Rate limit exceeded' };
-      const result = await handler.handleResponse(response, node, chatState);
-
-      expect(result.type).toBe('error');
-    });
-
-    it('should use default variable name when not specified', async () => {
-      const handler = new GPTHandler();
-      const node = createNode('gpt-node', {
-        prompt: 'Test prompt',
-      });
-
-      const response = { text: 'AI response' };
-      await handler.handleResponse(response, node, chatState);
-
-      expect(chatState.getVariable('gptResponse')).toBe('AI response');
+    it('a failed call shows nothing and moves on', async () => {
+      const { GPTHandler } = handlers();
+      const { node, api } = withCtx(createNode('gpt-node', {}, { id: 'g' }));
+      api.mockResolvedValue({ ok: false, status: 500, body: {} });
+      const before = chatState.getTranscript().length;
+      expect(await new GPTHandler().handle(node, chatState)).toEqual(NodeResult.next());
+      expect(chatState.getTranscript()).toHaveLength(before);
     });
   });
-
-  // ========================================
-  // HUMAN HANDOVER HANDLER TESTS
-  // ========================================
 
   describe('HumanHandoverHandler', () => {
     let HumanHandoverHandler: any;
@@ -711,548 +408,93 @@ describe('Integration Node Handlers', () => {
   });
 
   // ========================================
-  // DELAY HANDLER TESTS
+  // DELAY
   // ========================================
 
   describe('DelayHandler', () => {
-    let DelayHandler: any;
-
-    beforeEach(() => {
-      const handlers = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      DelayHandler = handlers.DelayHandler;
+    it('waits data.delay seconds, then the first edge', async () => {
+      const { DelayHandler } = handlers();
+      const result: any = await new DelayHandler().handle(createNode('delay-node', { delay: 3 }), chatState);
+      expect(result).toMatchObject({ type: 'delayedProceed', nextNodeId: null, delayMs: 3000 });
     });
 
-    it('should have correct node type', () => {
-      const handler = new DelayHandler();
-      expect(handler.nodeType).toBe('delay-node');
-    });
-
-    it('should return delayed proceed result in seconds', async () => {
-      const handler = new DelayHandler();
-      const node = createNode('delay-node', {
-        delay: 5,
-        unit: 'seconds',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      expect(result.type).toBe('delayedProceed');
-      if (result.type === 'delayedProceed') {
-        expect(result.delayMs).toBe(5000);
-      }
-    });
-
-    it('should handle milliseconds unit', async () => {
-      const handler = new DelayHandler();
-      const node = createNode('delay-node', {
-        delay: 500,
-        unit: 'milliseconds',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      if (result.type === 'delayedProceed') {
-        expect(result.delayMs).toBe(500);
-      }
-    });
-
-    it('should handle minutes unit', async () => {
-      const handler = new DelayHandler();
-      const node = createNode('delay-node', {
-        delay: 2,
-        unit: 'minutes',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      if (result.type === 'delayedProceed') {
-        expect(result.delayMs).toBe(2 * 60 * 1000);
-      }
-    });
-
-    it('should handle hours unit', async () => {
-      const handler = new DelayHandler();
-      const node = createNode('delay-node', {
-        delay: 1,
-        unit: 'hours',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      if (result.type === 'delayedProceed') {
-        // Capped at 10 minutes
-        expect(result.delayMs).toBeLessThanOrEqual(10 * 60 * 1000);
-      }
-    });
-
-    it('should cap maximum delay to 10 minutes', async () => {
-      const handler = new DelayHandler();
-      const node = createNode('delay-node', {
-        delay: 30,
-        unit: 'minutes',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      if (result.type === 'delayedProceed') {
-        expect(result.delayMs).toBe(10 * 60 * 1000);
-      }
-    });
-
-    it('should default to seconds when unit not specified', async () => {
-      const handler = new DelayHandler();
-      const node = createNode('delay-node', {
-        delay: 3,
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      if (result.type === 'delayedProceed') {
-        expect(result.delayMs).toBe(3000);
-      }
-    });
-
-    it('should use duration as alternative to delay field', async () => {
-      const handler = new DelayHandler();
-      const node = createNode('delay-node', {
-        duration: 2,
-        unit: 'seconds',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      if (result.type === 'delayedProceed') {
-        expect(result.delayMs).toBe(2000);
-      }
-    });
-
-    it('should store delay info in state', async () => {
-      const handler = new DelayHandler();
-      const node = createNode('delay-node', {
-        delay: 1,
-        unit: 'seconds',
-      });
-
-      await handler.handle(node, chatState);
-
-      expect(chatState.getVariable('_lastDelay')).toBe(1000);
-      expect(chatState.getVariable('_delayStartTime')).toBeDefined();
+    it('no delay set: no wait', async () => {
+      const { DelayHandler } = handlers();
+      expect(await new DelayHandler().handle(createNode('delay-node', {}), chatState)).toEqual(NodeResult.next());
     });
   });
 
   // ========================================
-  // EMAIL HANDLER TESTS
+  // EMAIL
   // ========================================
 
   describe('EmailHandler', () => {
-    let EmailHandler: any;
-
-    beforeEach(() => {
-      const handlers = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      EmailHandler = handlers.EmailHandler;
+    it('emits email-node-trigger with the node data and every answer, then moves on', async () => {
+      const { EmailHandler } = handlers();
+      chatState.saveVariableByName('topic', 'demo');
+      const { node, emits } = withCtx(createNode('email-node', { to: 'team@example.com', subject: 'New lead {topic}' }));
+      expect(await new EmailHandler().handle(node, chatState)).toEqual(NodeResult.next());
+      expect(emits[0].event).toBe('email-node-trigger');
+      expect(emits[0].payload.nodeData).toMatchObject({ to: 'team@example.com', subject: 'New lead {topic}' });
+      expect(emits[0].payload.topic).toBe('demo');
     });
 
-    it('should have correct node type', () => {
-      const handler = new EmailHandler();
-      expect(handler.nodeType).toBe('email-node');
-    });
-
-    it('should validate email configuration', async () => {
-      const handler = new EmailHandler();
-      const node = createNode('email-node', {
-        // Missing required fields
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      // Should error or proceed with error flag
-      expect(['error', 'proceed']).toContain(result.type);
-    });
-
-    it('should resolve variables in email fields', async () => {
-      chatState.setVariable('recipientEmail', 'user@example.com');
-      chatState.setVariable('userName', 'John');
-
-      const handler = new EmailHandler();
-      const node = createNode('email-node', {
-        to: '{{recipientEmail}}',
-        subject: 'Hello {{userName}}',
-        body: 'Dear {{userName}}, thank you for contacting us.',
-      });
-
-      await handler.handle(node, chatState);
-      // Variables should be resolved
-    });
-
-    it('should support CC and BCC', async () => {
-      const handler = new EmailHandler();
-      const node = createNode('email-node', {
-        to: 'primary@example.com',
-        cc: 'cc@example.com',
-        bcc: 'bcc@example.com',
-        subject: 'Test',
-        body: 'Test message',
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should support HTML format', async () => {
-      const handler = new EmailHandler();
-      const node = createNode('email-node', {
-        to: 'recipient@example.com',
-        subject: 'HTML Email',
-        body: '<h1>Hello</h1><p>This is an HTML email.</p>',
-        format: 'html',
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should proceed on error when configured', async () => {
-      const handler = new EmailHandler();
-      const node = createNode('email-node', {
-        to: 'invalid-email',
-        subject: 'Test',
-        body: 'Test',
-        proceedOnError: true,
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      expect(result.type).toBe('proceed');
-      if (result.type === 'proceed') {
-        expect(result.data?.emailSent).toBe(false);
-      }
+    it('reached by a jump it sends nothing (web index.ts)', async () => {
+      const { EmailHandler } = handlers();
+      const { node, emits } = withCtx(createNode('email-node', { to: 'a@b.co' }), { via: 'jump' });
+      expect(await new EmailHandler().handle(node, chatState)).toEqual(NodeResult.next());
+      expect(emits).toHaveLength(0);
     });
   });
 
   // ========================================
-  // GMAIL HANDLER TESTS
+  // NATIVE INTEGRATIONS (#35: credentialId)
   // ========================================
 
-  describe('GmailHandler', () => {
-    let GmailHandler: any;
+  describe('server-run integrations', () => {
+    const native = ['gmail-node', 'slack-node', 'discord-node', 'google-docs-node', 'google-drive-node', 'airtable-node', 'hubspot-node', 'notion-node', 'zohocrm-node'];
 
-    beforeEach(() => {
-      const handlers = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      GmailHandler = handlers.GmailHandler;
+    it.each(native)('%s sends the step data as saved (credentialId included) and does not wait', async (type) => {
+      const registry = new (require('../../src/core/nodes/NodeHandlerRegistry').NodeHandlerRegistry)();
+      handlers().registerIntegrationHandlers(registry);
+      const data = { credentialId: 'cred-1', operation: 'send', to: '{email}' };
+      const { node, emits } = withCtx(createNode(type, data, { id: 'n1' }));
+      expect(await registry.getHandler(type).handle(node, chatState)).toEqual(NodeResult.next());
+      expect(emits[0].event).toBe('execute-integration');
+      expect(emits[0].payload).toMatchObject({ nodeType: type, nodeId: 'n1', nodeData: data, chatSessionId: 'test-session', chatbotId: 'test-bot' });
     });
 
-    it('should have correct node type', () => {
-      const handler = new GmailHandler();
-      expect(handler.nodeType).toBe('gmail-node');
+    it('a result that arrives later is saved by name', async () => {
+      const { HubSpotHandler } = handlers();
+      const { node, fire } = withCtx(createNode('hubspot-node', {}, { id: 'h' }));
+      await new HubSpotHandler().handle(node, chatState);
+      fire('integration-result', { nodeId: 'h', success: true, answerVariable: 'hubspot_data', answerValue: { id: '901' }, columnMappedValues: { plan: 'Pro' } });
+      expect(chatState.getAnswer('hubspot_data')).toEqual({ id: '901' });
+      expect(chatState.getAnswer('plan')).toBe('Pro');
     });
 
-    it('should support saveAsDraft option', async () => {
-      const handler = new GmailHandler();
-      const node = createNode('gmail-node', {
-        to: 'recipient@example.com',
-        subject: 'Draft Email',
-        body: 'This is a draft',
-        saveAsDraft: true,
-      });
-
-      await handler.handle(node, chatState);
+    it('google sheets runs as its read / write node', async () => {
+      const { GoogleSheetsHandler } = handlers();
+      const { node, emits } = withCtx(createNode('google-sheets-node', { operation: 'write' }));
+      await new GoogleSheetsHandler().handle(node, chatState);
+      expect(emits[0].payload.nodeType).toBe('google-sheets-write-node');
     });
 
-    it('should support Gmail labels', async () => {
-      const handler = new GmailHandler();
-      const node = createNode('gmail-node', {
-        to: 'recipient@example.com',
-        subject: 'Labeled Email',
-        body: 'Message with labels',
-        labels: ['Important', 'Sales'],
-      });
+    it('mailchimp / segment / salesforce wait, then success "source", failure "source-failure" (or the success edge)', async () => {
+      const { SegmentHandler } = handlers();
+      const edges = [
+        { source: 'sg', target: 'ok', sourceHandle: 'source' },
+        { source: 'sg', target: 'bad', sourceHandle: 'source-failure' },
+      ];
+      const a = withCtx(createNode('segment-node', {}, { id: 'sg' }), { edges });
+      const run = new SegmentHandler().handle(a.node, chatState);
+      a.fire('integration-result', { nodeId: 'sg', success: false });
+      expect(await run).toEqual(NodeResult.port('source-failure'));
 
-      await handler.handle(node, chatState);
-    });
-  });
-
-  // ========================================
-  // SLACK HANDLER TESTS
-  // ========================================
-
-  describe('SlackHandler', () => {
-    let SlackHandler: any;
-
-    beforeEach(() => {
-      const handlers = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      SlackHandler = handlers.SlackHandler;
-    });
-
-    it('should have correct node type', () => {
-      const handler = new SlackHandler();
-      expect(handler.nodeType).toBe('slack-node');
-    });
-
-    it('should return error when message is missing', async () => {
-      const handler = new SlackHandler();
-      const node = createNode('slack-node', {
-        channel: '#general',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      expect(result.type).toBe('error');
-    });
-
-    it('should send message with webhook', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-      });
-
-      const handler = new SlackHandler();
-      const node = createNode('slack-node', {
-        message: 'Hello from Conferbot!',
-        webhookUrl: 'https://hooks.slack.com/services/xxx/yyy/zzz',
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should support blocks format', async () => {
-      const handler = new SlackHandler();
-      const node = createNode('slack-node', {
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: '*New Lead*',
-            },
-          },
-        ],
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should include answer data as attachment when configured', async () => {
-      chatState.setAnswer('q1', 'name', 'John Doe');
-      chatState.setAnswer('q2', 'email', 'john@example.com');
-
-      const handler = new SlackHandler();
-      const node = createNode('slack-node', {
-        message: 'New submission',
-        includeAnswers: true,
-        webhookUrl: 'https://hooks.slack.com/services/xxx',
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should support thread replies', async () => {
-      const handler = new SlackHandler();
-      const node = createNode('slack-node', {
-        message: 'Reply in thread',
-        channel: '#general',
-        threadTs: '1234567890.123456',
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should support custom username and icon', async () => {
-      const handler = new SlackHandler();
-      const node = createNode('slack-node', {
-        message: 'Branded message',
-        username: 'Conferbot',
-        icon: ':robot_face:',
-      });
-
-      await handler.handle(node, chatState);
-    });
-  });
-
-  // ========================================
-  // DISCORD HANDLER TESTS
-  // ========================================
-
-  describe('DiscordHandler', () => {
-    let DiscordHandler: any;
-
-    beforeEach(() => {
-      const handlers = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      DiscordHandler = handlers.DiscordHandler;
-    });
-
-    it('should have correct node type', () => {
-      const handler = new DiscordHandler();
-      expect(handler.nodeType).toBe('discord-node');
-    });
-
-    it('should return error when message and embeds are missing', async () => {
-      const handler = new DiscordHandler();
-      const node = createNode('discord-node', {
-        channel: 'general',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      expect(result.type).toBe('error');
-    });
-
-    it('should send message with webhook', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-      });
-
-      const handler = new DiscordHandler();
-      const node = createNode('discord-node', {
-        message: 'Hello from Conferbot!',
-        webhookUrl: 'https://discord.com/api/webhooks/xxx/yyy',
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should support embeds', async () => {
-      const handler = new DiscordHandler();
-      const node = createNode('discord-node', {
-        embeds: [
-          {
-            title: 'New Lead',
-            description: 'A new lead has been captured',
-            color: 0x00ff00,
-            fields: [
-              { name: 'Name', value: 'John Doe' },
-              { name: 'Email', value: 'john@example.com' },
-            ],
-          },
-        ],
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should support TTS messages', async () => {
-      const handler = new DiscordHandler();
-      const node = createNode('discord-node', {
-        message: 'Important announcement!',
-        tts: true,
-      });
-
-      await handler.handle(node, chatState);
-    });
-
-    it('should support custom avatar', async () => {
-      const handler = new DiscordHandler();
-      const node = createNode('discord-node', {
-        message: 'Message with custom avatar',
-        username: 'Custom Bot',
-        avatarUrl: 'https://example.com/avatar.png',
-      });
-
-      await handler.handle(node, chatState);
-    });
-  });
-
-  // ========================================
-  // GOOGLE SHEETS HANDLER TESTS
-  // ========================================
-
-  describe('GoogleSheetsHandler', () => {
-    let GoogleSheetsHandler: any;
-
-    beforeEach(() => {
-      try {
-        const handlers = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-        GoogleSheetsHandler = handlers.GoogleSheetsHandler;
-      } catch (e) {
-        // Handler may not be exported
-      }
-    });
-
-    it('should have correct node type if available', () => {
-      if (GoogleSheetsHandler) {
-        const handler = new GoogleSheetsHandler();
-        expect(handler.nodeType).toBe('google-sheets-node');
-      }
-    });
-
-    it('should support append row action', async () => {
-      if (GoogleSheetsHandler) {
-        const handler = new GoogleSheetsHandler();
-        const node = createNode('google-sheets-node', {
-          action: 'appendRow',
-          spreadsheetId: 'test-spreadsheet-id',
-          sheetName: 'Leads',
-          data: {
-            name: '{{name}}',
-            email: '{{email}}',
-          },
-        });
-
-        await handler.handle(node, chatState);
-      }
-    });
-  });
-
-  // ========================================
-  // INTEGRATION RESULT STORAGE TESTS
-  // ========================================
-
-  describe('Integration Result Storage', () => {
-    it('should store success status in state', async () => {
-      const { EmailHandler } = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      const handler = new EmailHandler();
-      handler.setSocketClient(mockSocket);
-
-      const node = createNode('email-node', {
-        to: 'test@example.com',
-        subject: 'Test',
-        body: 'Test message',
-      });
-
-      await handler.handle(node, chatState);
-
-      // Success or failure variables should be set
-      const success = chatState.getVariable('_emailSuccess');
-      const error = chatState.getVariable('_emailError');
-      expect(success !== undefined || error !== undefined).toBe(true);
-    });
-  });
-
-  // ========================================
-  // SOCKET EMISSION TESTS
-  // ========================================
-
-  describe('Socket Event Emission', () => {
-    it('should emit socket events when socket client is set', async () => {
-      const { GoogleAnalyticsHandler } = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      const handler = new GoogleAnalyticsHandler();
-      mockSocket.connected = true;
-      handler.setSocketClient(mockSocket);
-
-      const node = createNode('google-analytics-node', {
-        eventAction: 'test_action',
-        eventCategory: 'Chatbot',
-      });
-
-      await handler.handle(node, chatState);
-
-      // Socket should have received an emit call
-      expect(mockSocket.emit).toHaveBeenCalled();
-    });
-
-    it('should not report success when the socket is disconnected', async () => {
-      const { SlackHandler } = require('../../src/core/nodes/handlers/IntegrationNodeHandlers');
-      const handler = new SlackHandler();
-      mockSocket.connected = false;
-      handler.setSocketClient(mockSocket);
-
-      const node = createNode('slack-node', {
-        message: 'Hello team',
-      });
-
-      const result = await handler.handle(node, chatState);
-
-      expect(result.type).toBe('proceed');
-      expect(chatState.getVariable('_slackSuccess')).toBe(false);
-      expect(mockSocket.emit).not.toHaveBeenCalled();
+      const b = withCtx(createNode('segment-node', {}, { id: 'sg' }), { edges: [edges[0]] });
+      const run2 = new SegmentHandler().handle(b.node, chatState);
+      b.fire('integration-result', { nodeId: 'sg', success: false });
+      expect(await run2).toEqual(NodeResult.port('source'));
     });
   });
 });
