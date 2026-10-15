@@ -1,4 +1,5 @@
-import { buildHandoverTimeoutPayload, waitMinutesOf } from '../../src/core/handoverPayload';
+import { buildHandoverPayload, buildHandoverTimeoutPayload, waitMinutesOf } from '../../src/core/handoverPayload';
+import { ChatState } from '../../src/core/state/ChatState';
 
 describe('handover max wait', () => {
   it('reads minutes as the builder wrote them', () => {
@@ -14,5 +15,30 @@ describe('handover max wait', () => {
       assignmentData: { assignmentType: 'manual', assignmentStrategy: 'round_robin', assignedAgents: ['a2'] },
       workspaceId: 'w1',
     });
+  });
+});
+
+describe('initiate-handover carries the step settings (#59)', () => {
+  const state = new ChatState('s1', 'b1');
+  it('an email turned off on the step stays off; sound and skills go too', () => {
+    const p: any = buildHandoverPayload(state, {
+      enableHandoverEmail: false,
+      enableHandoverSound: true,
+      checkedSoundTab: 'default',
+      selectedSound: 'ding',
+      assignmentMethod: 'skills',
+      requiredSkills: ['billing'],
+    });
+    expect(p.enableHandoverEmail).toBe(false);
+    expect(p.enableHandoverSound).toBe(true);
+    expect(p.selectedSound).toBe('ding');
+    expect(p.assignmentMethod).toBe('skills');
+    expect(p.requiredSkills).toEqual(['billing']);
+  });
+
+  it('a step that follows the workspace sends no assignment overrides', () => {
+    const p: any = buildHandoverPayload(state, { assignmentMethod: 'workspace', requiredSkills: [] });
+    expect('assignmentMethod' in p).toBe(false);
+    expect('requiredSkills' in p).toBe(false);
   });
 });
