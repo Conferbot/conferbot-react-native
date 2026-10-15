@@ -14,11 +14,12 @@ This file tracks how far this SDK matches the web widget: what's done, what's le
 | #25 | Launcher motion. `launcherMotion.ts` is the reference evaluator, checked against Chrome's animation in 784 cases. | `src/core/launcherMotion.ts`, `FloatingWidget/useLauncherMotion.ts` |
 | #26 | User as `visitorContext` + identity hash on every response record | `src/core/state/ChatState.ts`, `src/types/index.ts` |
 | #27 | Greeting card, all 11 styles checked on the Android emulator | `src/core/greeting.ts`, `FloatingWidget/useGreeting.ts`, `FloatingWidget/GreetingCard.tsx` |
+| #28-#32, #58, #59 | Handover lifecycle: the Connecting line and its 4 outcomes, the 20s waiting signal, "Talk to a person" only while nobody is coming, the header's reply time, leaving the queue on the server, a live chat picked back up after a restart. Checked against the local embed-server (`live-chat-state`, `queue-self-resolve`, `agent-accepted`, `agent-left`, `chat-ended`). | `src/core/handoverState.ts`, `handoverWaiting.ts`, `replyTime.ts`, `handoverPayload.ts`; `context/hooks/useHandoverLifecycle.ts`, `MessageBubble`, `LiveChatCards` |
 | #57 | Launcher entrance, attention and idle call. `keyframes.ts` evaluates the web's Web Animations tracks; checked against Chrome in 447 cases (19,275 samples). | `src/core/keyframes.ts`, `launcherEntrance.ts`, `launcherAttention.ts`, `launcherIdleCall.ts`, `mascotArt.ts`, `fxPaint.ts`; `FloatingWidget/useLauncherEntrance.ts`, `useLauncherAttention.ts`, `useLauncherIdleCall.ts`, `FxSprites.tsx`, `IdleCallView.tsx`, `fxAnimated.ts` |
 
 ## Left in this SDK
 
-In order: home screen; mascots; i18n; sounds; celebrations; reply-time wording. The web sources are listed below.
+In order: home screen; mascots; i18n; sounds; celebrations; the rest of the reply-time wording (the home card's `homePeople`, the wait card's `typicalWait`; the header's `headerLine` is done). The web sources are listed below.
 
 ## Generators (`scripts/parity/`)
 
@@ -33,6 +34,11 @@ The data files shared by the 4 SDKs are generated from the widget's own CSS and 
   - `golden.json` holds the evaluator frames that the Kotlin, Dart and Swift tests check against.
 - **`launcherfx/`:** `check.sh` compiles the RN core, plays every entrance, attention and idle-call track in Chrome (`element.animate`, paused at each sample) and writes `golden.json`, then `compare.js` prints the largest difference. `cases.js` lists the cases (a 50px launcher at 16/16 on a 390 x 844 screen, right and left; seed 4242). `golden.json` is what the Kotlin, Dart and Swift tests check against: `{ src, box, base, tracks, samples: [{ t, v }] }`, `v` holding only the channels away from rest, iterations `-1` for Infinity.
 - **`ios-linux-baseline-fails.txt`:** the 28 iOS tests that already fail on Linux. Only failures outside this list matter.
+- **`flows/`:** the flow-node conformance spec shared by the 4 SDKs.
+  - `nodes.spec.json` lists the 82 node types the widget runs: the keys each one reads, its handles, what it stores, and file:line citations.
+  - `fixtures/` holds 156 cases. `gen.js` produced every one by running the widget's own code.
+  - `gaps.md` lists where each SDK differs today.
+  - Its README covers how to regenerate it (`node gen.js`, `--check`) and how each SDK's tests should use the fixtures.
 
 ## How to test
 
@@ -59,14 +65,16 @@ Every web widget feature works the same in the 4 mobile SDKs: customization, lau
 | Signed-in user as `visitorContext` + identity hash | done | done | done | done |
 | Greeting card (rules, frequency, 11 styles) | done | logic done, UI on a branch | todo | todo |
 | Launcher entrance / attention / idle call (#57) | done | todo | todo | todo |
+| Handover lifecycle: Connecting line + outcomes, 20s waiting signal, Talk to a person rules, leave queue on the server, restore after restart (#28-#31, #58) | done | todo | todo | todo |
+| Header: bot name + Online + reply time, Online again when a person joins (#32) | done | todo | todo | todo |
 | Home screen | todo | todo | todo | todo |
 | Mascots (incl. `mascotInGreeting`) | todo | todo | todo | todo |
 | `widgetLanguage` (i18n) | todo | todo | todo | todo |
 | Message sounds | todo | todo | todo | todo |
 | Celebrations / reactions | todo | todo | todo | todo |
-| Reply-time wording | todo | todo | todo | todo |
+| Reply-time wording (home card, wait card) | todo | todo | todo | todo |
 
-Live chat / agent features (handover, queue card, receipts, rating, files, prefill, max-wait timeout, agent bot replies, suggestion chips) are done in all 4.
+Live chat / agent features (handover, queue card, receipts, rating, files, prefill, max-wait timeout, agent bot replies, suggestion chips) are done in all 4. The handover lifecycle above (#28-#32, #58) is the RN reference for the other three.
 
 Each SDK repo has its own `docs/PARITY.md`. The React Native one also covers the generators in `scripts/parity/` and the greeting card spec in `docs/greeting-card-native-spec.md`.
 
@@ -85,6 +93,40 @@ All paths are under `conferbot-widget/src/`.
 - **Sounds:** `ts/chat/messageSound.ts`.
 - **Celebrations:** `ts/chat/delight/` (celebrate, reactions, rules) and `ts/chat/ratingFx.ts`.
 - **Reply time:** `ts/chat/replyTime.ts`, `replyTimeView.ts`, `headerPresence.ts`.
+
+### Porting the handover lifecycle (from RN, #28-#32, #58, #59)
+
+The logic is pure and tested in `src/core/`; port each file with its test (`__tests__/core/handoverState.test.ts`, `handoverWaiting.test.ts`, `replyTime.test.ts`), then wire it the way `context/hooks/useHandoverLifecycle.ts` does. The web sources are `ts/chat/handoverState.ts`, `handoverWaiting.ts`, `quickActions.ts`, `replyTime.ts`, `headerPresence.ts`, `core/events/agentListeners.ts`, `ts/chat/handlers/special.ts` and the restore in `index.ts`.
+
+- **`handoverState.ts`** reads the record. It never mutates: settling returns a new list, unlike the web.
+  - `handoverPhase(record)`: `none`, `connecting` (an `agent-left-chat` with `handover: true` and no person since), or `joined` (a person's `agent-joined-message`; an AI join, `ai: true` or an `ai-agent-` id, does not count).
+  - `talkToPersonAllowed` is `phase === 'none'`.
+  - `isRepeatJoin(record, agentId)`: the same person again, so draw nothing.
+  - The line's words come from `handoverLineText(settled)`: pending is "Connecting you with the team…"; the outcomes are `joined`, `unavailable`, `cancelled` and `ended`.
+  - Restore runs `annotateRestoredHandovers` first. It settles lines whose outcome the record knows and marks a person's join after an AI handover `afterAI` (the note "They can see your conversation so far").
+- **Socket readings:**
+  - `agentLeftKind(data)`: `visitor_inactive` is `ignore` (draw nothing). `escalated`, `handover: true` or an AI leaver is `handover` (one Connecting line; a repeat while one is pending draws none). Anything else is a person who `left`.
+  - `acceptedPlan(record, data)`: the outcome to settle (`joined` for a person; `unavailable` when the AI takes the chat back), whether to draw the join (not a repeat), and `afterAI`. Settle before the agent bot's silent-start check, as the web does.
+  - `handover-waiting` and `no-agents-available` settle `unavailable`. `chat-ended` and `ai-agent-inactive-close` settle `ended`.
+- **Leaving the queue (#58):**
+  - Send `queue-self-resolve {chatSessionId}` and wait for the answer. `ok` leaves. `agent_joined` stays.
+  - `not_waiting` is also what the server answers once a person has accepted (the ticket is then in progress, not open). Ask `live-chat-state`; `live` means stay (`queueLeaveNeedsState`, `queueLeaveResult`).
+  - On leave: record `queue-self-resolved`, draw "You left the queue", settle `cancelled`, signal `cb:wait-over`, and move the flow on.
+  - The server has no visitor end-chat and no `handover:*` events. End chat sends `queue-self-resolve`; the handover survey goes as `submit-chat-rating` (`surveyRatingPayload`).
+- **Restore (#29):** a session restored from the device must not run its flow again before asking the server.
+  - Join the room first (the server answers `live-chat-state` only for `socket.chatSessionId`). Then call `restoreNeedsLiveChatState(record, atHandover)` and `restoredLiveChat(state, record)`.
+  - `restoreStep` says what to do. `live`: live mode, the agent, the join line it missed. `wait`: back on the handover step's wait without asking again (RN `NodeFlowEngine.waitAt`). `continue`: the flow carries on from the handover step. `ask`: run the step again. `start`: as before.
+  - `atHandover` is the persisted current node being the `human-handover-node`.
+- **`handoverWaiting.ts`:**
+  - `createConnectingSignal(fire, canFire, setTimer, clearTimer)` fires `cb:waiting-for-human` 20s into a wait, once per wait. `end()` cancels it. While the chat is closed it re-checks every 2s.
+  - Start it when a flow handover with no AI agents begins, when an AI escalates (`agent-left` handover), and when a restore finds the chat still waiting.
+  - End it on `agent-accepted`, `handover-waiting` (the server's own signal), leaving the queue, nobody available, or the chat ending.
+  - The signals go through a listener bus (`createSignalBus`); RN exposes it as `useConferBot().onWidgetSignal`.
+- **`replyTime.ts`:**
+  - `headerStatus(customizations.replyTime, { personInChat, agentBot })` is the header's line under the bot name.
+  - Before anyone joins it shows the reply time ("Typically replies in a few minutes", "Online · team back Monday 9 AM", "Online · team replies by email"). Once a person is in the chat it shows plain "Online". An AI agent bot shows no reply-time line.
+  - The header never switches to the agent.
+- **`handoverPayload.ts` (#59):** `initiate-handover` carries the step's `enableHandoverEmail` (an explicit `false` is what keeps the team's email off), the sound settings, and `assignmentMethod` / `requiredSkills` when set.
 
 ### Porting the launcher entrance, attention and idle call (from RN, #57)
 
