@@ -28,7 +28,7 @@ The complete flow recorded live on an Android emulator against production: open 
 - **Native Components** - Built entirely with React Native views, not a WebView wrapper
 - **Floating Bubble (FAB)** - The same bottom-right chat bubble as the web widget, driven by your dashboard settings
 - **Real-time Messaging** - Socket.IO-based communication with automatic reconnection
-- **Node Flow Engine** - Renders the interactive flows you build in the Conferbot flow builder (choices, inputs, cards, and more)
+- **Node Flow Engine** - Runs the flows you build in the Conferbot flow builder exactly as the web widget does: all 82 step types (questions, choices, conditions, loops and sub-flows, AI route / extract, knowledge-base answers, OTP, consent, payment and more), checked against 156 shared cases produced by running the widget's own code
 - **Server-driven Theming** - Colors, bot name, and avatar configured in the dashboard apply automatically
 - **Live Agent Handover** - Seamless transition between bot and human agents, as on the web widget: a "Connecting you with the team…" line that settles to how the wait ended, the queue, leaving it, agent typing indicators, and a live chat picked back up after an app restart
 - **Offline Support** - Messages are queued locally and retried when connectivity returns
@@ -506,6 +506,21 @@ How a handover reads in the chat:
 - The header keeps the bot's name with "Online" and the team's reply time ("Typically replies in a few minutes", "Online · team back at 9 AM"), and goes back to "Online" when a person joins.
 - Cancel on the wait card leaves the queue on the server (`queue-self-resolve`), so the team stops seeing the visitor waiting. `leaveQueue()` does the same from your own UI.
 - After an app restart the SDK asks the server where the chat stands (`live-chat-state`): a person's chat comes back live with its agent, a visitor still in the queue goes back to the same wait, and a chat that ended meanwhile says so.
+
+## Bot Flows
+
+The SDK runs a bot's flow the way the web widget does. The shared flow-node spec in `scripts/parity/flows/` is the reference, and `__tests__/parity/flows.test.ts` runs all 156 of its cases through the engine.
+
+- **Routing:** the chat starts at the first welcome step. A step that doesn't branch follows its first edge. A branch (a choice, a condition, an AI intent) follows its own handle, and the chat ends when that handle has no edge. Unknown step types are passed along their first edge.
+- **Answers:** a question with an answer variable saves into it, so `{name}` / `${name}` / `{{name}}` fill later messages. An unknown variable shows nothing.
+- **Server-side steps:** the GPT, AI route / extract, knowledge-base, OTP, address and payment steps call your bot's server (`/api/v1/bot/:id/...`). No secret ever comes to the device.
+- **Integrations:** Gmail, Sheets, Slack, HubSpot and the rest run on the server with the step as it was saved, `credentialId` included. The flow moves on without waiting, except Mailchimp, Segment and Salesforce, which wait and take their success or failure path.
+- **Gates stay gates:** payment leaves by its paid path only when the server says paid, OTP only once a code is verified, and required consent only once agreed.
+- **Privacy:** card numbers, IBANs, ids and passwords in answers are masked before they are stored or sent (`redactSensitive`, on unless the owner turns it off).
+- **Pacing:** typing dots last as long as the web's (`paceFor`). Pass `typingDelay` to `NodeFlowEngine` for a fixed delay instead. Images move on once they load, after 4 s at most.
+- **No page in an app:** a hidden-fields step captures nothing, unless you run `NodeFlowEngine` yourself and pass `page: { url, referrer }` (for example from a deep link).
+
+The engine also reports every step it enters, every handle it takes and the end, through `onTrace` (`FlowTraceEvent`).
 
 ## Custom Endpoints
 
