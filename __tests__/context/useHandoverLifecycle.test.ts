@@ -141,6 +141,20 @@ describe('useHandoverLifecycle', () => {
     expect(engine.submitResponse).toHaveBeenCalledWith({ action: 'cancel', queueLeft: true });
   });
 
+  it('the answer and queue-left for the same Cancel: "You left the queue" once (#65)', async () => {
+    const engine = { isAtHandover: () => true, submitResponse: jest.fn(), handoverNodeData: () => ({}) };
+    const { hook, socket, screen, state } = setup({ ack: { 'queue-self-resolve': { ok: true } }, engine, waitingForPerson: true });
+    // queue-left first (it can beat the answer), then the answer, then queue-left again
+    act(() => socket.fire('queue-left', { chatSessionId: 's1', reason: 'self_service' }));
+    await act(async () => {
+      await hook.result.current.leaveQueue();
+    });
+    act(() => socket.fire('queue-left', { chatSessionId: 's1', reason: 'self_service' }));
+    expect(screen().filter((m: any) => m.type === 'queue-self-resolved')).toHaveLength(1);
+    expect(state.addRecord.mock.calls.filter(([r]: any[]) => r.type === 'queue-self-resolved')).toHaveLength(1);
+    expect(engine.submitResponse).toHaveBeenCalledTimes(1);
+  });
+
   it('a person accepted just before: not_waiting, live-chat-state live, the visitor stays', async () => {
     const engine = { isAtHandover: () => true, submitResponse: jest.fn(), handoverNodeData: () => ({}) };
     const { hook, socket } = setup({
