@@ -7,11 +7,26 @@ import {
   Platform,
   Image,
   Text,
+  useWindowDimensions,
 } from 'react-native';
 import { useConferBot } from '../../context/ConferBotContext';
 import { ChatWidget } from '../ChatWidget/ChatWidget';
 import type { ChatWidgetProps } from '../ChatWidget/ChatWidget';
 import { getBubbleIcon, CloseIcon } from './WidgetBubbleIcons';
+import { resolveLauncher } from '../../core/launcher';
+
+// react-native-svg draws a gradient launcher when the app has it; else its first colour.
+let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  SvgXml = require('react-native-svg').SvgXml;
+} catch {
+  SvgXml = null;
+}
+
+// Left to right, stretched to whatever size the button is (as the web's linear-gradient(to right)).
+const gradientXml = (a: string, b: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="1" height="1" fill="url(#g)"/></svg>`;
 
 // ========================================
 // TYPES
@@ -152,32 +167,38 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     // Context not available — widget used outside provider, that's fine
   }
 
-  // Resolve config: prop > server > default
   const sc = serverCustomizations || {};
-  const position = widgetConfig.position || (sc.widgetPosition === 'left' ? 'left' : 'right');
-  // Defaults match web widget: 55px size, right 26px, bottom 20px, icon 60%
-  const offsetX = widgetConfig.offsetX ?? (position === 'left' ? (sc.widgetOffsetLeft ?? 10) : (sc.widgetOffsetRight ?? 10));
-  const offsetBottom = widgetConfig.offsetBottom ?? sc.widgetOffsetBottom ?? 10;
-  const size = widgetConfig.size ?? sc.widgetSize ?? 50;
-  const borderRadius = widgetConfig.borderRadius ?? sc.widgetBorderRadius ?? size / 2;
-  const iconColor = widgetConfig.iconColor ?? '#ffffff';
-  // Web widget uses `width: 60%` for SVG inside FAB — match that proportion
-  const iconScale = widgetConfig.iconScale ?? 0.6;
-  const iconSize = Math.round(size * iconScale);
+  // The launcher as the web draws it on a phone (core/launcher); props win.
+  const { width: screenWidth } = useWindowDimensions();
+  const look = resolveLauncher(serverCustomizations, screenWidth);
+  const position = widgetConfig.position || look.position;
+  const flipped = position !== look.position;
+  const size = widgetConfig.size ?? look.size;
+  const width = widgetConfig.size ?? look.width;
+  const offsetX = widgetConfig.offsetX ?? look.side;
+  const offsetBottom = widgetConfig.offsetBottom ?? look.bottom;
+  const corners = widgetConfig.borderRadius !== undefined
+    ? { topLeft: widgetConfig.borderRadius, topRight: widgetConfig.borderRadius, bottomRight: widgetConfig.borderRadius, bottomLeft: widgetConfig.borderRadius }
+    : flipped
+    ? { topLeft: look.corners.topRight, topRight: look.corners.topLeft, bottomRight: look.corners.bottomLeft, bottomLeft: look.corners.bottomRight }
+    : look.corners;
+  const iconColor = widgetConfig.iconColor ?? look.ink;
+  const iconSize = widgetConfig.iconScale ? Math.round(size * widgetConfig.iconScale) : look.glyph;
 
   // Background
-  const themeType = widgetConfig.themeType || (sc.widgetIconThemeType === 'Gradient' ? 'gradient' : 'solid');
-  const bgColor = widgetConfig.backgroundColor || sc.widgetIconBgColor || sc.headerBgColor || '#1b55f3';
-  const gradStart = widgetConfig.gradientColorStart || sc.widgetGradientBgOne || '#fffcf1';
-  const gradEnd = widgetConfig.gradientColorEnd || sc.widgetGradientBgTwo || '#1b55f3';
+  const themeType = widgetConfig.themeType || look.background.type;
+  const bgColor = widgetConfig.backgroundColor || look.solid;
+  const gradStart = widgetConfig.gradientColorStart || (look.background.type === 'gradient' ? look.background.colors[0] : bgColor);
+  const gradEnd = widgetConfig.gradientColorEnd || (look.background.type === 'gradient' ? look.background.colors[1] : bgColor);
 
-  // Icon — web widget uses widgetIconType to switch between SVG icon and custom image
-  const iconName = widgetConfig.iconName || sc.widgetIconSVG;
-  const iconType = sc.widgetIconType || 'Icon';
-  const iconImageUrl = widgetConfig.iconImageUrl || (iconType === 'Image' ? sc.widgetIconImage : undefined);
+  // Icon: an uploaded image always wins; the avatar style fills the button with the bot's photo.
+  const iconName = widgetConfig.iconName || look.iconId || undefined;
+  const iconImageUrl = widgetConfig.iconImageUrl || look.imageUrl;
+  const avatarUrl = !iconImageUrl && look.style === 'avatar' ? look.avatar : null;
+  const showLabel = !iconImageUrl && look.style === 'label';
 
-  // CTA — border radius capped at 20 (matches web widget)
-  const ctaText = widgetConfig.ctaText || sc.chatIconCtaText || '';
+  // CTA: only when the owner turned the greeting on; border radius capped at 20 (as the web).
+  const ctaText = widgetConfig.ctaText || look.ctaText || '';
   const ctaBorderRadius = Math.min(sc.widgetBorderRadius ?? 50, 20);
 
   // Show CTA after a short delay
@@ -222,12 +243,6 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     chatWidgetProps.onClose?.();
   }, [chatWidgetProps.onClose]);
 
-  // Rotate interpolation for icon swap
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '90deg'],
-  });
-
   const openIconOpacity = rotateAnim.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: [1, 0, 0],
@@ -241,16 +256,16 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   // Resolve icon component
   const IconComponent = getBubbleIcon(iconName);
 
-  // Shadow — matches web widget's deep luxurious shadow
+  // A soft glow in the header colour (0 0 4px), as the web draws it.
   const shadowStyle = (widgetConfig.showShadow !== false) ? Platform.select({
     ios: {
-      shadowColor: 'rgb(50, 50, 93)',
-      shadowOffset: { width: 0, height: 13 },
-      shadowOpacity: 0.25,
-      shadowRadius: 27,
+      shadowColor: look.glow,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.9,
+      shadowRadius: 4,
     },
     android: {
-      elevation: 12,
+      elevation: 6,
     },
   }) : undefined;
 
@@ -265,7 +280,32 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         />
       );
     }
-    return <IconComponent size={iconSize} color={iconColor} />;
+    if (avatarUrl) {
+      // The photo fills the button inside a thin ring of its colour, with an online dot.
+      const dot = Math.max(10, Math.round(size * 0.24));
+      return (
+        <View style={{ width: size, height: size, padding: 3 }}>
+          <Image
+            source={{ uri: avatarUrl }}
+            style={{ flex: 1, backgroundColor: '#fff', borderTopLeftRadius: corners.topLeft, borderTopRightRadius: corners.topRight, borderBottomRightRadius: corners.bottomRight, borderBottomLeftRadius: corners.bottomLeft }}
+            resizeMode="cover"
+          />
+          <View style={{ position: 'absolute', right: size >= 56 ? 2 : 1, bottom: size >= 56 ? 2 : 1, width: dot, height: dot, borderRadius: dot / 2, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#fff' }} />
+        </View>
+      );
+    }
+    const glyph = <IconComponent size={showLabel ? Math.round(size * 0.52) : iconSize} color={iconColor} />;
+    if (showLabel) {
+      return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Math.round(size * 0.16) }}>
+          {glyph}
+          <Text numberOfLines={1} style={{ color: iconColor, fontWeight: '600', fontSize: Math.max(13, Math.min(16, Math.round(size * 0.3))), maxWidth: 220 }}>
+            {look.label}
+          </Text>
+        </View>
+      );
+    }
+    return glyph;
   };
 
   // Render button background (solid or gradient)
@@ -273,7 +313,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     const innerContent = (
       <>
         {/* Open icon */}
-        <Animated.View style={[styles.iconLayer, { opacity: openIconOpacity }]}>
+        <Animated.View style={[showLabel ? null : styles.iconLayer, { opacity: openIconOpacity }]}>
           {renderIcon()}
         </Animated.View>
         {/* Close icon */}
@@ -283,26 +323,39 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
       </>
     );
 
+    // The label pill grows from the button's edge; even padding either side.
+    const labelPad = Math.round((size - Math.round(size * 0.52)) / 2);
     const buttonStyle = {
-      width: size,
+      width: showLabel ? undefined : width,
+      minWidth: showLabel ? size : undefined,
+      paddingHorizontal: showLabel ? labelPad : 0,
       height: size,
-      borderRadius,
+      borderTopLeftRadius: corners.topLeft,
+      borderTopRightRadius: corners.topRight,
+      borderBottomRightRadius: corners.bottomRight,
+      borderBottomLeftRadius: corners.bottomLeft,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
     };
 
-    // Gradient support: RN can't do CSS gradients natively, use widgetIconBgColor as solid fallback
-    const resolvedBg = bgColor;
-
+    const gradient = themeType === 'gradient' && SvgXml;
     return (
-      <View style={[buttonStyle, { backgroundColor: resolvedBg }]}>
+      <View style={[buttonStyle, { backgroundColor: gradient ? gradStart : bgColor }]}>
+        {gradient && SvgXml ? (
+          <View
+            style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderTopLeftRadius: corners.topLeft, borderTopRightRadius: corners.topRight, borderBottomRightRadius: corners.bottomRight, borderBottomLeftRadius: corners.bottomLeft }]}
+            pointerEvents="none"
+          >
+            <SvgXml xml={gradientXml(gradStart, gradEnd)} width="100%" height="100%" />
+          </View>
+        ) : null}
         {innerContent}
       </View>
     );
   };
 
   // CTA offset from edge: FAB offset + FAB size + gap
-  const ctaEdgeOffset = offsetX + size + 10;
+  const ctaEdgeOffset = offsetX - look.tucked + width + 10;
 
   return (
     <>
@@ -331,13 +384,13 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
       <View
         style={[
           styles.fabContainer,
-          position === 'left' ? { left: offsetX } : { right: offsetX },
+          position === 'left' ? { left: offsetX - look.tucked } : { right: offsetX - look.tucked },
           { bottom: offsetBottom },
         ]}
         pointerEvents="box-none"
       >
         {/* FAB Button */}
-        <Animated.View style={[{ transform: [{ scale: scaleAnim }, { rotate }] }, shadowStyle]}>
+        <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, shadowStyle]}>
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={toggleChat}
