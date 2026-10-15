@@ -403,4 +403,17 @@ describe('ChatHeader', () => {
       expect(getByTestId('chat-header')).toBeTruthy();
     });
   });
+
+  describe('status line (#32)', () => {
+    it('shows the reply time on the Online line, under the bot name', () => {
+      const { getByText } = render(<ChatHeader title="Acme" showOnline statusText="Typically replies in a few minutes" />);
+      expect(getByText('Acme')).toBeTruthy();
+      expect(getByText('Typically replies in a few minutes')).toBeTruthy();
+    });
+
+    it('says Online by default', () => {
+      const { getByText } = render(<ChatHeader title="Acme" showOnline />);
+      expect(getByText('Online')).toBeTruthy();
+    });
+  });
 });
