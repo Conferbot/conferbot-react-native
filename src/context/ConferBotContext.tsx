@@ -11,7 +11,8 @@ import type {
   ReadReceiptConfig,
 } from '../types';
 import { SocketEvents } from '../types';
-import type { NodeFlowEngine, ChatState } from '../core';
+import type { NodeFlowEngine } from '../core';
+import { ChatState } from '../core';
 import { deduplicateMessages, trimMessages } from './types';
 import type { ExtendedConferBotContext, ConferBotProviderProps } from './types';
 
@@ -212,6 +213,20 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     config: readReceiptConfig,
     isChatVisible: isOpen,
   });
+
+  // The app's user travels with every record, as the web widget's visitorContext.
+  useEffect(() => {
+    ChatState.visitorContext = user
+      ? {
+          ...(user.metadata || {}),
+          id: user.id,
+          ...(user.name ? { name: user.name } : {}),
+          ...(user.email ? { email: user.email } : {}),
+          ...(user.phone ? { phone: user.phone } : {}),
+          ...(user.hash ? { hash: user.hash } : {}),
+        }
+      : null;
+  }, [user?.id, user?.name, user?.email, user?.phone, user?.hash, user?.metadata]);
 
   // ********** Theme Override Hook ********** //
   // The widget theme (core/widgetTheme): with themeColors "theme" its palette
