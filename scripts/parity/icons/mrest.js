@@ -23,7 +23,7 @@ for (const i of LAUNCHER_ICONS) if (!seen.has(i.anim)) { seen.add(i.anim); pick.
 const cases = [];
 for (const id of LAUNCHER_ICONS.map((i) => i.id)) for (const st of ['idle']) for (const t of TIMES) cases.push({ id, st, t });
 (async () => {
-  const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+  const b = await puppeteer.launch({ executablePath: require('../chrome'), args: ['--no-sandbox'] });
   const p = await b.newPage();
   await p.setViewport({ width: 1400, height: 3000 });
   let html = `<html><body style="margin:0;background:#fff"><style>${CSS}</style>`;
