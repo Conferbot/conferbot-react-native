@@ -84,18 +84,28 @@ const EmailField: React.FC<{
   );
 };
 
-/** The owner's quick actions (and "Talk to a person") above the composer. */
+/**
+ * The owner's quick actions (and "Talk to a person") above the composer,
+ * as on the web (quickActions.ts): from the first AI answer on. "Talk to a
+ * person" only while no handover is under way and nobody is here
+ * (`offerHuman`, core/handoverState.ts talkToPersonAllowed); it goes on tap
+ * and never comes back on the strip, and the owner's links stay.
+ */
 export const QuickActionsStrip: React.FC<{ offerHuman: boolean }> = ({ offerHuman }) => {
   const { s } = useStyles();
   const ctx = useContext(ConferBotContext);
-  // As on the web: from the first AI answer on, and gone once a person answers.
+  // Retired once tapped, or once a handover took it off: an AI reply
+  // arriving mid-handover cannot bring it back.
+  const [humanRetired, setHumanRetired] = useState(false);
   const record = ctx?.record || [];
   const aiAnswered = record.some((r: any) => r?.type === 'agent-message' && isAIAgentDetails(r?.agentDetails));
-  const agent: any = ctx?.currentAgent;
-  const personHere = !!agent && agent.isAIAgent !== true && !String(agent.id || '').startsWith('ai-agent-');
-  if (!aiAnswered || personHere) return null;
+  const offered = offerHuman && ctx?.serverCustomizations?.chatTalkToHuman === true;
+  React.useEffect(() => {
+    if (aiAnswered && !offerHuman) setHumanRetired(true);
+  }, [aiAnswered, offerHuman]);
+  if (!aiAnswered) return null;
   const actions = quickActionsOf(ctx?.serverCustomizations);
-  const human = offerHuman && ctx?.serverCustomizations?.chatTalkToHuman === true;
+  const human = offered && !humanRetired;
   if (!actions.length && !human) return null;
   return (
     <View style={s.strip} accessibilityLabel="Quick actions">
@@ -113,7 +123,15 @@ export const QuickActionsStrip: React.FC<{ offerHuman: boolean }> = ({ offerHuma
         </TouchableOpacity>
       ))}
       {human && (
-        <TouchableOpacity style={s.stripButton} accessibilityRole="button" onPress={() => ctx?.sendMessage?.(TALK_TO_PERSON_ASK)}>
+        <TouchableOpacity
+          style={s.stripButton}
+          accessibilityRole="button"
+          testID="cb-talk-to-person"
+          onPress={() => {
+            setHumanRetired(true);
+            ctx?.sendMessage?.(TALK_TO_PERSON_ASK);
+          }}
+        >
           <Text style={s.stripText}>Talk to a person</Text>
         </TouchableOpacity>
       )}
