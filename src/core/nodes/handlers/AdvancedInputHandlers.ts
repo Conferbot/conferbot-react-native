@@ -1,508 +1,271 @@
 /**
  * AdvancedInputHandlers.ts
  *
- * Advanced Input Node Handlers for the Conferbot React Native SDK.
- * Handles complex input nodes: calendar, multiple questions.
+ * calendar-node and ask-multiple-questions-node, per the flow-node spec and
+ * the web widget (ts/chat/displayStep.ts calendar-node,
+ * handlers/askQuestions.ts _handleAskMultipleQuestions*).
  */
 
-import {
-  BaseNodeHandler,
-  NodeResult,
-  NodeUIState,
-  NodeHandler,
-} from '../NodeHandler';
+import { BaseNodeHandler, NodeResult, NodeUIState, NodeHandler } from '../NodeHandler';
 import { ChatState } from '../../state/ChatState';
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
 import { DisplayNodes } from '../NodeTypes';
+import { ctxOf } from '../../flow/context';
+import { fillVariables } from '../../flow/text';
+import { EN, isValidEmail, isValidPhone, normalizePhone, ownerTextOr, phoneErrorText } from '../../flow/inputs';
+import {
+  dayKeyInZone,
+  dayNameInZone,
+  expandSlots,
+  futureSlots,
+  hhmmInZone,
+  longDate,
+  noonInZone,
+  slotLabel,
+  visitorTimeZone,
+  wallTimeInZone,
+} from '../../flow/calendar';
+import { botSay, pushAnswer, shownText, typedText, userSay } from './flowKit';
 
 // ========================================
-// CALENDAR HANDLER
+// CALENDAR
 // ========================================
+
+/** Days offered ahead of today. */
+const CALENDAR_DAYS = 90;
 
 /**
- * Handles 'calendar' nodes - date/time picker with optional time slots
+ * calendar-node: a month calendar on the bot's clock (data.timeZone, default
+ * UTC). Without time selection the picked day is saved as the visitor's long
+ * date ("Tuesday, October 20, 2026"); with it, the day's weeklyHours cut into
+ * slotDuration slots, and the saved value names both clocks. Moves on 400 ms
+ * after the pick. Answer: {date: "YYYY-MM-DD", slot?: "HH:MM"} (slot start on
+ * the bot's clock; `time` is read the same).
  */
 export class CalendarHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.CALENDAR;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Calendar node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get question
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   this.getString(data, 'message') ||
-                   'Please select a date';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'selectedDate';
-
-    // Mode: date, time, datetime, dateRange
-    let mode: NodeUIState.Calendar['mode'] = 'date';
-    const modeValue = this.getString(data, 'mode') ||
-                      this.getString(data, 'type', 'date');
-
-    if (['date', 'time', 'datetime', 'dateRange'].includes(modeValue)) {
-      mode = modeValue as NodeUIState.Calendar['mode'];
-    }
-
-    // Date constraints
-    const minDate = this.getString(data, 'minDate', '');
-    const maxDate = this.getString(data, 'maxDate', '');
-
-    // Time slots (for appointment scheduling)
-    const availableSlots = this.getArray<any>(data, 'availableSlots', []);
-    const showTimeSlots = this.getBoolean(data, 'showTimeSlots') ||
-                          availableSlots.length > 0;
-
-    // Process available slots
-    const processedSlots: NodeUIState.Calendar['availableSlots'] = availableSlots.map((slot: any) => ({
-      date: slot.date || slot.day,
-      times: Array.isArray(slot.times) ? slot.times : (slot.time ? [slot.time] : []),
-    }));
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Calendar = {
-      type: 'calendar',
-      nodeId,
-      question,
-      variableName,
-      mode,
-      minDate: minDate || undefined,
-      maxDate: maxDate || undefined,
-      availableSlots: processedSlots.length > 0 ? processedSlots : undefined,
-      showTimeSlots,
-    };
-
-    return NodeResult.displayUI(uiState);
+  private zone(data: any): string {
+    return String(data?.timeZone || 'UTC');
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
+  /** A day's bookable slots on the bot's clock. */
+  private slotsFor(data: any, dayKey: string, now: Date): ReturnType<typeof expandSlots> {
+    const zone = this.zone(data);
+    const dayName = dayNameInZone(noonInZone(dayKey, zone), zone);
+    const schedule = (Array.isArray(data?.weeklyHours) ? data.weeklyHours : []).find((d: any) => d?.dayName === dayName);
+    if (!schedule?.available) return [];
+    return futureSlots(expandSlots(schedule.slots, data?.slotDuration, data?.bufferMinutes), dayKey, zone, now);
+  }
+
+  private dayOpen(data: any, dayKey: string): boolean {
+    const zone = this.zone(data);
+    const dayName = dayNameInZone(noonInZone(dayKey, zone), zone);
+    const excludedDays = (Array.isArray(data?.excludeDays) ? data.excludeDays : []).map((d: any) => String(d).toLowerCase());
+    const excludedDates = Array.isArray(data?.excludeDates) ? data.excludeDates.map(String) : [];
+    return !excludedDays.includes(dayName.toLowerCase()) && !excludedDates.includes(dayKey);
+  }
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Calendar {
+    const data = node.data || {};
+    const zone = this.zone(data);
+    const now = new Date();
+    const today = dayKeyInZone(now, zone);
+    const showTime = !!data.showTimeSelection;
+    const availableSlots: NodeUIState.Calendar['availableSlots'] = [];
+    if (showTime) {
+      for (let i = 0; i < CALENDAR_DAYS; i++) {
+        const key = dayKeyInZone(new Date(noonInZone(today, zone).getTime() + i * 86400000), zone);
+        if (!this.dayOpen(data, key)) continue;
+        const slots = this.slotsFor(data, key, now);
+        if (slots.length) availableSlots.push({ date: key, times: slots.map((s) => s.start) });
+      }
+    }
+    return {
+      type: 'calendar',
+      nodeId: this.getNodeId(node),
+      question: shownText(state, data.calendarPrompt),
+      variableName: data.answerVariable,
+      mode: showTime ? 'datetime' : 'date',
+      minDate: data.showPastDates ? undefined : today,
+      availableSlots: showTime ? availableSlots : undefined,
+      showTimeSlots: showTime,
+    };
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = node.data || {};
     const nodeId = this.getNodeId(node);
+    const botZone = this.zone(data);
+    const visitorZone = ctxOf(node, state).visitorTimeZone || visitorTimeZone();
+    const dateString = String(response?.date || response?.selectedDate || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return NodeResult.displayUI(this.ui(node, state));
 
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'selectedDate';
+    const showTime = !!data.showTimeSelection;
+    const slotStart = String(response?.slot || response?.time || '').trim();
+    const ctx = ctxOf(node, state);
 
-    if (!response) {
-      const required = this.getBoolean(data || {}, 'required', true);
-      if (required) {
-        return NodeResult.error('Please select a date', true);
-      }
-    }
-
-    // Parse and validate the response
-    let dateValue: any;
-    let displayText: string;
-
-    if (typeof response === 'object') {
-      // Could be { date, time } or { startDate, endDate } for ranges
-      if (response.startDate && response.endDate) {
-        dateValue = {
-          startDate: response.startDate,
-          endDate: response.endDate,
-        };
-        displayText = `${this.formatDate(response.startDate)} - ${this.formatDate(response.endDate)}`;
-      } else {
-        dateValue = {
-          date: response.date || response.selectedDate,
-          time: response.time || response.selectedTime,
-        };
-        displayText = response.time
-          ? `${this.formatDate(response.date)} at ${response.time}`
-          : this.formatDate(response.date);
-      }
+    let value: string;
+    let record: Record<string, any>;
+    if (!showTime) {
+      const botDate = noonInZone(dateString, botZone);
+      const visitorDate = noonInZone(dateString, visitorZone);
+      const date = longDate(botDate, botZone);
+      const localDate = longDate(visitorDate, visitorZone);
+      record = { date: localDate || date, selectedDate: dateString, botTimeZone: botZone, visitorTimeZone: visitorZone, showTimeSelection: false };
+      value = localDate || date;
+      userSay(state, value, nodeId);
     } else {
-      // Simple date string
-      dateValue = response;
-      displayText = this.formatDate(response);
-    }
-
-    // Validate date constraints
-    const minDate = this.getString(data || {}, 'minDate', '');
-    const maxDate = this.getString(data || {}, 'maxDate', '');
-
-    const dateToCheck = typeof dateValue === 'object'
-      ? (dateValue.date || dateValue.startDate)
-      : dateValue;
-
-    if (minDate && dateToCheck) {
-      const min = new Date(minDate);
-      const selected = new Date(dateToCheck);
-      if (!isNaN(min.getTime()) && !isNaN(selected.getTime()) && selected < min) {
-        return NodeResult.error(`Please select a date on or after ${minDate}`, true);
-      }
-    }
-
-    if (maxDate && dateToCheck) {
-      const max = new Date(maxDate);
-      const selected = new Date(dateToCheck);
-      if (!isNaN(max.getTime()) && !isNaN(selected.getTime()) && selected > max) {
-        return NodeResult.error(`Please select a date on or before ${maxDate}`, true);
-      }
-    }
-
-    state.setAnswer(nodeId, variableName, dateValue, nodeId);
-    state.addUserMessage(displayText, nodeId);
-
-    // Record the slot selection on the server when a time slot was chosen
-    // (mirrors the web widget's 'calendar-slot-selection-record' emit)
-    const selectedTime = typeof dateValue === 'object' ? dateValue.time : undefined;
-    if (selectedTime) {
-      const socketClient = (data as any)?.socketClient;
-      const selectionPayload = {
+      const slots = this.slotsFor(data, dateString, new Date());
+      const slot = slots.find((s) => s.start === slotStart);
+      if (!slot) return NodeResult.displayUI(this.ui(node, state));
+      const botDate = noonInZone(dateString, botZone);
+      const visitorDate = noonInZone(dayKeyInZone(botDate, botZone), visitorZone);
+      const date = longDate(botDate, botZone);
+      const localDate = longDate(visitorDate, visitorZone);
+      const visitorStart = hhmmInZone(wallTimeInZone(dateString, slot.start, botZone), visitorZone);
+      const visitorEnd = hhmmInZone(wallTimeInZone(dateString, slot.end, botZone), visitorZone);
+      const timeSlotSelected = slotLabel(slot);
+      const visitorTime = `${visitorStart} - ${visitorEnd}`;
+      record = {
+        date: localDate || date,
+        selectedDate: botDate.toISOString(),
+        botTimeZone: botZone,
+        visitorTimeZone: visitorZone,
+        showTimeSelection: true,
+        timeSlotSelected,
+        visitorTime,
+      };
+      value = `${localDate || date} ${visitorTime} (Visitor's local time) / ${timeSlotSelected} (Bot's time)`;
+      userSay(state, `${localDate}, ${visitorTime} (Your local time)`, nodeId);
+      ctx.emit('calendar-slot-selection-record', {
         visitorId: state.getVariable('_visitorId') || state.sessionId,
         chatbotId: state.botId,
         nodeId,
-        selectedDate: dateToCheck,
-        botTimeZone: this.getString(data || {}, 'timeZone') ||
-                     this.getString(data || {}, 'botTimeZone') ||
-                     this.getString(data || {}, 'timezone', 'UTC'),
-        visitorTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        timeSlotSelected: selectedTime,
-        visitorTime: selectedTime,
-      };
-
-      if (typeof socketClient?.calendarSlotSelectionRecord === 'function') {
-        socketClient.calendarSlotSelectionRecord(selectionPayload);
-      } else if (typeof socketClient?.emitToServer === 'function') {
-        socketClient.emitToServer('calendar-slot-selection-record', selectionPayload);
-      }
+        selectedDate: record.selectedDate,
+        botTimeZone: botZone,
+        visitorTimeZone: visitorZone,
+        timeSlotSelected,
+        visitorTime,
+      });
     }
-
-    return this.proceed(node, { [variableName]: dateValue });
-  }
-
-  /**
-   * Formats a date for display
-   */
-  private formatDate(dateStr: any): string {
-    if (!dateStr) return '';
-    try {
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return String(dateStr);
-      return date.toLocaleDateString();
-    } catch {
-      return String(dateStr);
-    }
+    pushAnswer(state, { id: nodeId, shape: 'user-calendar-selection', data: record });
+    state.setAnswerVariable(nodeId, value);
+    return NodeResult.delayedProceed(null, 400);
   }
 }
 
 // ========================================
-// MULTIPLE QUESTIONS HANDLER
+// MULTIPLE QUESTIONS
 // ========================================
 
 /**
- * Question definition for multiple questions form
- */
-interface FormQuestion {
-  id: string;
-  question: string;
-  type: 'text' | 'email' | 'phone' | 'number' | 'date' | 'select' | 'multiselect';
-  variableName: string;
-  required?: boolean;
-  placeholder?: string;
-  options?: Array<{ label: string; value: any }>;
-  validation?: Record<string, any>;
-}
-
-/**
- * Handles 'multiplequestions' nodes - multi-field form
+ * ask-multiple-questions-node: data.message, then each of data.questions in
+ * turn after 2000 ms of typing. An "email" answer is checked as an e-mail,
+ * "phone" / "mobile" as a phone (saved normalised). Each answer fills the
+ * variable registered as nodeId + index and is recorded as
+ * "<nodeId>:<questionId>". After the last one, the first edge.
  */
 export class MultipleQuestionsHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.ASK_MULTIPLE_QUESTIONS;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Multiple Questions node has no data');
-    }
+  private questions(node: Record<string, any>): any[] {
+    return Array.isArray(node.data?.questions) ? node.data.questions : [];
+  }
 
+  private indexKey(node: Record<string, any>): string {
+    return `_mq_${this.getNodeId(node)}`;
+  }
+
+  private ui(node: Record<string, any>, state: ChatState, index: number): NodeUIState.TextInput {
+    const q = this.questions(node)[index] || {};
+    const variable = String(q.answerVariable || '').toLowerCase();
+    const inputType = variable === 'email' ? 'email' : variable === 'phone' || variable === 'mobile' ? 'phone' : 'text';
+    return { ...NodeUIState.textInput(this.getNodeId(node), shownText(state, q.questionText), q.answerVariable || '', inputType), awaitInput: true };
+  }
+
+  /** Ask question `index` (2000 ms of typing first). */
+  private async ask(node: Record<string, any>, state: ChatState, index: number): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
-
-    // Get form title
-    let title = this.getString(data, 'title') ||
-                this.getString(data, 'heading', '');
-
-    title = title ? this.resolveText(title, state) : '';
-
-    // Get questions array
-    const questionsData = this.getArray<any>(data, 'questions', []) ||
-                          this.getArray<any>(data, 'fields', []) ||
-                          this.getArray<any>(data, 'inputs', []);
-
-    if (questionsData.length === 0) {
-      return this.createError('Multiple Questions node has no questions');
-    }
-
-    // Map questions to standard format
-    const questions: NodeUIState.MultipleQuestions['questions'] = questionsData.map((q: any, index: number) => {
-      const id = q.id || q._id || `field_${index}`;
-      let questionText = q.question || q.label || q.text || `Field ${index + 1}`;
-      questionText = this.resolveText(questionText, state);
-
-      // Determine field type
-      let fieldType: FormQuestion['type'] = 'text';
-      const typeValue = (q.type || q.inputType || 'text').toLowerCase();
-
-      const typeMap: Record<string, FormQuestion['type']> = {
-        text: 'text',
-        string: 'text',
-        email: 'email',
-        phone: 'phone',
-        tel: 'phone',
-        number: 'number',
-        numeric: 'number',
-        date: 'date',
-        select: 'select',
-        dropdown: 'select',
-        multiselect: 'multiselect',
-        multi: 'multiselect',
-      };
-
-      if (typeMap[typeValue]) {
-        fieldType = typeMap[typeValue];
-      }
-
-      // Get variable name
-      const variableName = q.variableName || q.variable || q.name || id;
-
-      // Get placeholder
-      let placeholder = q.placeholder || '';
-      placeholder = placeholder ? this.resolveText(placeholder, state) : '';
-
-      // Get options for select/multiselect
-      let options: Array<{ label: string; value: any }> | undefined;
-      if (fieldType === 'select' || fieldType === 'multiselect') {
-        const optionsData = q.options || q.choices || [];
-        options = optionsData.map((opt: any, optIndex: number) => {
-          if (typeof opt === 'string') {
-            return { label: opt, value: opt };
-          }
-          return {
-            label: this.resolveText(opt.label || opt.text || `Option ${optIndex + 1}`, state),
-            value: opt.value ?? opt.label,
-          };
-        });
-      }
-
-      // Build validation
-      const validation: Record<string, any> = {};
-      if (q.minLength) validation.minLength = q.minLength;
-      if (q.maxLength) validation.maxLength = q.maxLength;
-      if (q.min) validation.min = q.min;
-      if (q.max) validation.max = q.max;
-      if (q.pattern) validation.pattern = q.pattern;
-
-      return {
-        id,
-        question: questionText,
-        type: fieldType,
-        variableName,
-        required: q.required !== false,
-        placeholder: placeholder || undefined,
-        options,
-        validation: Object.keys(validation).length > 0 ? validation : undefined,
-      };
-    });
-
-    // Submit button label
-    let submitLabel = this.getString(data, 'submitLabel') ||
-                      this.getString(data, 'buttonText') ||
-                      'Submit';
-    submitLabel = this.resolveText(submitLabel, state);
-
-    // Add to transcript
-    const transcriptText = title || 'Please fill out the following form:';
-    state.addBotMessage(transcriptText, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.MultipleQuestions = {
-      type: 'multipleQuestions',
+    const questions = this.questions(node);
+    const q = questions[index] || {};
+    await ctxOf(node, state).typing(2000);
+    state.setVariable(this.indexKey(node), index);
+    const label = questions.length > 1 ? `Question ${index + 1} of ${questions.length}\n` : '';
+    botSay(state, `${label}${shownText(state, q.questionText)}`, nodeId, this.nodeType);
+    state.addRecord({
+      _id: `${nodeId}:${q.id ?? index}`,
+      id: `${nodeId}:${q.id ?? index}`,
       nodeId,
-      title: title || undefined,
-      questions,
-      submitLabel,
-    };
-
-    return NodeResult.displayUI(uiState);
+      questionId: q.id ?? String(index),
+      answerVariable: q.answerVariable,
+      shape: 'ask-multiple-questions-question',
+      type: 'ask-multiple-questions-question',
+      questionText: q.questionText,
+      renderedText: fillVariables(q.questionText, (k) => state.lookupVariable(k)),
+      time: new Date().toISOString(),
+    });
+    return NodeResult.displayUI(this.ui(node, state, index));
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
-
-    if (!response || typeof response !== 'object') {
-      return NodeResult.error('Please fill out all required fields', true);
-    }
-
-    // Get questions for validation
-    const questionsData = this.getArray<any>(data || {}, 'questions', []) ||
-                          this.getArray<any>(data || {}, 'fields', []);
-
-    // Validate each required field
-    for (const q of questionsData) {
-      const variableName = q.variableName || q.variable || q.name || q.id;
-      const value = response[variableName];
-      const isRequired = q.required !== false;
-
-      if (isRequired && (value === undefined || value === null || value === '')) {
-        const label = q.question || q.label || variableName;
-        return NodeResult.error(`Please fill out: ${label}`, true);
-      }
-
-      // Type-specific validation
-      if (value !== undefined && value !== null && value !== '') {
-        const validation = this.validateFieldValue(value, q);
-        if (!validation.valid) {
-          return NodeResult.error(validation.message || 'Invalid value', true);
-        }
-      }
-    }
-
-    // Store all answers
-    const storedData: Record<string, any> = {};
-
-    for (const q of questionsData) {
-      const variableName = q.variableName || q.variable || q.name || q.id;
-      const value = response[variableName];
-
-      if (value !== undefined) {
-        state.setAnswer(nodeId, variableName, value, nodeId);
-        storedData[variableName] = value;
-
-        // Update user metadata for known fields
-        this.updateUserMetadata(state, variableName, value);
-      }
-    }
-
-    // Add to transcript (summarized)
-    const fieldCount = Object.keys(storedData).length;
-    state.addUserMessage(`[Form submitted: ${fieldCount} field(s)]`, nodeId);
-
-    return this.proceed(node, storedData);
+    const message = shownText(state, node.data?.message);
+    if (message) botSay(state, message, nodeId, this.nodeType);
+    ctxOf(node, state).shown();
+    if (!this.questions(node).length) return NodeResult.next();
+    return this.ask(node, state, 0);
   }
 
-  /**
-   * Validates a field value based on its type
-   */
-  private validateFieldValue(
-    value: any,
-    question: any
-  ): { valid: boolean; message?: string } {
-    const type = (question.type || 'text').toLowerCase();
-
-    switch (type) {
-      case 'email':
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(String(value))) {
-          return { valid: false, message: 'Please enter a valid email address' };
-        }
-        break;
-
-      case 'phone':
-        const phonePattern = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
-        if (!phonePattern.test(String(value))) {
-          return { valid: false, message: 'Please enter a valid phone number' };
-        }
-        break;
-
-      case 'number':
-        const num = parseFloat(String(value));
-        if (isNaN(num)) {
-          return { valid: false, message: 'Please enter a valid number' };
-        }
-        if (question.min !== undefined && num < question.min) {
-          return { valid: false, message: `Value must be at least ${question.min}` };
-        }
-        if (question.max !== undefined && num > question.max) {
-          return { valid: false, message: `Value must be at most ${question.max}` };
-        }
-        break;
-
-      case 'date':
-        const date = new Date(value);
-        if (isNaN(date.getTime())) {
-          return { valid: false, message: 'Please enter a valid date' };
-        }
-        break;
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const nodeId = this.getNodeId(node);
+    const questions = this.questions(node);
+    const index = Number(state.getVariable(this.indexKey(node)) ?? 0);
+    const q = questions[index] || {};
+    let value = typedText(response);
+    if (!value) return NodeResult.displayUI(this.ui(node, state, index));
+    const variable = String(q.answerVariable || '');
+    if (variable === 'email' && !isValidEmail(value)) {
+      return NodeResult.invalid(ownerTextOr(node.data?.incorrectEmailResponse, EN.emailInvalid, ['Please enter a valid email']), this.ui(node, state, index));
     }
-
-    // Check string length constraints
-    if (question.minLength && String(value).length < question.minLength) {
-      return { valid: false, message: `Minimum ${question.minLength} characters required` };
+    if (variable === 'mobile' || variable === 'phone') {
+      if (!isValidPhone(value)) return NodeResult.invalid(phoneErrorText(node.data), this.ui(node, state, index));
+      value = normalizePhone(value);
     }
-    if (question.maxLength && String(value).length > question.maxLength) {
-      return { valid: false, message: `Maximum ${question.maxLength} characters allowed` };
-    }
+    if (variable === 'name') state.setUserName(value);
+    if (variable === 'email') state.setUserEmail(value);
+    if (variable === 'phone' || variable === 'mobile') state.setUserPhone(value);
 
-    // Custom pattern
-    if (question.pattern) {
-      try {
-        const regex = new RegExp(question.pattern);
-        if (!regex.test(String(value))) {
-          return { valid: false, message: 'Invalid format' };
-        }
-      } catch {
-        // Invalid regex, skip
-      }
-    }
+    pushAnswer(state, {
+      id: `${nodeId}:${q.id ?? index}`,
+      nodeId,
+      questionId: q.id ?? String(index),
+      answerVariable: q.answerVariable,
+      shape: 'user-ask-multiple-questions-question-response',
+      type: 'user-ask-multiple-questions-question-response',
+      text: value,
+    });
+    state.setAnswerVariable(`${nodeId}${index}`, value);
+    userSay(state, value, nodeId);
 
-    return { valid: true };
-  }
-
-  /**
-   * Updates user metadata for known field types
-   */
-  private updateUserMetadata(state: ChatState, variableName: string, value: any): void {
-    const lowerName = variableName.toLowerCase();
-
-    if (lowerName.includes('name') && !lowerName.includes('last') && !lowerName.includes('company')) {
-      state.setUserName(String(value));
-    } else if (lowerName.includes('email')) {
-      state.setUserEmail(String(value));
-    } else if (lowerName.includes('phone') || lowerName.includes('tel') || lowerName.includes('mobile')) {
-      state.setUserPhone(String(value));
-    }
+    if (index + 1 < questions.length) return this.ask(node, state, index + 1);
+    state.deleteVariable(this.indexKey(node));
+    return NodeResult.next();
   }
 }
 
 // ========================================
-// ADVANCED INPUT HANDLER COLLECTION
+// REGISTRATION
 // ========================================
 
-/**
- * Array of all advanced input node handlers
- */
-export const advancedInputHandlers: NodeHandler[] = [
-  new CalendarHandler(),
-  new MultipleQuestionsHandler(),
-];
+export const advancedInputHandlers: NodeHandler[] = [new CalendarHandler(), new MultipleQuestionsHandler()];
 
-/**
- * Registers all advanced input node handlers with the registry
- */
 export function registerAdvancedInputHandlers(registry: NodeHandlerRegistry): void {
   registry.registerAll(advancedInputHandlers);
 }
