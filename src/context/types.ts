@@ -1,6 +1,7 @@
 // @ts-nocheck
 import type { ResolvedCustomizations } from '../core/customizations';
 import type { ResolvedWidgetTheme } from '../core/widgetTheme';
+import type { WidgetSignalDetail, WidgetSignalName } from '../core/handoverWaiting';
 import type {
   ConferBotConfig,
   ConferBotUser,
@@ -137,6 +138,17 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   skipLeaveMessage: () => void;
   dismissCsat: () => void;
   dismissFileRequest: () => void;
+  /**
+   * Leave the queue (the wait card's Cancel): queue-self-resolve, then the
+   * flow carries on. False when a person already picked the chat up.
+   */
+  leaveQueue: () => Promise<boolean>;
+  /**
+   * Listen to the web widget's waiting signals: 'cb:waiting-for-human'
+   * (also 20s into a wait with nobody yet), 'cb:human-joined',
+   * 'cb:wait-over'. Returns the unsubscribe.
+   */
+  onWidgetSignal: (name: WidgetSignalName, fn: (detail: WidgetSignalDetail) => void) => () => void;
 }
 
 // ********** Extended Config Types ********** //
