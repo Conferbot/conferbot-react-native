@@ -195,8 +195,18 @@ export function useHandoverLifecycle({
     [add]
   );
 
-  /** Out of the queue: the line, the record, the signal, the flow moves on. */
+  // Left this wait already: the server answers queue-self-resolve and also
+  // sends queue-left, so one Cancel can arrive twice (#65, as iOS #63).
+  // A new wait clears it.
+  const leftRef = useRef(false);
+  useEffect(() => {
+    if (waitingForPerson) leftRef.current = false;
+  }, [waitingForPerson]);
+
+  /** Out of the queue: the line, the record, the signal, the flow moves on (once per wait). */
   const leftQueue = useCallback(() => {
+    if (leftRef.current) return;
+    leftRef.current = true;
     waitOver('cancelled');
     settle('cancelled');
     const id = entryId('queue-self-resolved');
