@@ -43,6 +43,12 @@ export interface ChatHeaderProps {
   hideLogo?: boolean;
   /** The green "Online" line under the title (off with hideOnlineStatus or a tagline). */
   showOnline?: boolean;
+  /**
+   * The words on that line: "Online", or the team's reply time ("Typically
+   * replies in a few minutes", "Online · team back at 9 AM";
+   * core/replyTime.ts headerStatus). Default "Online".
+   */
+  statusText?: string;
   showConnectionStatus?: boolean;
   onClose?: () => void;
   onAvatarPress?: () => void;
@@ -78,6 +84,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   logoUrl,
   hideLogo = false,
   showOnline = false,
+  statusText = 'Online',
   showConnectionStatus = true,
   onClose,
   onAvatarPress,
@@ -146,9 +153,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         )}
 
         {!tagline && !displaySubtitle && showOnline && (
-          <View style={styles.onlineRow} accessible accessibilityLabel="Online">
+          <View style={styles.onlineRow} accessible accessibilityLabel={statusText}>
             <View style={styles.onlineDot} />
-            <Text style={styles.subtitle}>Online</Text>
+            <Text style={[styles.subtitle, { flexShrink: 1 }]} numberOfLines={1}>{statusText}</Text>
           </View>
         )}
 
