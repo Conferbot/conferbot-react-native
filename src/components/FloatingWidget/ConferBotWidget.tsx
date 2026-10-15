@@ -14,6 +14,7 @@ import { ChatWidget } from '../ChatWidget/ChatWidget';
 import type { ChatWidgetProps } from '../ChatWidget/ChatWidget';
 import { getBubbleIcon, CloseIcon } from './WidgetBubbleIcons';
 import { resolveLauncher } from '../../core/launcher';
+import { launcherIconSvg } from '../../core/launcherIcons';
 
 // react-native-svg draws a gradient launcher when the app has it; else its first colour.
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
@@ -294,7 +295,13 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         </View>
       );
     }
-    const glyph = <IconComponent size={showLabel ? Math.round(size * 0.52) : iconSize} color={iconColor} />;
+    const glyphSize = showLabel ? Math.round(size * 0.52) : iconSize;
+    // The web's launcher icons (core/launcherIcons) when react-native-svg is there; else the simple set.
+    const glyph = SvgXml ? (
+      <SvgXml xml={launcherIconSvg(iconName, iconColor, look.solid, glyphSize)} width={glyphSize} height={glyphSize} />
+    ) : (
+      <IconComponent size={glyphSize} color={iconColor} />
+    );
     if (showLabel) {
       return (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Math.round(size * 0.16) }}>
@@ -318,7 +325,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         </Animated.View>
         {/* Close icon */}
         <Animated.View style={[styles.iconLayer, { opacity: closeIconOpacity }]}>
-          <CloseIcon size={iconSize} color={iconColor} />
+          <CloseIcon size={Math.round(size * 0.6)} color={iconColor} />
         </Animated.View>
       </>
     );
