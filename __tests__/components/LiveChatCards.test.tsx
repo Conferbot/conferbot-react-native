@@ -49,13 +49,37 @@ describe('LiveChatCards', () => {
     expect(queryByText('Talk to a person')).toBeNull();
   });
 
-  it('shows quick actions only from the first AI answer, and not with a person', () => {
-    const serverCustomizations = { chatQuickActions: [{ label: 'Pricing', url: 'https://x.co/p' }] };
+  it('shows quick actions only from the first AI answer; the owner\'s links stay with a person', () => {
+    const serverCustomizations = { chatQuickActions: [{ label: 'Pricing', url: 'https://x.co/p' }], chatTalkToHuman: true };
     expect(withContext(<QuickActionsStrip offerHuman />, { serverCustomizations, record: [] }).queryByText(/Pricing/)).toBeNull();
-    expect(
-      withContext(<QuickActionsStrip offerHuman />, { serverCustomizations, record: AI_ANSWER, currentAgent: { id: 'u1', name: 'Sam', isAIAgent: false } }).queryByText(/Pricing/)
-    ).toBeNull();
+    // A person is here (offerHuman false): the links stay, Talk to a person goes.
+    const withPerson = withContext(<QuickActionsStrip offerHuman={false} />, { serverCustomizations, record: AI_ANSWER });
+    expect(withPerson.queryByText(/Pricing/)).toBeTruthy();
+    expect(withPerson.queryByText('Talk to a person')).toBeNull();
     expect(withContext(<QuickActionsStrip offerHuman />, { serverCustomizations, record: AI_ANSWER }).queryByText(/Pricing/)).toBeTruthy();
+  });
+
+  it('Talk to a person goes on tap and never comes back on the strip (#30)', () => {
+    const value = { serverCustomizations: { chatTalkToHuman: true }, record: AI_ANSWER, sendMessage: jest.fn() };
+    const view = withContext(<QuickActionsStrip offerHuman />, value);
+    fireEvent.press(view.getByText('Talk to a person'));
+    expect(value.sendMessage).toHaveBeenCalledTimes(1);
+    expect(view.queryByText('Talk to a person')).toBeNull();
+
+    // Taken off while connecting: an AI reply mid-handover cannot bring it back.
+    const rerendered = withContext(<QuickActionsStrip offerHuman />, value);
+    expect(rerendered.getByText('Talk to a person')).toBeTruthy();
+    const wrap = (offer: boolean) => (
+      <ThemeProvider>
+        <ConferBotContext.Provider value={value as any}>
+          <QuickActionsStrip offerHuman={offer} />
+        </ConferBotContext.Provider>
+      </ThemeProvider>
+    );
+    rerendered.rerender(wrap(false));
+    expect(rerendered.queryByText('Talk to a person')).toBeNull();
+    rerendered.rerender(wrap(true));
+    expect(rerendered.queryByText('Talk to a person')).toBeNull();
   });
 
   it('shows the queue line, not while the handover step shows it', () => {
