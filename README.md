@@ -30,7 +30,7 @@ The complete flow recorded live on an Android emulator against production: open 
 - **Real-time Messaging** - Socket.IO-based communication with automatic reconnection
 - **Node Flow Engine** - Renders the interactive flows you build in the Conferbot flow builder (choices, inputs, cards, and more)
 - **Server-driven Theming** - Colors, bot name, and avatar configured in the dashboard apply automatically
-- **Live Agent Handover** - Seamless transition between bot and human agents, with agent typing indicators
+- **Live Agent Handover** - Seamless transition between bot and human agents, as on the web widget: a "Connecting you with the team…" line that settles to how the wait ended, the queue, leaving it, agent typing indicators, and a live chat picked back up after an app restart
 - **Offline Support** - Messages are queued locally and retried when connectivity returns
 - **Session Persistence** - Conversations survive app restarts via AsyncStorage
 - **Push Token Registration** - Register device tokens for background message delivery
@@ -478,6 +478,35 @@ useEffect(() => {
 
 Key server events: `BOT_RESPONSE`, `AGENT_MESSAGE`, `AGENT_ACCEPTED`, `AGENT_LEFT`, `AGENT_TYPING_STATUS`, `CHAT_ENDED`, `CONNECTION_ERROR`.
 
+### Waiting for a person
+
+While a visitor waits for the team, the SDK gives the same signals as the web widget, for your own waiting experience (a game, an article, a banner). `onWidgetSignal()` returns an unsubscribe function. No detail carries personal data.
+
+```tsx
+import { useConferBot, WAITING_FOR_HUMAN_EVENT, HUMAN_JOINED_EVENT, WAIT_OVER_EVENT } from '@conferbot/react-native';
+
+const { onWidgetSignal } = useConferBot();
+
+useEffect(() => {
+  const offs = [
+    // 20s into a wait with nobody yet (only while the chat is open), or the
+    // server's own word that the team is busy or offline.
+    onWidgetSignal(WAITING_FOR_HUMAN_EVENT, (d) => console.log('waiting', d)), // { offline, reason, backAt, emailCaptured }
+    onWidgetSignal(HUMAN_JOINED_EVENT, (d) => console.log('joined', d)),       // { name }
+    onWidgetSignal(WAIT_OVER_EVENT, (d) => console.log('over', d)),            // { reason: 'unavailable' | 'cancelled' | 'ended' }
+  ];
+  return () => offs.forEach((off) => off());
+}, [onWidgetSignal]);
+```
+
+How a handover reads in the chat:
+
+- An AI agent passing the visitor to the team draws "Connecting you with the team…" with typing dots, never "has left the chat". The line settles to "Connected with the team", "The team couldn't join just now", "You left the queue" or "Chat ended before the team joined".
+- "Talk to a person" is offered only while no handover is under way and nobody is in the chat. It goes once tapped; the owner's quick-action links stay.
+- The header keeps the bot's name with "Online" and the team's reply time ("Typically replies in a few minutes", "Online · team back at 9 AM"), and goes back to "Online" when a person joins.
+- Cancel on the wait card leaves the queue on the server (`queue-self-resolve`), so the team stops seeing the visitor waiting. `leaveQueue()` does the same from your own UI.
+- After an app restart the SDK asks the server where the chat stands (`live-chat-state`): a person's chat comes back live with its agent, a visitor still in the queue goes back to the same wait, and a chat that ended meanwhile says so.
+
 ## Custom Endpoints
 
 By default the SDK talks to production at `https://wdt.conferbot.com` (REST base `https://wdt.conferbot.com/api/v1/mobile`). Point it elsewhere (self-hosted, staging, or a local embed-server) before rendering the provider:
@@ -502,7 +531,7 @@ ConferBotEndpoints.configure({
 | `ConferBotWithAnalyticsProvider` | provider props + `appVersion?`, `buildNumber?`, analytics `config` | Provider variant with analytics wired in |
 | `ConferBotWidget` | `widgetConfig?: WidgetConfig` + all `ChatWidgetProps` | Floating bubble (FAB) + chat modal, web-widget style |
 | `ChatWidget` | `visible?`, `onClose?`, `title?`, `placeholder?`, `enableAttachments?`, `enableVoiceMessage?`, `showTimestamps?`, `closeOnBackdrop?`, `typingDelay?`, `voiceMaxDuration?`, `voiceMinDuration?`, `debug?`, `testID?` | Drop-in full-screen chat modal with node flow engine |
-| `ChatHeader` | `title?`, `tagline?`, `subtitle?`, `agent?: Agent`, `botAvatarUrl?`, `showConnectionStatus?`, `onClose?`, `rightActions?` | Chat header with avatar, agent info, connection dot |
+| `ChatHeader` | `title?`, `tagline?`, `subtitle?`, `showOnline?`, `statusText?`, `agent?: Agent`, `botAvatarUrl?`, `showConnectionStatus?`, `onClose?`, `rightActions?` | Chat header with avatar, status line ("Online" or the reply time), connection dot. The built-in widgets keep the bot in the header and never pass `agent`. |
 | `MessageList` | `messages: RecordItem[]`, `showTypingIndicator?`, `showTimestamps?`, `reactions?`, `messageStatuses?`, `activeNodeUI?`, `onNodeSubmit?`, `onEndReached?` | Virtualized message list with inline node rendering |
 | `MessageBubble` | see `MessageBubbleProps` | Single message bubble (user/bot/agent/system) |
 | `ChatInput` | `onSend: (text: string) => void \| Promise<void>`, `placeholder?`, `disabled?`, `enableAttachments?`, `enableVoiceMessage?`, `enableEmoji?`, `maxLength?`, `onTyping?` | Text input bar with attachments, emoji, voice |
@@ -551,6 +580,8 @@ Actions:
 | `clearPersistedData` / `resetConversation` | `() => Promise<void>` | Wipe stored session / start fresh |
 | `rateKBArticle` | `(articleId: string, helpful: boolean, rating: number, feedback?: string) => void` | Rate a knowledge base article |
 | `sendVisitorTyping` | `(isTyping: boolean) => void` | Emit visitor typing status |
+| `leaveQueue` | `() => Promise<boolean>` | Leave the queue for a person (`queue-self-resolve`), then the flow carries on. `false` when a person already has the chat |
+| `onWidgetSignal` | `(name, (detail) => void) => () => void` | Listen to `cb:waiting-for-human`, `cb:human-joined`, `cb:wait-over` (see Waiting for a person) |
 
 ### Utilities and services
 
