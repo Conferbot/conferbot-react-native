@@ -1,909 +1,344 @@
 /**
  * AskNodeHandlers.ts
  *
- * Ask Question Node Handlers for the Conferbot React Native SDK.
- * Handles all ask-* nodes that collect user input with validation.
- * These nodes require user interaction before proceeding.
+ * The question steps answered in the composer (ask-name, ask-email,
+ * ask-phone-number, ask-number, ask-url, ask-location,
+ * ask-custom-question) and the file step (ask-file). Field names, checks,
+ * records and saved values follow the flow-node spec and the web widget's
+ * ts/chat/handlers/askQuestions.ts:
+ *
+ * - the prompt is data.questionText;
+ * - the answer fills the variable the step registered when it was shown
+ *   (data.answerVariable) - a step without one stores nothing;
+ * - phone numbers are saved normalised, numbers as numbers, bare links as
+ *   https;
+ * - a refused answer says why and the step keeps waiting.
  */
 
-import {
-  BaseNodeHandler,
-  NodeResult,
-  NodeUIState,
-  NodeHandler,
-} from '../NodeHandler';
+import { BaseNodeHandler, NodeResult, NodeUIState, NodeHandler } from '../NodeHandler';
 import { ChatState } from '../../state/ChatState';
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
 import { DisplayNodes } from '../NodeTypes';
+import { ctxOf } from '../../flow/context';
+import { nameGreetingHtml, fillVariables } from '../../flow/text';
+import {
+  EN,
+  fileTypesWords,
+  fileUploadProblem,
+  isOptionalUpload,
+  isValidEmail,
+  isValidLink,
+  isValidPhone,
+  linkHref,
+  normalizePhone,
+  numberProblem,
+  ownerTextOr,
+  parseNumberInput,
+  phoneErrorText,
+  suggestEmailFix,
+  DEFAULT_MAX_FILE_MB,
+} from '../../flow/inputs';
+import { botSay, pushAnswer, shownText, typedText, userSay } from './flowKit';
 
-// ========================================
-// VALIDATION PATTERNS
-// ========================================
+type InputType = NodeUIState.TextInput['inputType'];
 
-const ValidationPatterns = {
-  email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-  phone: /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/,
-  url: /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/,
-  name: /^[a-zA-Z\s'-]{2,100}$/,
-  number: /^-?\d*\.?\d+$/,
-  date: /^\d{4}-\d{2}-\d{2}$/,
-};
-
-// ========================================
-// BASE ASK HANDLER
-// ========================================
-
-/**
- * Base class for all ask node handlers with common functionality
- */
+/** A composer question: shows questionText, takes typed text. */
 abstract class BaseAskHandler extends BaseNodeHandler {
-  abstract readonly inputType: NodeUIState.TextInput['inputType'];
-  abstract readonly validationPattern?: RegExp;
+  protected abstract readonly inputType: InputType;
+  protected abstract readonly shape: string;
+  protected readonly placeholder: string = 'Type your answer...';
+
+  protected ui(node: Record<string, any>, state: ChatState): NodeUIState.TextInput {
+    return NodeUIState.textInput(this.getNodeId(node), shownText(state, node.data?.questionText), String(node.data?.answerVariable || ''), this.inputType, {
+      placeholder: this.placeholder,
+    });
+  }
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError(`${this.nodeType} node has no data`);
-    }
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
 
+  /** The refusal message, or null when the answer is fine. */
+  protected problem(_value: string, _node: Record<string, any>, _state: ChatState): string | null {
+    return null;
+  }
+
+  /** What is saved and recorded for the answer. */
+  protected saved(value: string): { variable: any; text: string } {
+    return { variable: value, text: value };
+  }
+
+  /** After the answer is saved: by default, on along the first edge. */
+  protected async after(_value: string, _node: Record<string, any>, _state: ChatState): Promise<NodeResult> {
+    return NodeResult.next();
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const value = typedText(response);
     const nodeId = this.getNodeId(node);
-
-    // Get question text
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   this.getString(data, 'message') ||
-                   this.getDefaultQuestion();
-
-    // Resolve variables in question
-    question = this.resolveText(question, state);
-
-    // Get variable name for storing the answer
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         this.getString(data, 'name') ||
-                         this.getDefaultVariableName();
-
-    // Get placeholder text
-    let placeholder = this.getString(data, 'placeholder', '');
-    placeholder = placeholder ? this.resolveText(placeholder, state) : this.getDefaultPlaceholder();
-
-    // Get error message
-    let errorMessage = this.getString(data, 'errorMessage') ||
-                       this.getString(data, 'validationMessage', '');
-    errorMessage = errorMessage ? this.resolveText(errorMessage, state) : this.getDefaultErrorMessage();
-
-    // Build validation rules
-    const validation = this.buildValidation(data);
-
-    // Add question to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.TextInput = {
-      type: 'textInput',
-      nodeId,
-      question,
-      placeholder,
-      variableName,
-      inputType: this.inputType,
-      validation,
-      errorMessage,
-    };
-
-    return NodeResult.displayUI(uiState);
+    if (!value) return NodeResult.displayUI(this.ui(node, state));
+    const problem = this.problem(value, node, state);
+    if (problem) return NodeResult.invalid(problem, this.ui(node, state));
+    const { variable, text } = this.saved(value);
+    pushAnswer(state, { id: nodeId, shape: this.shape, text });
+    userSay(state, text, nodeId);
+    state.setAnswerVariable(nodeId, variable);
+    return this.after(value, node, state);
   }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    // Input components submit {value, variableName, type} - unwrap to the
-    // raw value so validation does not run against "[object Object]"
-    if (response && typeof response === 'object' && 'value' in response) {
-      response = response.value;
-    }
-
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    // Get variable name
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         this.getString(data || {}, 'name') ||
-                         this.getDefaultVariableName();
-
-    // Validate response
-    const validationResult = this.validateResponse(response, data || {});
-    if (!validationResult.valid) {
-      return NodeResult.error(
-        validationResult.message || this.getDefaultErrorMessage(),
-        true
-      );
-    }
-
-    // Process the response value
-    const processedValue = this.processValue(response);
-
-    // Store the answer
-    state.setAnswer(nodeId, variableName, processedValue, nodeId);
-
-    // Add user response to transcript
-    state.addUserMessage(String(processedValue), nodeId);
-
-    // Update user metadata if applicable
-    this.updateUserMetadata(state, processedValue);
-
-    // Proceed to next node
-    return this.proceed(node, { [variableName]: processedValue });
-  }
-
-  /**
-   * Validates the user's response
-   */
-  protected validateResponse(
-    response: any,
-    data: Record<string, any>
-  ): { valid: boolean; message?: string } {
-    // Check if response is empty
-    if (response === undefined || response === null || response === '') {
-      const required = this.getBoolean(data, 'required', true);
-      if (required) {
-        return { valid: false, message: 'This field is required' };
-      }
-      return { valid: true };
-    }
-
-    const responseStr = String(response);
-
-    // Check min length
-    const minLength = this.getNumber(data, 'minLength', 0);
-    if (minLength > 0 && responseStr.length < minLength) {
-      return { valid: false, message: `Minimum ${minLength} characters required` };
-    }
-
-    // Check max length
-    const maxLength = this.getNumber(data, 'maxLength', 0);
-    if (maxLength > 0 && responseStr.length > maxLength) {
-      return { valid: false, message: `Maximum ${maxLength} characters allowed` };
-    }
-
-    // Check pattern
-    if (this.validationPattern && !this.validationPattern.test(responseStr)) {
-      return { valid: false, message: this.getDefaultErrorMessage() };
-    }
-
-    // Custom pattern from node data
-    const customPattern = this.getString(data, 'pattern', '');
-    if (customPattern) {
-      try {
-        const regex = new RegExp(customPattern);
-        if (!regex.test(responseStr)) {
-          return { valid: false, message: this.getDefaultErrorMessage() };
-        }
-      } catch {
-        // Invalid regex, skip validation
-      }
-    }
-
-    return { valid: true };
-  }
-
-  /**
-   * Builds validation rules for the UI state
-   */
-  protected buildValidation(data: Record<string, any>): NodeUIState.TextInput['validation'] {
-    const validation: NodeUIState.TextInput['validation'] = {
-      required: this.getBoolean(data, 'required', true),
-    };
-
-    const minLength = this.getNumber(data, 'minLength', 0);
-    if (minLength > 0) validation.minLength = minLength;
-
-    const maxLength = this.getNumber(data, 'maxLength', 0);
-    if (maxLength > 0) validation.maxLength = maxLength;
-
-    const min = this.getNumber(data, 'min', 0);
-    if (min !== 0) validation.min = min;
-
-    const max = this.getNumber(data, 'max', 0);
-    if (max !== 0) validation.max = max;
-
-    if (this.validationPattern) {
-      validation.pattern = this.validationPattern.source;
-    }
-
-    const customPattern = this.getString(data, 'pattern', '');
-    if (customPattern) {
-      validation.pattern = customPattern;
-    }
-
-    return validation;
-  }
-
-  /**
-   * Processes the value before storing (can be overridden)
-   */
-  protected processValue(value: any): any {
-    return value;
-  }
-
-  /**
-   * Updates user metadata if applicable (can be overridden)
-   */
-  protected updateUserMetadata(state: ChatState, value: any): void {
-    // Default: no metadata update
-  }
-
-  /**
-   * Gets the default question text
-   */
-  protected abstract getDefaultQuestion(): string;
-
-  /**
-   * Gets the default variable name
-   */
-  protected abstract getDefaultVariableName(): string;
-
-  /**
-   * Gets the default placeholder text
-   */
-  protected abstract getDefaultPlaceholder(): string;
-
-  /**
-   * Gets the default error message
-   */
-  protected abstract getDefaultErrorMessage(): string;
 }
 
 // ========================================
-// ASK NAME HANDLER
+// ASK NAME
 // ========================================
 
 /**
- * Handles 'ask-name' nodes - collects user's name
+ * ask-name-node: any text. The full answer is saved; nameGreetResponse
+ * greets by the first name after 2000 ms of typing (none set: the default
+ * greeting; cleared in the builder: no greeting).
  */
 export class AskNameHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_NAME;
-  readonly inputType: NodeUIState.TextInput['inputType'] = 'text';
-  readonly validationPattern = ValidationPatterns.name;
+  protected readonly inputType: InputType = 'text';
+  protected readonly shape = 'user-ask-name-response';
+  protected readonly placeholder = 'Your name';
 
-  protected getDefaultQuestion(): string {
-    return 'What is your name?';
-  }
-
-  protected getDefaultVariableName(): string {
-    return 'name';
-  }
-
-  protected getDefaultPlaceholder(): string {
-    return 'Enter your name';
-  }
-
-  protected getDefaultErrorMessage(): string {
-    return 'Please enter a valid name';
-  }
-
-  protected updateUserMetadata(state: ChatState, value: any): void {
-    state.setUserName(String(value));
+  protected async after(value: string, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const nodeId = this.getNodeId(node);
+    state.setUserName(value);
+    const greeting = nameGreetingHtml(node.data?.nameGreetResponse, value);
+    if (!greeting) return NodeResult.next();
+    await ctxOf(node, state).typing(2000);
+    state.addRecord({
+      _id: nodeId,
+      id: nodeId,
+      shape: 'ask-name-response-greet',
+      type: 'ask-name-response-greet',
+      text: greeting,
+      renderedText: fillVariables(greeting, (k) => state.lookupVariable(k)),
+      time: new Date().toISOString(),
+    });
+    botSay(state, shownText(state, greeting), nodeId, this.nodeType);
+    return NodeResult.next();
   }
 }
 
 // ========================================
-// ASK EMAIL HANDLER
+// ASK EMAIL
 // ========================================
 
 /**
- * Handles 'ask-email' nodes - collects user's email
+ * ask-email-node: the widget's e-mail check (incorrectEmailResponse, else
+ * the default). A likely domain typo is refused once with the fix offered;
+ * the same address sent again is kept as typed.
  */
 export class AskEmailHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_EMAIL;
-  readonly inputType: NodeUIState.TextInput['inputType'] = 'email';
-  readonly validationPattern = ValidationPatterns.email;
+  protected readonly inputType: InputType = 'email';
+  protected readonly shape = 'user-ask-email-response';
+  protected readonly placeholder = 'name@company.com';
 
-  protected getDefaultQuestion(): string {
-    return 'What is your email address?';
+  protected problem(value: string, node: Record<string, any>, state: ChatState): string | null {
+    if (!isValidEmail(value)) {
+      return ownerTextOr(node.data?.incorrectEmailResponse, EN.emailInvalid, ['Please enter a valid email']);
+    }
+    const fix = suggestEmailFix(value);
+    const typed = value.trim().toLowerCase();
+    if (fix && state.getVariable('_lastEmailTypo') !== typed) {
+      state.setVariable('_lastEmailTypo', typed);
+      return EN.emailTypo(fix);
+    }
+    state.setVariable('_lastEmailTypo', '');
+    return null;
   }
 
-  protected getDefaultVariableName(): string {
-    return 'email';
+  protected async after(value: string): Promise<NodeResult> {
+    return NodeResult.next({ email: value });
   }
 
-  protected getDefaultPlaceholder(): string {
-    return 'Enter your email';
-  }
-
-  protected getDefaultErrorMessage(): string {
-    return 'Please enter a valid email address';
-  }
-
-  protected processValue(value: any): any {
-    return String(value).toLowerCase().trim();
-  }
-
-  protected updateUserMetadata(state: ChatState, value: any): void {
-    state.setUserEmail(String(value));
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const result = await super.handleResponse(response, node, state);
+    if (result.type === 'proceed') state.setUserEmail(typedText(response));
+    return result;
   }
 }
 
 // ========================================
-// ASK PHONE HANDLER
+// ASK PHONE
 // ========================================
 
-/**
- * Handles 'ask-phone' nodes - collects user's phone number
- */
+/** ask-phone-number-node: 6-15 digits once normalised; saved normalised. */
 export class AskPhoneHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_PHONE;
-  readonly inputType: NodeUIState.TextInput['inputType'] = 'phone';
-  readonly validationPattern = ValidationPatterns.phone;
+  protected readonly inputType: InputType = 'phone';
+  protected readonly shape = 'user-ask-phone-number-response';
+  protected readonly placeholder = 'Phone number';
 
-  protected getDefaultQuestion(): string {
-    return 'What is your phone number?';
+  protected problem(value: string, node: Record<string, any>): string | null {
+    return isValidPhone(value) ? null : phoneErrorText(node.data);
   }
 
-  protected getDefaultVariableName(): string {
-    return 'phone';
+  protected saved(value: string) {
+    const phone = normalizePhone(value);
+    return { variable: phone, text: phone };
   }
 
-  protected getDefaultPlaceholder(): string {
-    return 'Enter your phone number';
-  }
-
-  protected getDefaultErrorMessage(): string {
-    return 'Please enter a valid phone number';
-  }
-
-  protected processValue(value: any): any {
-    // Remove extra spaces but keep formatting
-    return String(value).trim();
-  }
-
-  protected updateUserMetadata(state: ChatState, value: any): void {
-    state.setUserPhone(String(value));
+  protected async after(value: string, _node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    state.setUserPhone(normalizePhone(value));
+    return NodeResult.next();
   }
 }
 
 // ========================================
-// ASK NUMBER HANDLER
+// ASK NUMBER
 // ========================================
 
 /**
- * Handles 'ask-number' nodes - collects a numeric value
+ * ask-number-node: "1,200" is 1200, "3,5" is 3.5; enableConditions bounds;
+ * invalidNumberResponse ({min}/{max} filled). Saved as a NUMBER.
  */
 export class AskNumberHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_NUMBER;
-  readonly inputType: NodeUIState.TextInput['inputType'] = 'number';
-  readonly validationPattern = ValidationPatterns.number;
+  protected readonly inputType: InputType = 'number';
+  protected readonly shape = 'user-ask-number-response';
+  protected readonly placeholder = 'Enter a number';
 
-  protected getDefaultQuestion(): string {
-    return 'Please enter a number';
+  protected problem(value: string, node: Record<string, any>): string | null {
+    return numberProblem(value, node.data);
   }
 
-  protected getDefaultVariableName(): string {
-    return 'number';
-  }
-
-  protected getDefaultPlaceholder(): string {
-    return 'Enter a number';
-  }
-
-  protected getDefaultErrorMessage(): string {
-    return 'Please enter a valid number';
-  }
-
-  protected validateResponse(
-    response: any,
-    data: Record<string, any>
-  ): { valid: boolean; message?: string } {
-    // First run base validation
-    const baseResult = super.validateResponse(response, data);
-    if (!baseResult.valid) return baseResult;
-
-    if (response === undefined || response === null || response === '') {
-      return { valid: true }; // Empty is handled by base
-    }
-
-    const num = parseFloat(String(response));
-    if (isNaN(num)) {
-      return { valid: false, message: 'Please enter a valid number' };
-    }
-
-    // Check min value
-    const min = this.getNumber(data, 'min', Number.MIN_SAFE_INTEGER);
-    if (data.min !== undefined && num < min) {
-      return { valid: false, message: `Value must be at least ${min}` };
-    }
-
-    // Check max value
-    const max = this.getNumber(data, 'max', Number.MAX_SAFE_INTEGER);
-    if (data.max !== undefined && num > max) {
-      return { valid: false, message: `Value must be at most ${max}` };
-    }
-
-    return { valid: true };
-  }
-
-  protected processValue(value: any): any {
-    const num = parseFloat(String(value));
-    return isNaN(num) ? 0 : num;
+  protected saved(value: string) {
+    const n = parseNumberInput(value);
+    return { variable: n ?? value, text: n === null ? value : String(n) };
   }
 }
 
 // ========================================
-// ASK URL HANDLER
+// ASK URL
 // ========================================
 
-/**
- * Handles 'ask-url' nodes - collects a URL
- */
+/** ask-url-node: a link people would type; a bare host is saved with https://. */
 export class AskUrlHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_URL;
-  readonly inputType: NodeUIState.TextInput['inputType'] = 'url';
-  readonly validationPattern = ValidationPatterns.url;
+  protected readonly inputType: InputType = 'url';
+  protected readonly shape = 'user-ask-url-response';
 
-  protected getDefaultQuestion(): string {
-    return 'Please enter a URL';
+  protected problem(value: string): string | null {
+    return isValidLink(value) ? null : EN.link;
   }
 
-  protected getDefaultVariableName(): string {
-    return 'url';
-  }
-
-  protected getDefaultPlaceholder(): string {
-    return 'https://example.com';
-  }
-
-  protected getDefaultErrorMessage(): string {
-    return 'Please enter a valid URL';
-  }
-
-  protected processValue(value: any): any {
-    let url = String(value).trim();
-    // Add https:// if no protocol specified
-    if (url && !url.match(/^https?:\/\//i)) {
-      url = 'https://' + url;
-    }
-    return url;
+  protected saved(value: string) {
+    const url = linkHref(value) || value.trim();
+    return { variable: url, text: url };
   }
 }
 
 // ========================================
-// ASK DATE HANDLER
+// ASK LOCATION / CUSTOM QUESTION
 // ========================================
 
-/**
- * Handles 'ask-date' nodes - collects a date
- */
-export class AskDateHandler extends BaseAskHandler {
-  readonly nodeType = 'ask-date-node';
-  readonly inputType: NodeUIState.TextInput['inputType'] = 'date';
-  readonly validationPattern = ValidationPatterns.date;
+/** ask-location-node: any text. */
+export class AskLocationHandler extends BaseAskHandler {
+  readonly nodeType = DisplayNodes.ASK_LOCATION;
+  protected readonly inputType: InputType = 'text';
+  protected readonly shape = 'user-ask-location-response';
+  protected readonly placeholder = 'City or address';
+}
 
-  protected getDefaultQuestion(): string {
-    return 'Please select a date';
-  }
-
-  protected getDefaultVariableName(): string {
-    return 'date';
-  }
-
-  protected getDefaultPlaceholder(): string {
-    return 'Select a date';
-  }
-
-  protected getDefaultErrorMessage(): string {
-    return 'Please enter a valid date';
-  }
-
-  protected validateResponse(
-    response: any,
-    data: Record<string, any>
-  ): { valid: boolean; message?: string } {
-    const baseResult = super.validateResponse(response, data);
-    if (!baseResult.valid) return baseResult;
-
-    if (response === undefined || response === null || response === '') {
-      return { valid: true };
-    }
-
-    // Try to parse the date
-    const date = new Date(response);
-    if (isNaN(date.getTime())) {
-      return { valid: false, message: 'Please enter a valid date' };
-    }
-
-    // Check min date
-    const minDate = this.getString(data, 'minDate', '');
-    if (minDate) {
-      const min = new Date(minDate);
-      if (!isNaN(min.getTime()) && date < min) {
-        return { valid: false, message: `Date must be on or after ${minDate}` };
-      }
-    }
-
-    // Check max date
-    const maxDate = this.getString(data, 'maxDate', '');
-    if (maxDate) {
-      const max = new Date(maxDate);
-      if (!isNaN(max.getTime()) && date > max) {
-        return { valid: false, message: `Date must be on or before ${maxDate}` };
-      }
-    }
-
-    return { valid: true };
-  }
-
-  protected processValue(value: any): any {
-    const date = new Date(value);
-    if (isNaN(date.getTime())) {
-      return value;
-    }
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD format
-  }
+/** ask-custom-question-node: any text. */
+export class AskCustomQuestionHandler extends BaseAskHandler {
+  readonly nodeType = DisplayNodes.ASK_CUSTOM_QUESTION;
+  protected readonly inputType: InputType = 'text';
+  protected readonly shape = 'user-ask-custom-question-response';
 }
 
 // ========================================
-// ASK ADDRESS HANDLER
+// ASK FILE
 // ========================================
 
 /**
- * Handles 'ask-address' nodes - collects an address
- */
-export class AskAddressHandler extends BaseAskHandler {
-  readonly nodeType = 'ask-address-node';
-  readonly inputType: NodeUIState.TextInput['inputType'] = 'address';
-  readonly validationPattern = undefined; // Address has no standard pattern
-
-  protected getDefaultQuestion(): string {
-    return 'What is your address?';
-  }
-
-  protected getDefaultVariableName(): string {
-    return 'address';
-  }
-
-  protected getDefaultPlaceholder(): string {
-    return 'Enter your address';
-  }
-
-  protected getDefaultErrorMessage(): string {
-    return 'Please enter a valid address';
-  }
-
-  protected validateResponse(
-    response: any,
-    data: Record<string, any>
-  ): { valid: boolean; message?: string } {
-    // Base validation
-    const baseResult = super.validateResponse(response, data);
-    if (!baseResult.valid) return baseResult;
-
-    if (response === undefined || response === null || response === '') {
-      return { valid: true };
-    }
-
-    // Address should be at least 10 characters
-    const minLength = this.getNumber(data, 'minLength', 10);
-    if (String(response).length < minLength) {
-      return { valid: false, message: 'Please enter a complete address' };
-    }
-
-    return { valid: true };
-  }
-}
-
-// ========================================
-// ASK FILE HANDLER
-// ========================================
-
-/**
- * Handles 'ask-file' nodes - requests file upload from user
+ * ask-file-node: an upload card. A file over maxFileSizeMB (default 5) or
+ * not in allowedFileTypes is refused on the card; the picked file is
+ * uploaded to POST /api/v1/bot/:id/media and its URL saved. A failed upload
+ * keeps the step waiting. Optional ("(optional)" in the question, or
+ * data.optional) offers Skip: recorded as skipped, no variable.
+ *
+ * Answers: {file: {uri, name, type, size}} (uploaded here), {url, fileName}
+ * (uploaded by the UI already), or {skip: true}.
  */
 export class AskFileHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.ASK_FILE;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Ask File node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get question text
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   this.getString(data, 'message') ||
-                   'Please upload a file';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'file';
-
-    // Get file constraints
-    const acceptedTypes = this.getArray<string>(data, 'acceptedTypes', []);
-    const accept = this.getString(data, 'accept', '');
-    const maxSize = this.getNumber(data, 'maxSize', 10 * 1024 * 1024); // 10MB default
-    const multiple = this.getBoolean(data, 'multiple', false);
-
-    // Parse accepted types
-    let fileTypes: string[] = acceptedTypes;
-    if (accept) {
-      fileTypes = accept.split(',').map((t: string) => t.trim());
-    }
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.FileUpload = {
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.FileUpload {
+    const data = node.data || {};
+    const types: string[] = Array.isArray(data.allowedFileTypes) ? data.allowedFileTypes : [];
+    return {
       type: 'fileUpload',
-      nodeId,
-      question,
-      variableName,
-      acceptedTypes: fileTypes.length > 0 ? fileTypes : undefined,
-      maxSize,
-      multiple,
-    };
-
-    return NodeResult.displayUI(uiState);
+      nodeId: this.getNodeId(node),
+      question: shownText(state, data.questionText),
+      variableName: data.answerVariable,
+      acceptedTypes: types.length ? types : undefined,
+      maxSize: (Number(data.maxFileSizeMB) > 0 ? Number(data.maxFileSizeMB) : DEFAULT_MAX_FILE_MB) * 1024 * 1024,
+      optional: isOptionalUpload(data),
+      typesInWords: fileTypesWords(types),
+    } as NodeUIState.FileUpload;
   }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    // Input components submit {value, variableName, type} - unwrap to the
-    // raw value so validation does not run against "[object Object]"
-    if (response && typeof response === 'object' && 'value' in response) {
-      response = response.value;
-    }
-
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'file';
-
-    // Validate file(s) uploaded
-    if (!response) {
-      const required = this.getBoolean(data || {}, 'required', true);
-      if (required) {
-        return NodeResult.error('Please upload a file', true);
-      }
-    }
-
-    // Store file info
-    state.setAnswer(nodeId, variableName, response, nodeId);
-
-    // Add to transcript
-    const fileInfo = Array.isArray(response)
-      ? `[Uploaded ${response.length} file(s)]`
-      : `[Uploaded file: ${response?.name || 'file'}]`;
-    state.addUserMessage(fileInfo, nodeId);
-
-    return this.proceed(node, { [variableName]: response });
-  }
-}
-
-// ========================================
-// ASK LOCATION HANDLER
-// ========================================
-
-/**
- * Handles 'ask-location' nodes - requests location from user
- */
-export class AskLocationHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.ASK_LOCATION;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Ask Location node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get question text
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   this.getString(data, 'message') ||
-                   'Please share your location';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'location';
-
-    // Get options
-    const allowManualEntry = this.getBoolean(data, 'allowManualEntry', true);
-    const showMap = this.getBoolean(data, 'showMap', true);
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.LocationPicker = {
-      type: 'locationPicker',
-      nodeId,
-      question,
-      variableName,
-      allowManualEntry,
-      showMap,
-    };
-
-    return NodeResult.displayUI(uiState);
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    // Input components submit {value, variableName, type} - unwrap to the
-    // raw value so validation does not run against "[object Object]"
-    if (response && typeof response === 'object' && 'value' in response) {
-      response = response.value;
-    }
-
-    const data = this.getNodeData(node);
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
+    const data = node.data || {};
 
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'location';
-
-    // Validate location
-    if (!response) {
-      const required = this.getBoolean(data || {}, 'required', true);
-      if (required) {
-        return NodeResult.error('Please provide your location', true);
-      }
+    if (response?.skip === true || response?.action === 'skip') {
+      if (!isOptionalUpload(data)) return NodeResult.displayUI(this.ui(node, state));
+      pushAnswer(state, { id: nodeId, shape: 'user-ask-file-response', skipped: true });
+      userSay(state, EN.skipped, nodeId);
+      return NodeResult.next();
     }
 
-    // Normalize location data
-    let locationValue: any;
-    if (typeof response === 'string') {
-      // Manual text entry
-      locationValue = { address: response };
-    } else if (response?.latitude !== undefined && response?.longitude !== undefined) {
-      // Coordinates
-      locationValue = {
-        latitude: response.latitude,
-        longitude: response.longitude,
-        address: response.address,
-      };
-    } else {
-      locationValue = response;
+    let url: string | undefined = typeof response?.url === 'string' && response.url.trim() ? response.url : undefined;
+    let fileName: string = response?.fileName || response?.file?.name || response?.files?.[0]?.name || 'file';
+    if (!url && Array.isArray(response?.files) && response.files[0]?.url) url = response.files[0].url;
+
+    if (!url) {
+      const file = response?.file;
+      if (!file) return NodeResult.displayUI(this.ui(node, state));
+      const problem = fileUploadProblem(file, data);
+      if (problem) return NodeResult.invalid(problem, this.ui(node, state), true);
+      const uploaded = await ctxOf(node, state).upload(file);
+      if (!uploaded.ok || !uploaded.url) return NodeResult.invalid(EN.uploadRetry, this.ui(node, state), true);
+      url = uploaded.url;
+      fileName = file.name || fileName;
     }
 
-    // Store location
-    state.setAnswer(nodeId, variableName, locationValue, nodeId);
-
-    // Add to transcript
-    const locationText = locationValue?.address ||
-                         (locationValue?.latitude
-                           ? `(${locationValue.latitude}, ${locationValue.longitude})`
-                           : '[Location shared]');
-    state.addUserMessage(locationText, nodeId);
-
-    return this.proceed(node, { [variableName]: locationValue });
+    pushAnswer(state, { id: nodeId, shape: 'user-ask-file-response', fileName, url });
+    userSay(state, url, nodeId);
+    state.setAnswerVariable(nodeId, url);
+    return NodeResult.next();
   }
 }
 
 // ========================================
-// ASK CUSTOM QUESTION HANDLER
+// REGISTRATION
 // ========================================
 
-/**
- * Handles 'ask-custom-question-node' - generic text input with custom question prompt
- */
-export class AskCustomQuestionHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.ASK_CUSTOM_QUESTION;
-
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Ask Custom Question node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    let question = this.getString(data, 'questionText') ||
-                   this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   'Please answer the question';
-
-    question = this.resolveText(question, state);
-
-    const variableName = this.getString(data, 'answerVariable') ||
-                         this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         nodeId;
-
-    const placeholder = this.getString(data, 'placeholder', 'Type your answer');
-
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    const uiState: NodeUIState.TextInput = {
-      type: 'textInput',
-      nodeId,
-      question,
-      placeholder,
-      variableName,
-      inputType: 'text',
-      validation: {
-        required: this.getBoolean(data, 'required', true),
-      },
-      errorMessage: 'Please enter an answer',
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    // Input components submit {value, variableName, type} - unwrap to the
-    // raw value so validation does not run against "[object Object]"
-    if (response && typeof response === 'object' && 'value' in response) {
-      response = response.value;
-    }
-
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'answerVariable') ||
-                         this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         nodeId;
-
-    const answer = String(response ?? '').trim();
-
-    if (!answer && this.getBoolean(data || {}, 'required', true)) {
-      return NodeResult.error('Please enter an answer', true);
-    }
-
-    state.setAnswer(nodeId, variableName, answer, nodeId);
-    state.addUserMessage(answer, nodeId);
-
-    return this.proceed(node, { [variableName]: answer });
-  }
-}
-
-// ========================================
-// ASK HANDLER COLLECTION
-// ========================================
-
-/**
- * Array of all ask node handlers
- */
 export const askHandlers: NodeHandler[] = [
   new AskNameHandler(),
   new AskEmailHandler(),
   new AskPhoneHandler(),
   new AskNumberHandler(),
   new AskUrlHandler(),
-  new AskDateHandler(),
-  new AskAddressHandler(),
   new AskFileHandler(),
   new AskLocationHandler(),
   new AskCustomQuestionHandler(),
 ];
 
-/**
- * Registers all ask node handlers with the registry
- */
 export function registerAskHandlers(registry: NodeHandlerRegistry): void {
   registry.registerAll(askHandlers);
 }
