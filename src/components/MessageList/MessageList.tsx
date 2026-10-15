@@ -317,10 +317,14 @@ export const MessageList: React.FC<MessageListProps> = ({
   const renderBotImage = useCallback(
     (item: RecordItem) => {
       const url = (item as any).url;
+      const mediaNodeId = (item as any).mediaNodeId;
       if (!url) return null;
-      return <BotImage url={url} theme={theme} />;
+      // An image step moves the flow on once its picture loads (or fails),
+      // as the web widget does; the engine caps the wait at 4 s.
+      const onSettled = mediaNodeId ? () => conferBot?.flowEngine?.mediaSettled?.(mediaNodeId) : undefined;
+      return <BotImage url={url} theme={theme} onSettled={onSettled} />;
     },
-    [theme]
+    [theme, conferBot?.flowEngine]
   );
 
   // "Sent / Delivered / Seen" under the visitor's latest live message, while
@@ -588,7 +592,7 @@ const createStyles = (theme: ConferBotTheme) =>
   });
 
 /** A bot's standalone image; one that does not load is not drawn (no empty box). */
-const BotImage: React.FC<{ url: string; theme: ConferBotTheme }> = ({ url, theme }) => {
+const BotImage: React.FC<{ url: string; theme: ConferBotTheme; onSettled?: () => void }> = ({ url, theme, onSettled }) => {
   const [failed, setFailed] = React.useState(false);
   if (failed) return null;
   return (
@@ -607,7 +611,11 @@ const BotImage: React.FC<{ url: string; theme: ConferBotTheme }> = ({ url, theme
           backgroundColor: theme.colors.botBubble,
         }}
         resizeMode="cover"
-        onError={() => setFailed(true)}
+        onLoad={() => onSettled?.()}
+        onError={() => {
+          setFailed(true);
+          onSettled?.();
+        }}
         accessible={true}
         accessibilityRole="image"
         accessibilityLabel="Image"
