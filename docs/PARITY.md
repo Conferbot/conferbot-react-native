@@ -14,14 +14,15 @@ This file tracks how far this SDK matches the web widget: what's done, what's le
 | #25 | Launcher motion. `launcherMotion.ts` is the reference evaluator, checked against Chrome's animation in 784 cases. | `src/core/launcherMotion.ts`, `FloatingWidget/useLauncherMotion.ts` |
 | #26 | User as `visitorContext` + identity hash on every response record | `src/core/state/ChatState.ts`, `src/types/index.ts` |
 | #27 | Greeting card, all 11 styles checked on the Android emulator | `src/core/greeting.ts`, `FloatingWidget/useGreeting.ts`, `FloatingWidget/GreetingCard.tsx` |
+| #57 | Launcher entrance, attention and idle call. `keyframes.ts` evaluates the web's Web Animations tracks; checked against Chrome in 447 cases (19,275 samples). | `src/core/keyframes.ts`, `launcherEntrance.ts`, `launcherAttention.ts`, `launcherIdleCall.ts`, `mascotArt.ts`, `fxPaint.ts`; `FloatingWidget/useLauncherEntrance.ts`, `useLauncherAttention.ts`, `useLauncherIdleCall.ts`, `FxSprites.tsx`, `IdleCallView.tsx`, `fxAnimated.ts` |
 
 ## Left in this SDK
 
-In order: launcher entrance / attention / idle call; home screen; mascots; i18n; sounds; celebrations; reply-time wording. The web sources are listed below.
+In order: home screen; mascots; i18n; sounds; celebrations; reply-time wording. The web sources are listed below.
 
 ## Generators (`scripts/parity/`)
 
-The data files shared by the 4 SDKs are generated from the widget's own CSS and SVG. The scripts expect `conferbot-widget` and `sdk/` side by side; set `CONFERBOT_DEV` to their parent folder if your layout differs. Run `npm install` in `scripts/parity` once; it needs Chrome at `/usr/bin/google-chrome`.
+The data files shared by the 4 SDKs are generated from the widget's own CSS and SVG. The scripts expect `conferbot-widget` and `sdk/` side by side; set `CONFERBOT_DEV` to their parent folder if your layout differs. Run `npm install` in `scripts/parity` once. Chrome is `/usr/bin/google-chrome`, else the macOS app; set `CHROME_PATH` to use another (`chrome.js`).
 
 - **`themes/gen.js`:** reads `css/themes/*.css`, `ts/theme/registry.ts` and `palettes.json`, and writes `themes.json`. That became each SDK's widget themes data file.
 - **`icons/`:**
@@ -30,6 +31,7 @@ The data files shared by the 4 SDKs are generated from the widget's own CSS and 
   - `check.sh` regenerates, syncs RN and compares against Chrome.
   - `compare.js`, `mrest.js`, `mcompare.js` and `mall.js` render the web and the evaluator side by side.
   - `golden.json` holds the evaluator frames that the Kotlin, Dart and Swift tests check against.
+- **`launcherfx/`:** `check.sh` compiles the RN core, plays every entrance, attention and idle-call track in Chrome (`element.animate`, paused at each sample) and writes `golden.json`, then `compare.js` prints the largest difference. `cases.js` lists the cases (a 50px launcher at 16/16 on a 390 x 844 screen, right and left; seed 4242). `golden.json` is what the Kotlin, Dart and Swift tests check against: `{ src, box, base, tracks, samples: [{ t, v }] }`, `v` holding only the channels away from rest, iterations `-1` for Infinity.
 - **`ios-linux-baseline-fails.txt`:** the 28 iOS tests that already fail on Linux. Only failures outside this list matter.
 
 ## How to test
@@ -56,7 +58,7 @@ Every web widget feature works the same in the 4 mobile SDKs: customization, lau
 | Launcher motion (idle moments, message reaction, ripple) | done | done | done | done |
 | Signed-in user as `visitorContext` + identity hash | done | done | done | done |
 | Greeting card (rules, frequency, 11 styles) | done | logic done, UI on a branch | todo | todo |
-| Launcher entrance / attention / idle call | todo | todo | todo | todo |
+| Launcher entrance / attention / idle call (#57) | done | todo | todo | todo |
 | Home screen | todo | todo | todo | todo |
 | Mascots (incl. `mascotInGreeting`) | todo | todo | todo | todo |
 | `widgetLanguage` (i18n) | todo | todo | todo | todo |
@@ -72,17 +74,27 @@ Each SDK repo has its own `docs/PARITY.md`. The React Native one also covers the
 
 All paths are under `conferbot-widget/src/`.
 
-- **Launcher entrance / attention / idle call (all default off):**
-  - `ts/launcher/entrance.ts`, setting `launcherEntrance`: classic default; lightning, rocket, portal, ufo, drop, confetti, coin.
-  - `ts/launcher/attention.ts`, setting `launcherAttention`: off, pulse, wobble, bounce, wave, float, shine, heartbeat, orbit.
-  - `ts/launcher/idleCall.ts`, setting `launcherIdleCall`: off, psst, peek, wave, knock, tap; delay 12.
-  - The CSS is in `css/`.
+- **Launcher entrance / attention / idle call (all default off; done in RN, #57):**
+  - `ts/launcher/entrance.ts`, setting `launcherEntrance`: classic default; lightning, rocket, portal, ufo, drop, confetti, coin, meteor, magic, parachute, plane, egg.
+  - `ts/launcher/attention.ts`, setting `launcherAttention`: off, pulse, wobble, bounce, wave, float, shine, heartbeat, orbit. The pulse ring's keyframes are in its `ATTENTION_CSS`.
+  - `ts/launcher/idleCall.ts` and `idlePacing.ts`, settings `launcherIdleCall` (off, psst, peek, wave, knock, tap), `launcherIdleCallDelay` (12, 5-120), `launcherIdleCallText` (24 characters). The mascot is `ts/launcher/art3d.ts` `mascot()`.
+  - Mounted in `index.ts` after `mountLauncherMotion`; `launcherMotion.ts` holds idle moments while a launcher attention runs.
 - **Home screen:** `ts/home/` (homeCopy, askBox, trust, pageAware, visitorMemory).
 - **Mascots:** `ts/home/mascotMotion.ts`, `ts/launcher/launcherStyle.ts`, `ts/launcher/art3d.ts`, `ts/visibility/greeting.ts`. The `mascot` typing style is accepted but not drawn yet.
 - **i18n:** `ts/i18n.ts` + `ts/i18n/{en,de,es,fr,nl}.ts`.
 - **Sounds:** `ts/chat/messageSound.ts`.
 - **Celebrations:** `ts/chat/delight/` (celebrate, reactions, rules) and `ts/chat/ratingFx.ts`.
 - **Reply time:** `ts/chat/replyTime.ts`, `replyTimeView.ts`, `headerPresence.ts`.
+
+### Porting the launcher entrance, attention and idle call (from RN, #57)
+
+- **`src/core/keyframes.ts`** first: a Web Animations evaluator (offsets spaced evenly, per-property keyframes, each keyframe's easing on its step, the options' easing on the iteration, delay / iterations / fill, the later animation winning). Two Chrome details matter: a property missing at 0% starts from the element's own value but eases with the 0% keyframe's easing; and `rotate: "y 180deg"` is a flat flip, so draw it as `scaleX(cos a)`. Test it on `scripts/parity/launcherfx/golden.json` (RN: within 0.01px / 0.01deg / 0.001 scale and opacity).
+- **`launcherAttention.ts`**, **`launcherIdleCall.ts`**, **`launcherEntrance.ts`** are the web's tracks as data, port them as they are (keep the keyframe strings); the golden's `src` names each case (`attention:wobble:self`, `idle:knock@right:arm`, `entrance:rocket@right:s3.1`) so a port can rebuild its own and compare. `mascotArt.ts` is the blob mascot as SVG layers; `fxPaint.ts` draws CSS gradients (radial, linear, conic as wedges) and flattens the plane's motion path (Chrome measures it from the box's own top-left).
+- **The rules** (in the RN hooks):
+  - Entrance: decided when the settings arrive, once per app session per bot and entrance, not over an open chat or with reduced motion. Hold the launcher invisible until `revealAt` (still tappable; a tap ends it), play `arrive`, keep the greeting hidden until `settleAt`, then fade it up (`SETTLE_REVEAL`). It is `busy` until then.
+  - Attention: the clock starts when the launcher (or, for wave / float, the card) shows and no entrance is busy; it pauses during a launcher idle / message moment; over once the chat opens; not started within 30 minutes of an opening. A launcher mode holds the idle moments (they still count) and the three load ripples (not a message's).
+  - Idle call: after the delay, retry every 4s while blocked (chat open, app in the background, keyboard up, entrance busy, greeting up less than 15s). Two calls per app session 3 minutes apart, then a 3-day rest in storage (also after an opening); closing the greeting stops calls for the session. No bubble while the greeting is up. Knock and tap draw in front of the launcher, the others behind it.
+- **Drawing:** RN samples the evaluator every 16ms into native-driven interpolations of one clock per effect (nothing re-renders while they play). Filters (brightness, glows, blur, the bevel) have no react-native-svg counterpart and are left out. On the web, a left-hand launcher's mascot loses its mirror while it slides (the slide's `scale` replaces it) and the coin's gloss sits at the button's left edge until its sweep; both are kept as the web plays them.
 
 ### Porting the greeting card (from RN)
 
