@@ -316,7 +316,7 @@ Everything you configure in the Conferbot dashboard (Widget Customization / flow
 
 - **Colors**: header background/text, bot bubble, user bubble, option bubble, chat background, base font size
 - **Identity**: bot name in the header (server `botName` wins over the local `title` prop), avatar image, tagline
-- **Floating bubble**: FAB color or gradient, icon (SVG name or custom image), size, position, offsets, border radius, CTA text
+- **Floating bubble**: as the web widget draws it on a phone. Colour or left-to-right gradient (with `react-native-svg`), icon ink that stays readable on light colours, icon (SVG name or uploaded image), position, the phone size and offsets (16px from the bottom and side unless set), shape (speech bubble by default, circle, squircle, tab or peek), style (icon, the bot's avatar with an online dot, or the label pill on tablets; phones show the round button, as the web does), and the greeting text only when the greeting is turned on.
 - **Chat background**: solid, gradient (linear, radial, mesh, blur), image with its mask, or one of the 13 patterns (drawn with `react-native-svg` when installed, else the base colour)
 - **Widget theme**: all 27 dashboard themes (Classic, Minimal, Glass, Neo-brutal, Midnight, Aurora and the rest). Each brings its surfaces, text colours, corner radii and bubble outline, as on the web widget. **Appearance** light, dark, or auto (follows the phone's dark mode); Midnight, Neon, Chalkboard, Cyberpunk and Space are always dark. **Colours** "Brand" keeps your colours; "Theme palette" swaps in the theme's own header, bubble, option, launcher and send-button colours. Your own bubble radius, option radius and chat background still win over the theme. Theme fonts are not loaded on mobile; the app's font is used.
 
@@ -327,7 +327,7 @@ Everything you configure in the Conferbot dashboard (Widget Customization / flow
 - **Components you compose yourself** (`MessageList`, `ChatHeader`, ... in a custom layout): styled by the nearest `ThemeProvider` you provide - fully under your control.
 - The `customization` prop on `ConferBotProvider` (`ConferBotCustomization`) is accepted for forward compatibility but is **not applied to the built-in UI in v1.1.0**. Use dashboard customizations or `ThemeProvider` instead.
 
-Note: React Native cannot render CSS gradients natively, so a gradient FAB theme from the dashboard falls back to the solid background color.
+Note: a gradient launcher needs `react-native-svg`; without it the launcher uses the gradient's first colour.
 
 ### Local themes
 
