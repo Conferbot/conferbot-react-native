@@ -2,7 +2,7 @@
 
 This compares each SDK's flow engine, as it is today, against `nodes.spec.json` and the fixtures.
 
-- **How it was found:** by reading each SDK's code. React Native and Flutter now run all 156 fixtures (`__tests__/parity/flows.test.ts`, `test/parity/flows_test.dart`, all pass), so their sections list only what remains; Android and iOS have not run them yet. Paths are relative to each SDK repo.
+- **How it was found:** by reading each SDK's code. React Native, Flutter and Android now run all 156 fixtures (`__tests__/parity/flows.test.ts`, `test/parity/flows_test.dart`, `FlowFixturesTest.kt`, all pass), so their sections list only what remains; iOS has not run them yet. Paths are relative to each SDK repo.
 - **Spot-checks:** I re-read the items marked ✓ myself.
 - **No SDK code was changed** for this report.
 - **Severity:**
@@ -12,7 +12,7 @@ This compares each SDK's flow engine, as it is today, against `nodes.spec.json` 
 
 ## All four SDKs
 
-The same gaps appeared in every SDK; React Native and Flutter have fixed all of them (see their sections). File these once per repo.
+The same gaps appeared in every SDK; React Native, Flutter and Android have fixed all of them (see their sections). File these once per repo.
 
 | # | Area | Web (spec) | SDKs today | Fixtures |
 |---|---|---|---|---|
@@ -42,60 +42,27 @@ All 156 fixtures pass through `src/core/NodeFlowEngine.ts` and the handlers in `
 
 ## Android
 
-The engine is in `conferbot/src/main/java/com/conferbot/sdk/core/NodeFlowEngine.kt`. The handlers are in `core/handlers/*.kt`.
+All 156 fixtures pass through `core/NodeFlowEngine.kt` and the handlers in `core/nodes/handlers/*` (`FlowFixturesTest`, one JUnit case each, on a virtual clock; the fixtures are copied by `scripts/sync-flow-fixtures.sh`); none is pending. The A1-A10 and AN1-AN23 gaps found by reading are fixed (conferbot-android #29-#34, #54, #64-#67; #48 stays open for native cards). What remains is outside what the fixtures check:
 
-| # | Node / area | Web | Android today |
+| # | Area | Web | Android today |
 |---|---|---|---|
-| AN1 S1 | start | first `welcome-node` | `steps[0]` (`NodeFlowEngine.kt:89`) |
-| AN2 S1 | missing edge, port, target or unknown | ends | Falls back to `steps[currentIndex+1]`, the next node in array order ✓ (`NodeFlowEngine.kt:596-602`). Also accepts a handle without its `source-` prefix (`:623-625`) |
-| AN3 S1 | condition-node | variable lookup by bare name, `customLeft/RightValue`, operator set | A bare name is compared as literal text (`state/ChatState.kt:738`). Missing operators: `not_equals`, `not_contains`, `starts_with`, `ends_with`, `does_not_match`, `is_set`, `is_not_set`; anything unknown is `==`. Always case-insensitive (`LogicNodeHandlers.kt:111`). Ports are right |
-| AN4 S1 | random-flow-node | `source-<branch.id>`, wired branches only | `source-<index>`, no wiring check (`LogicNodeHandlers.kt:279`) |
-| AN5 S1 | user-redirect-node | link CTA, auto-advance | Reads `url`, **opens the browser by itself**, and stalls with no callback (`ui/compose/NodeComponents.kt:2380-2385`, engine `:247-252`) |
-| AN6 S1 | navigate-node | links + Done | Ignores `navigateOptions`/`doneNavigatingText` and moves on after 600 ms (`DisplayNodeHandlers.kt:304`) |
-| AN7 S1 | quiz-node | `correctAnswer` = "optionN" | Parsed as an Int: "option3" becomes 0, so only option 1 scores (`LegacyNodeHandlers.kt:259`) |
-| AN8 S1 | stripe-node | not a gate | A failure returns `shouldProceed = true`; the payment UI has no callback, so it stalls (`IntegrationNodeHandlers.kt`) |
-| AN9 S2 | choice prompts | `questionText` (image, yes-no, rating, opinion), `selectPrompt`, `checkOptionsPrompt` | All read `choicePrompt`, so these prompts are blank (`ChoiceNodeHandlers.kt:235,304,363,424,489,557,617`) |
-| AN10 S2 | yes-or-no default ids | `"1"`/`"2"` | `yes`/`no` (`ChoiceNodeHandlers.kt:504-505`) |
-| AN11 S2 | rating-choice `ratingType` | 1..10 or `smiley` | Only `smiley` and `10`; anything else is 5 (`ChoiceNodeHandlers.kt:561-565`) |
-| AN12 S2 | opinion-scale `from` | default 0 | default 1 (`ChoiceNodeHandlers.kt:614,655`) |
-| AN13 S2 | answer variables | none without `answerVariable`; legacy never | Default keys (name, email, phone...) or nodeId everywhere |
-| AN14 S2 | record shapes | `user-ask-phone-number-response`, `user-ask-custom-question-response`, `user-selected-check-options` | `user-ask-phone-response`, `user-ask-custom-response`, `user-check-options-response` (`AskQuestionNodeHandlers.kt:178,382`) |
-| AN15 S2 | ask-name greeting | a bubble with the first name, capitalised, after 2000 ms; default text | Transcript only, full name, no default, 500 ms (`AskQuestionNodeHandlers.kt:65-72`) |
-| AN16 S2 | phone / number / url validation | 6-15 digits normalised; "1,200"; bounds; bare host -> https | `^[+]?[0-9]{7,15}$` on raw input; `toDouble`; no bounds; URI with a scheme required (`NodeHandler.kt:511-520`) |
-| AN17 S2 | ask-file | `allowedFileTypes`, `maxFileSizeMB`, optional Skip | `allowedTypes`/`acceptedFileTypes`, `maxSize`, no Skip (`AskQuestionNodeHandlers.kt:408,593`) |
-| AN18 S2 | ask-multiple-questions-node | each answer under its `answerVariable` | `<nodeId>_q<i>` keys (`AskQuestionNodeHandlers.kt:664,737`) |
-| AN19 S2 | calendar-node | `calendarPrompt`, `timeZone`, `weeklyHours` | `questionText`, `botTimeZone`/`timezone` (`AskQuestionNodeHandlers.kt:773`) |
-| AN20 S2 | math-operation-node | saved to `answerVariable`; ÷0 gives "" | `resultVariable`; ÷0 gives 0 (`LogicNodeHandlers.kt:212`) |
-| AN21 S2 | jump-to-node | `nodeId` first; a missing target ends | `targetNodeId` first; a missing target proceeds to the next node (`LogicNodeHandlers.kt:334-341`) |
-| AN22 S2 | human-handover `maxWaitTime` | default 2 | default 5 (`SpecialNodeHandlers.kt:115`) |
-| AN23 S3 | delay / message | nothing shown; blank skipped | Shows typing during the delay. Skips a message equal to the last choice |
+| AN1 S3 | Rich step UI | Each rich step draws its own card (`richNodesView.ts`). | Drawn through the existing cards: consent, dynamic choices, product card, payment and navigate as choices; slider as the range; date/time as the calendar; ranking as multiple choice; OTP, AI, KB, signature and address as the text box; matrix as the multiple-questions card. No drawing pad, no address results list, and a choice can't open a link or Checkout yet (#48). |
+| AN2 S3 | signature-node | A typed name is drawn on a canvas and uploaded as PNG. | Uploaded as an SVG of the typed name; a drawn signature needs the UI to hand over the image. |
+| AN3 S3 | hidden-fields-node | The page's query, URL and referrer. | Nothing is captured unless the engine is given a page (`NodeFlowEngine.Config.pageUrl`). |
+| AN4 S2 | webhook-node | Called from the browser (spec `webOnly`). | Still called from the device, in the background; the flow no longer waits for it. |
+| AN5 S3 | google-calendar-node "book" | A slot picker. | Waits for the server's result, then moves on (spec `webOnly`). |
 
 ## iOS
 
-The engine is in `Sources/Conferbot/Core/NodeFlowEngine.swift` (NFE). The handlers are in `Core/Nodes/Handlers/*.swift`.
+All 156 fixtures pass through `Sources/Conferbot/Core/NodeFlowEngine.swift` and the handlers in `Core/Nodes/Handlers/*` (`Tests/FlowFixtureTests.swift`, with the driver in `Tests/FlowFixtureDriver.swift` modelled on RN's); none is pending. The IO1-IO20 gaps found by reading are fixed (conferbot-ios #26-#31, #52, #53, #64, #67-#70; #45 stays open for the UI). What remains is outside what the fixtures check:
 
-| # | Node / area | Web | iOS today |
+| # | Area | Web | iOS today |
 |---|---|---|---|
-| IO1 S1 | message / image / video / audio / file / html / redirect | auto-advance | Each returns `.displayUI(...)` and nothing advances it, so **the flow stalls after the first message** ✓ (`DisplayNodeHandlers.swift:104-107`; NFE `:244-256`) |
-| IO2 S1 | "end" check | only the end of a path ends the chat | `nodeType.lowercased().contains("end")` ends the flow, which catches **`calendar-node`** and `google-calendar-node` ✓ (NFE `:715-718`) |
-| IO3 S1 | n-choices-node | `choices[].choiceText` | Reads `buttons`/`options`/`actions` with `label`/`text`, so real n-choices nodes error and halt (`DisplayNodeHandlers.swift:753,763`) |
-| IO4 S1 | condition-node | flat `leftValue`/`rightValue`...; `source-0`/`source-1` | Needs `data.conditions[]`, else an error. Ports are `"true"`/`"false"`, which never match, so it falls back to any edge (`LogicNodeHandlers.swift:189,205`) |
-| IO5 S1 | boolean-logic / business-hours | `source-0`/`source-1` from the flow edges | Look in `node["edges"]`, which flow nodes never carry, so they mostly take the false/closed path (`MissingNodeHandlers.swift:588,780`) |
-| IO6 S1 | rating / opinion | value ports | An Int input uses no port, so the default list picks `source-1` (NFE `:727`) |
-| IO7 S1 | two-choices-node | choice 2 -> `source-2` | ids "0"/"1", so choice 2 matches `source-1`, which is choice 1's branch |
-| IO8 S1 | port matching | exact | `sourceHandle.contains(port)`: "1" matches "source-10"; then a default edge, then any edge (NFE `:550,573-592`) |
-| IO9 S1 | random-flow-node | `branches` | Reads `variants`/`options`, so it errors (`LogicNodeHandlers.swift:381`) |
-| IO10 S1 | html-node / navigate-node | `data.html`; `navigateOptions` | Reads `embedUrl`/`url`, so both error (`DisplayNodeHandlers.swift:1060`, `MissingNodeHandlers.swift:501`) |
-| IO11 S2 | answer variables | by `data.answerVariable` | Never read; answers are stored by nodeId, so `{name}` never resolves (`ChatState.swift:133`) |
-| IO12 S2 | prompts | `questionText`, `choicePrompt`, `selectPrompt`, `checkOptionsPrompt`, `calendarPrompt` | None read; uses `message`/`text` |
-| IO13 S2 | rating / opinion keys | `ratingType`; `from`/`to`/`fromLabel`/`toLabel` | `maxRating`/`style`; `min`/`max`/`minLabel` (`DisplayNodeHandlers.swift:914-968`) |
-| IO14 S2 | ask-multiple-questions-node | every question in turn | Only `questions[0]` (`MissingNodeHandlers.swift:304`) |
-| IO15 S2 | calendar-node | weekly hours, slots, zone | Reads only `mode` (`NodeHandlerRegistry.swift:417`) |
-| IO16 S2 | jump-to-node | `nodeId`/`targetNodeId`/`jumpTo` | Never reads `jumpTo`; a missing target stalls with an error (`MissingNodeHandlers.swift:662`) |
-| IO17 S2 | human-handover-node | pre-chat questions, `fallbackMessage` | Not read (`IntegrationNodeHandlers.swift:2146-2177`) |
-| IO18 S2 | validation | as web | Loose phone check ("1" passes); URL needs a scheme; no number bounds; no custom error texts; no name greeting (`NodeHandler.swift:132-156`) |
-| IO19 S2 | UI | every node type | ChatView draws only choice pills, the handover card and text (`ChatView.swift:381-418`); `NodeRenderer` is unused |
-| IO20 S2 | handler outputs | n/a | Generic variables (`result`, `withinBusinessHours`...) overwrite user variables (NFE `:281-286`) |
+| IO21 S3 | Rich step UI | Each rich step draws its own card. | The stock ChatView draws button steps as pills (choices, yes/no, consent, payment, navigate, dynamic choices, quiz) and composer steps in the text field (ask-*, OTP, AI, KB, signature by typed name, address as the street line). No view yet for rating, opinion scale / slider, calendar / datetime, file upload, multi-choice (n-check-options, ranking), cards (carousel, product) or the matrix (`.rich`); a custom UI answers them through `handleNodeInput` / `handleButtonClick` / `handleMultipleChoiceSelection` (#45). |
+| IO22 S3 | signature-node | A typed name drawn on a canvas, uploaded as PNG. | Uploaded as an SVG of the typed name, as RN; a drawn signature needs the app to hand over the PNG (`["image": Data]`). |
+| IO23 S3 | hidden-fields-node | The page's query, URL and referrer. | Nothing is captured unless the engine is given `Config.page`. |
+| IO24 S2 | webhook-node | Called from the browser (spec `webOnly`). | Still called from the device in the background, as RN; the flow does not wait for it. |
+| IO25 S3 | Pacing | Media move on when they load. | Images and videos move on at the 4000 ms cap unless the app calls `mediaSettled(nodeId:)`; the stock bubbles don't call it yet. |
 
 ## Flutter
 
