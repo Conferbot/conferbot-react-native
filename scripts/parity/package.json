@@ -1,0 +1,6 @@
+{
+  "name": "sdk-parity-tools",
+  "private": true,
+  "description": "Generators that turn the web widget's CSS/SVG into data for the 4 mobile SDKs. Run npm install here once.",
+  "dependencies": { "puppeteer-core": "22.15.0" }
+}
