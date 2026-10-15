@@ -14,6 +14,8 @@ import {
 } from '../../types/messageStatus';
 
 import type { Reaction, ReactionEmoji } from '../../types';
+import { fillVariables } from '../flow/text';
+import { maskRecordEntry, maskValue } from '../privacy/redact';
 
 // ========================================
 // TYPES
@@ -71,7 +73,10 @@ export class ChatState {
   private _botId: string;
 
   // Answer variables (from user inputs)
-  private _answerVariables: Map<string, AnswerVariable> = new Map();
+  private _answerVariables: AnswerVariable[] = [];
+
+  // Card numbers, ids and passwords masked in answers and records
+  private _redactSensitive: boolean = true;
 
   // General variables (for flow logic)
   private _variables: Map<string, any> = new Map();
@@ -636,40 +641,109 @@ export class ChatState {
     value: any,
     nodeId?: string
   ): void {
-    const answer: AnswerVariable = {
-      questionId,
-      variableName,
-      value,
+    // By name, as the web saves logic results and integration values
+    // (saveVariableByName): every entry with that key, else a new one.
+    this.saveVariableByName(variableName, value, nodeId ?? questionId, questionId);
+  }
+
+  /**
+   * Masking of card numbers, ids and passwords in the answers and the
+   * visitor's record entries (web customizations.redactSensitive: on unless
+   * false). The transcript keeps what was typed.
+   */
+  setRedactSensitive(on: boolean): void {
+    this._redactSensitive = on !== false;
+  }
+
+  get redactSensitive(): boolean {
+    return this._redactSensitive;
+  }
+
+  private masked(value: any): any {
+    return this._redactSensitive ? maskValue(value) : value;
+  }
+
+  /**
+   * A question step with data.answerVariable registers {nodeId, key,
+   * value: null} when it is shown; its answer then fills it by nodeId
+   * (web index.ts _nodeCategorizeHelper / _setAnswerVariable).
+   */
+  registerAnswerVariable(nodeId: string, key: string): void {
+    if (!key) return;
+    this._answerVariables.push({
+      questionId: nodeId,
+      variableName: key,
+      value: null,
       nodeId,
       timestamp: new Date().toISOString(),
-    };
-    this._answerVariables.set(variableName, answer);
+    });
     this.notifyListeners();
   }
 
   /**
-   * Gets an answer variable by name
+   * Fills the entry registered for a step (the first with that nodeId).
+   * Nothing happens when the step registered none - a question without
+   * data.answerVariable stores nothing. Returns whether an entry was filled.
    */
-  getAnswer(variableName: string): any {
-    return this._answerVariables.get(variableName)?.value;
+  setAnswerVariable(nodeId: string, value: any): boolean {
+    const entry = this._answerVariables.find((v) => v.nodeId === nodeId);
+    if (!entry) return false;
+    entry.value = this.masked(value);
+    entry.timestamp = new Date().toISOString();
+    this.notifyListeners();
+    return true;
   }
 
   /**
-   * Gets all answer variables as a plain object
+   * Saves a value under a variable's name: every entry with that name gets
+   * it; with none, one entry is added (nodeId "column_mapped_<key>" unless
+   * one is given) - web index.ts _setAnswerVariableByKey.
+   */
+  saveVariableByName(key: string, value: any, nodeId?: string, questionId?: string): void {
+    if (!key) return;
+    const v = this.masked(value);
+    const matches = this._answerVariables.filter((a) => a.variableName === key);
+    if (matches.length) {
+      matches.forEach((a) => {
+        a.value = v;
+        a.timestamp = new Date().toISOString();
+      });
+    } else {
+      const id = nodeId !== undefined && nodeId !== null && nodeId !== '' ? nodeId : `column_mapped_${key}`;
+      this._answerVariables.push({ questionId: questionId ?? id, variableName: key, value: v, nodeId: id, timestamp: new Date().toISOString() });
+    }
+    this.notifyListeners();
+  }
+
+  /** Whether an entry with this key exists (answered or not). */
+  hasAnswerVariable(key: string): boolean {
+    return this._answerVariables.some((a) => a.variableName === key);
+  }
+
+  /**
+   * An answer by name: the FIRST entry with that key (web
+   * _getValueFromAnswerVariableKey); undefined when there is none.
+   */
+  getAnswer(variableName: string): any {
+    return this._answerVariables.find((a) => a.variableName === variableName)?.value;
+  }
+
+  /**
+   * Gets all answer variables as a plain object (the first entry per key)
    */
   getAllAnswers(): Record<string, any> {
     const answers: Record<string, any> = {};
-    this._answerVariables.forEach((answer, key) => {
-      answers[key] = answer.value;
+    this._answerVariables.forEach((answer) => {
+      if (!(answer.variableName in answers)) answers[answer.variableName] = answer.value;
     });
     return answers;
   }
 
   /**
-   * Gets all answer variables with full metadata
+   * Gets all answer variables with full metadata, in the order they were made
    */
   getAnswerVariables(): AnswerVariable[] {
-    return Array.from(this._answerVariables.values());
+    return this._answerVariables.map((a) => ({ ...a }));
   }
 
   // ========================================
@@ -837,10 +911,16 @@ export class ChatState {
    * then the user selection merges into the same entry.
    */
   addRecord(entry: RecordEntry): void {
+    // The visitor's own entries never carry a card number, id or password
+    // (web index.ts _pushDataToRecord -> privacy maskRecordEntry).
+    if (this._redactSensitive) maskRecordEntry(entry);
     const entryId = (entry as any).id || (entry as any)._id;
     if (entryId) {
+      // Same step AND same kind (type|shape): the bot's step and the
+      // visitor's answer to it are separate entries, as on the web.
+      const kind = (r: any) => `${r?.type ?? ''}|${r?.shape ?? ''}`;
       const existingIndex = this._record.findIndex(
-        (r: any) => (r.id || r._id) === entryId
+        (r: any) => (r.id || r._id) === entryId && kind(r) === kind(entry)
       );
       if (existingIndex !== -1) {
         // Merge into existing record (same as web widget's _pushDataToRecord)
@@ -857,6 +937,15 @@ export class ChatState {
         return;
       }
     }
+    this._record.push(entry);
+    this.notifyListeners();
+  }
+
+  /**
+   * Appends an entry as it is - every visit of a step and every edge taken
+   * is its own entry (web index.ts S.record.push).
+   */
+  appendRecord(entry: RecordEntry): void {
     this._record.push(entry);
     this.notifyListeners();
   }
@@ -998,7 +1087,7 @@ export class ChatState {
       botMessages: botMessageCount,
       userMessages: userMessageCount,
       goalsReached,
-      answersCollected: this._answerVariables.size,
+      answersCollected: this._answerVariables.length,
       variablesSet: this._variables.size,
       totalReactions,
       messagesWithReactions: this._reactions.size,
@@ -1016,42 +1105,28 @@ export class ChatState {
    * Supports ${variableName}, {variableName}, and {{variableName}} syntax
    * (matching the web widget's parsedHtmlElement replaceVariables).
    */
-  resolveVariables(text: string): string {
+  resolveVariables(text: string, mode: 'raw' | 'html' = 'raw'): string {
     if (!text) return text;
+    // Web nodeLogic.fillVariables: {x}, ${x}, {{x}}, ${ANSWERS.x}, $${x};
+    // an unknown, null or "" value shows nothing and the gap is tidied.
+    // "html" escapes the values (owner HTML around them); "raw" does not.
+    return fillVariables(text, (key) => this.lookupVariable(key), { mode });
+  }
 
-    // Resolve function shared across patterns
-    const resolve = (match: string, varName: string): string => {
-      const trimmedName = varName.trim();
-
-      // Check answer variables first
-      const answer = this.getAnswer(trimmedName);
-      if (answer !== undefined) {
-        return String(answer);
-      }
-
-      // Check general variables
-      const variable = this.getVariable(trimmedName);
-      if (variable !== undefined) {
-        return String(variable);
-      }
-
-      // Check user metadata
-      const metadata = this._userMetadata[trimmedName];
-      if (metadata !== undefined) {
-        return String(metadata);
-      }
-
-      // Return original if not found
-      return match;
-    };
-
-    // First pass: {{variable}} (double-brace, legacy SDK format)
-    let result = text.replace(/\{\{([^}]+)\}\}/g, resolve);
-
-    // Second pass: ${variable} and {variable} (matching web widget exactly)
-    result = result.replace(/\$?\{(\w+)\}/g, resolve);
-
-    return result;
+  /**
+   * A placeholder's value: the answers first (the first entry with that
+   * key, as the web reads them), then the flow variables, then the
+   * visitor's details. Internal "_" variables never fill text.
+   */
+  lookupVariable(key: string): any {
+    const name = String(key ?? '').trim();
+    if (!name) return undefined;
+    if (this.hasAnswerVariable(name)) return this.getAnswer(name);
+    if (!name.startsWith('_')) {
+      const variable = this.getVariable(name);
+      if (variable !== undefined) return variable;
+    }
+    return this._userMetadata[name];
   }
 
   // ========================================
@@ -1125,7 +1200,15 @@ export class ChatState {
     // Restore answer variables
     if (Array.isArray(data.answerVariables)) {
       for (const answer of data.answerVariables) {
-        state._answerVariables.set(answer.variableName, answer);
+        const key = answer?.variableName ?? answer?.key;
+        if (!key) continue;
+        state._answerVariables.push({
+          questionId: answer.questionId ?? answer.nodeId ?? key,
+          variableName: key,
+          value: answer.value ?? null,
+          nodeId: answer.nodeId ?? answer.questionId,
+          timestamp: answer.timestamp ?? new Date().toISOString(),
+        });
       }
     }
 
@@ -1188,7 +1271,7 @@ export class ChatState {
   reset(): void {
     // Generate a new session ID (same approach as web widget)
     this._sessionId = Math.random().toString(36).substring(2, 15);
-    this._answerVariables.clear();
+    this._answerVariables = [];
     this._variables.clear();
     this._userMetadata = {};
     this._transcript = [];
