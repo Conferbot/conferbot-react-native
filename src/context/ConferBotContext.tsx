@@ -27,6 +27,7 @@ import { resolveCustomizations } from '../core/customizations';
 import { resolveWidgetTheme, withThemePalette } from '../core/widgetTheme';
 import { useAgentBot } from './hooks/useAgentBot';
 import { useLiveChatExtras } from './hooks/useLiveChatExtras';
+import { useHandoverLifecycle } from './hooks/useHandoverLifecycle';
 
 // ********** Context Creation ********** //
 const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
@@ -173,6 +174,24 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     },
   });
 
+  // ********** Handover Lifecycle Hook ********** //
+  // The Connecting line and its outcome, the 20s waiting signal, leaving
+  // the queue, and a live chat picked back up after a restart
+  // (core/handoverState.ts, core/handoverWaiting.ts).
+  const handover = useHandoverLifecycle({
+    socketClient,
+    chatStateRef,
+    flowEngine: flowEngineRef,
+    record,
+    setRecord,
+    isOpen,
+    setIsLiveChatMode,
+    setCurrentAgent,
+    setCurrentUIState,
+    setIsNodeProcessing,
+    waitingForPerson: currentUIState?.type === 'humanHandover' && !isLiveChatMode,
+  });
+
   // The agent chat is greeted when the visitor opens the chat, never at
   // connect (fetched-chatbot-data arrives at every app start).
   const agentStartRef = useRef<{ sessionId: string; bot: any; nodes: any[] } | null>(null);
@@ -281,7 +300,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setupAgentListeners: () => {
       setupAgentListeners();
       liveChatExtras.setupLiveChatListeners();
+      handover.setupHandoverListeners();
     },
+    handover,
   });
 
   // ********** Reset Conversation ********** //
@@ -296,6 +317,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setAgentTyping(false);
     resetAgent();
     liveChatExtras.resetLiveChatExtras();
+    handover.resetHandover();
 
     flowEngineRef.current?.reset();
     flowEngineRef.current = null;
@@ -342,6 +364,8 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
         setChatSessionId(sessionId);
         // The listeners' fetched-chatbot-data uses the socket's session.
         if (socketClient.current) socketClient.current.chatSessionId = sessionId;
+        // Its live chat (if any) is picked back up once the bot data arrives.
+        handover.restoredSessionRef.current = sessionId;
 
         // The device's own messages first: they are what was on screen (the
         // server's record is in its own shapes and has no AI replies).
@@ -635,6 +659,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     skipLeaveMessage: liveChatExtras.skipLeaveMessage,
     dismissCsat: liveChatExtras.dismissCsat,
     dismissFileRequest: liveChatExtras.dismissFileRequest,
+    // Handover lifecycle
+    leaveQueue: handover.leaveQueue,
+    onWidgetSignal: handover.onWidgetSignal,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
