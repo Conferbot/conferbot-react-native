@@ -1,8 +1,9 @@
 /**
  * NodeHandlers Tests
  *
- * Tests for node handler implementations.
- * Covers display nodes, ask nodes, choice nodes, and logic nodes.
+ * The display, ask and choice step handlers, read the way the builder saves
+ * them (scripts/parity/flows/nodes.spec.json). Whole flows run against the
+ * web's outcomes in __tests__/parity/flows.test.ts.
  */
 
 import { ChatState } from '../../src/core/state/ChatState';
@@ -22,20 +23,19 @@ import {
   AskNameHandler,
   AskNumberHandler,
   AskUrlHandler,
+  AskFileHandler,
 } from '../../src/core/nodes/handlers/AskNodeHandlers';
 import {
   ButtonsHandler,
   RatingHandler,
   DropdownHandler,
   OpinionScaleHandler,
+  PictureChoiceHandler,
+  YesOrNoChoiceHandler,
+  NCheckOptionsHandler,
+  CarouselHandler,
 } from '../../src/core/nodes/handlers/ChoiceNodeHandlers';
-import {
-  createMessageNode,
-  createImageNode,
-  createButtonsNode,
-  createAskEmailNode,
-  createNode,
-} from '../testUtils';
+import { createNode } from '../testUtils';
 
 describe('Node Handlers', () => {
   let chatState: ChatState;
@@ -44,317 +44,60 @@ describe('Node Handlers', () => {
     chatState = new ChatState('test-session', 'test-bot');
   });
 
+  const ask = (handler: any, node: any) => {
+    if (node.data?.answerVariable) chatState.registerAnswerVariable(node.id, node.data.answerVariable);
+    return handler.handle(node, chatState);
+  };
+
   // ========================================
   // DISPLAY NODE HANDLERS
   // ========================================
 
   describe('Display Node Handlers', () => {
-    describe('MessageHandler', () => {
-      const handler = new MessageHandler();
-
-      it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('message-node');
-      });
-
-      it('should handle simple message node', async () => {
-        const node = createMessageNode('Hello, world!');
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          expect(result.uiState.type).toBe('message');
-          expect((result.uiState as NodeUIState.Message).text).toBe('Hello, world!');
-        }
-      });
-
-      it('should resolve variables in message text', async () => {
-        chatState.setAnswer('q1', 'name', 'John');
-        const node = createNode('message-node', { text: 'Hello, {{name}}!' });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          expect((result.uiState as NodeUIState.Message).text).toBe('Hello, John!');
-        }
-      });
-
-      it('should add message to transcript', async () => {
-        const node = createMessageNode('Test message');
-        await handler.handle(node, chatState);
-
-        const transcript = chatState.getTranscript();
-        expect(transcript).toHaveLength(1);
-        expect(transcript[0].type).toBe('bot');
-        expect(transcript[0].text).toBe('Test message');
-      });
-
-      it('should handle typing delay', async () => {
-        const node = createNode('message-node', {
-          text: 'Delayed message',
-          typingDelay: 1000,
-          showTyping: true,
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('delayedProceed');
-        if (result.type === 'delayedProceed') {
-          expect(result.delayMs).toBe(1000);
-        }
-      });
-
-      it('should handle node without data gracefully', async () => {
-        // Node handlers typically have fallbacks for missing data
-        const result = await handler.handle({ id: 'test' }, chatState);
-
-        // The handler may either return an error or a displayUI with empty/default text
-        expect(['error', 'displayUI']).toContain(result.type);
-      });
-
-      it('should support alternative text field names', async () => {
-        const node = createNode('message-node', { message: 'Using message field' });
-        const result = await handler.handle(node, chatState);
-
-        if (result.type === 'displayUI') {
-          expect((result.uiState as NodeUIState.Message).text).toBe('Using message field');
-        }
-      });
+    it('message-node shows data.text with the answers filled in, as a bubble', async () => {
+      chatState.saveVariableByName('name', 'Ana');
+      const result: any = await new MessageHandler().handle(createNode('message-node', { text: '<p>Hi {name}, <b>welcome</b></p>' }), chatState);
+      expect(result.uiState).toMatchObject({ type: 'message', text: 'Hi Ana, welcome' });
+      expect(chatState.getTranscript().pop()?.text).toBe('Hi Ana, welcome');
     });
 
-    describe('ImageHandler', () => {
-      const handler = new ImageHandler();
-
-      it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('image-node');
-      });
-
-      it('should handle image node with URL', async () => {
-        const node = createImageNode('https://example.com/image.jpg', 'Test caption');
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.Image;
-          expect(uiState.type).toBe('image');
-          expect(uiState.url).toBe('https://example.com/image.jpg');
-          expect(uiState.caption).toBe('Test caption');
-        }
-      });
-
-      it('should return error when URL is missing', async () => {
-        const node = createNode('image-node', {});
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('error');
-        if (result.type === 'error') {
-          expect(result.message).toContain('URL');
-        }
-      });
-
-      it('should resolve variables in caption', async () => {
-        chatState.setVariable('product', 'Widget');
-        const node = createNode('image-node', {
-          url: 'https://example.com/image.jpg',
-          caption: 'Our {{product}}',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        if (result.type === 'displayUI') {
-          expect((result.uiState as NodeUIState.Image).caption).toBe('Our Widget');
-        }
-      });
-
-      it('should add image to transcript', async () => {
-        const node = createImageNode('https://example.com/image.jpg', 'Caption');
-        await handler.handle(node, chatState);
-
-        const transcript = chatState.getTranscript();
-        expect(transcript).toHaveLength(1);
-        expect(transcript[0].text).toBe('[Image: Caption]');
-      });
+    it('message-node never skips a message equal to the last choice (web shows it)', async () => {
+      chatState.setVariable('_lastUserChoice', 'A');
+      const result = await new MessageHandler().handle(createNode('message-node', { text: 'A' }), chatState);
+      expect(result.type).toBe('displayUI');
     });
 
-    describe('VideoHandler', () => {
-      const handler = new VideoHandler();
-
-      it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('video-node');
-      });
-
-      it('should handle video node', async () => {
-        const node = createNode('video-node', {
-          url: 'https://example.com/video.mp4',
-          poster: 'https://example.com/poster.jpg',
-          autoplay: false,
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.Video;
-          expect(uiState.type).toBe('video');
-          expect(uiState.url).toBe('https://example.com/video.mp4');
-          expect(uiState.poster).toBe('https://example.com/poster.jpg');
-          expect(uiState.autoplay).toBe(false);
-        }
-      });
-
-      it('should return error when URL is missing', async () => {
-        const node = createNode('video-node', {});
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('error');
-      });
+    it('image-node reads data.image and draws it as a picture, not "[Image]"', async () => {
+      const result: any = await new ImageHandler().handle(createNode('image-node', { image: 'https://cdn.example/a.png' }), chatState);
+      expect(result.uiState).toMatchObject({ type: 'image', url: 'https://cdn.example/a.png' });
+      const entry = chatState.getTranscript().pop();
+      expect(entry?.text).toBe('');
+      expect(entry?.data?.imageUrl).toBe('https://cdn.example/a.png');
     });
 
-    describe('AudioHandler', () => {
-      const handler = new AudioHandler();
-
-      it('should handle audio node', async () => {
-        const node = createNode('audio-node', {
-          url: 'https://example.com/audio.mp3',
-          autoplay: true,
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.Audio;
-          expect(uiState.type).toBe('audio');
-          expect(uiState.url).toBe('https://example.com/audio.mp3');
-          expect(uiState.autoplay).toBe(true);
-        }
-      });
+    it('video / audio / file read data.video / data.audio / data.file and never stall', async () => {
+      const v: any = await new VideoHandler().handle(createNode('video-node', { video: 'https://cdn.example/v.mp4' }), chatState);
+      const a: any = await new AudioHandler().handle(createNode('audio-node', { audio: [{ id: 1, audio: 'x' }] }), chatState);
+      const f: any = await new FileHandler().handle(createNode('file-node', { file: 'https://cdn.example/files/guide.pdf' }), chatState);
+      expect(v.uiState).toMatchObject({ type: 'video', url: 'https://cdn.example/v.mp4' });
+      expect(a.type).toBe('displayUI');
+      expect(f.uiState).toMatchObject({ type: 'file', url: 'https://cdn.example/files/guide.pdf', filename: 'guide.pdf' });
     });
 
-    describe('FileHandler', () => {
-      const handler = new FileHandler();
-
-      it('should handle file node', async () => {
-        const node = createNode('file-node', {
-          url: 'https://example.com/document.pdf',
-          filename: 'document.pdf',
-          size: 1024,
-          mimeType: 'application/pdf',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.File;
-          expect(uiState.type).toBe('file');
-          expect(uiState.url).toBe('https://example.com/document.pdf');
-          expect(uiState.filename).toBe('document.pdf');
-          expect(uiState.size).toBe(1024);
-        }
-      });
-
-      it('should extract filename from URL if not provided', async () => {
-        const node = createNode('file-node', {
-          url: 'https://example.com/path/to/document.pdf',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        if (result.type === 'displayUI') {
-          expect((result.uiState as NodeUIState.File).filename).toBe('document.pdf');
-        }
-      });
+    it('html-node fills the answers (escaped) and removes scripts and handlers', async () => {
+      chatState.saveVariableByName('n', '<b>x</b>');
+      const result: any = await new HTMLHandler().handle(createNode('html-node', { html: '<p onclick="x()">Hi {n}</p><script>bad()</script>' }), chatState);
+      expect(result.uiState.content).toBe('<p>Hi &lt;b&gt;x&lt;/b&gt;</p>');
     });
 
-    describe('HTMLHandler', () => {
-      const handler = new HTMLHandler();
-
-      it('should handle HTML node', async () => {
-        const node = createNode('html-node', {
-          html: '<div>Custom HTML</div>',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.HTML;
-          expect(uiState.type).toBe('html');
-          expect(uiState.content).toBe('<div>Custom HTML</div>');
-        }
-      });
-
-      it('should resolve variables in HTML content', async () => {
-        chatState.setVariable('color', 'red');
-        const node = createNode('html-node', {
-          html: '<div style="color: {{color}}">Text</div>',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        if (result.type === 'displayUI') {
-          expect((result.uiState as NodeUIState.HTML).content).toContain('color: red');
-        }
-      });
-    });
-
-    describe('RedirectHandler', () => {
-      const handler = new RedirectHandler();
-
-      it('should handle redirect node', async () => {
-        const node = createNode('user-redirect-node', {
-          url: 'https://example.com',
-          openInNewTab: true,
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('proceed');
-        if (result.type === 'proceed') {
-          expect(result.data?.redirectUrl).toBe('https://example.com');
-          expect(result.data?.openInNewTab).toBe(true);
-        }
-      });
-
-      it('should store redirect info in state', async () => {
-        const node = createNode('user-redirect-node', {
-          url: 'https://example.com',
-        });
-
-        await handler.handle(node, chatState);
-
-        const redirect = chatState.getVariable('_redirect');
-        expect(redirect).toBeDefined();
-        expect(redirect.url).toBe('https://example.com');
-      });
-
-      it('should handle redirect with delay', async () => {
-        const node = createNode('user-redirect-node', {
-          url: 'https://example.com',
-          delay: 2000,
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('delayedProceed');
-        if (result.type === 'delayedProceed') {
-          expect(result.delayMs).toBe(2000);
-        }
-      });
-
-      it('should resolve variables in URL', async () => {
-        chatState.setVariable('page', 'products');
-        const node = createNode('user-redirect-node', {
-          url: 'https://example.com/{{page}}',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        if (result.type === 'proceed') {
-          expect(result.data?.redirectUrl).toBe('https://example.com/products');
-        }
-      });
+    it('user-redirect-node shows a link to data.link (query values encoded) and moves on - it never navigates', async () => {
+      chatState.saveVariableByName('ref', 'Priya Shah');
+      const result: any = await new RedirectHandler().handle(
+        createNode('user-redirect-node', { redirectPrompt: '<p>Open</p>', link: 'example.com/p?ref={ref}' }),
+        chatState
+      );
+      expect(result.type).toBe('displayUI');
+      expect(chatState.getTranscript().pop()?.data?.linkUrl).toBe('https://example.com/p?ref=Priya%20Shah');
     });
   });
 
@@ -363,179 +106,71 @@ describe('Node Handlers', () => {
   // ========================================
 
   describe('Ask Node Handlers', () => {
-    describe('AskEmailHandler', () => {
-      let handler: any;
-
-      beforeEach(() => {
-        // Create handler - we need to access it differently since it's exported
-        const { AskEmailHandler: Handler } = require('../../src/core/nodes/handlers/AskNodeHandlers');
-        handler = new Handler();
-      });
-
-      it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('ask-email-node');
-      });
-
-      it('should handle ask email node', async () => {
-        const node = createAskEmailNode('What is your email?', 'userEmail');
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.TextInput;
-          expect(uiState.type).toBe('textInput');
-          expect(uiState.inputType).toBe('email');
-          expect(uiState.question).toBe('What is your email?');
-          expect(uiState.variableName).toBe('userEmail');
-        }
-      });
-
-      it('should handle user response', async () => {
-        const node = createAskEmailNode('What is your email?', 'userEmail');
-        const response = 'test@example.com';
-
-        const result = await handler.handleResponse(response, node, chatState);
-
-        expect(result.type).toBe('proceed');
-        expect(chatState.getAnswer('userEmail')).toBe('test@example.com');
-      });
-
-      it('should set user email in metadata', async () => {
-        const node = createAskEmailNode('What is your email?', 'email');
-        await handler.handleResponse('user@example.com', node, chatState);
-
-        expect(chatState.userEmail).toBe('user@example.com');
-      });
+    it('asks data.questionText and saves the answer in the variable it registered', async () => {
+      const node = createNode('ask-email-node', { questionText: '<p>Your email?</p>', answerVariable: 'email' }, { id: 'q' });
+      const ui: any = await ask(new AskEmailHandler(), node);
+      expect(ui.uiState).toMatchObject({ type: 'textInput', question: 'Your email?', inputType: 'email' });
+      const result = await new AskEmailHandler().handleResponse(' ana@example.org ', node, chatState);
+      expect(result).toEqual(NodeResult.next({ email: 'ana@example.org' }));
+      expect(chatState.getAnswer('email')).toBe('ana@example.org');
+      expect(chatState.getRecord().find((r: any) => r.shape === 'user-ask-email-response')?.text).toBe('ana@example.org');
     });
 
-    describe('AskNameHandler', () => {
-      let handler: any;
-
-      beforeEach(() => {
-        const { AskNameHandler: Handler } = require('../../src/core/nodes/handlers/AskNodeHandlers');
-        handler = new Handler();
-      });
-
-      it('should handle ask name node', async () => {
-        const node = createNode('ask-name-node', {
-          question: 'What is your name?',
-          variableName: 'userName',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          expect((result.uiState as NodeUIState.TextInput).inputType).toBe('text');
-        }
-      });
-
-      it('should set user name in metadata', async () => {
-        const node = createNode('ask-name-node', {
-          question: 'What is your name?',
-          variableName: 'name',
-        });
-
-        await handler.handleResponse('John Doe', node, chatState);
-
-        expect(chatState.userName).toBe('John Doe');
-      });
+    it('without data.answerVariable nothing is stored', async () => {
+      const node = createNode('ask-email-node', { questionText: 'Email?' }, { id: 'q' });
+      await ask(new AskEmailHandler(), node);
+      await new AskEmailHandler().handleResponse('ana@example.org', node, chatState);
+      expect(chatState.getAnswerVariables()).toHaveLength(0);
     });
 
-    describe('AskPhoneHandler', () => {
-      let handler: any;
-
-      beforeEach(() => {
-        const { AskPhoneHandler: Handler } = require('../../src/core/nodes/handlers/AskNodeHandlers');
-        handler = new Handler();
-      });
-
-      it('should handle ask phone node', async () => {
-        const node = createNode('ask-phone-number-node', {
-          question: 'What is your phone number?',
-          variableName: 'userPhone',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          expect((result.uiState as NodeUIState.TextInput).inputType).toBe('phone');
-        }
-      });
-
-      it('should set user phone in metadata', async () => {
-        const node = createNode('ask-phone-number-node', {
-          question: 'What is your phone number?',
-          variableName: 'phone',
-        });
-
-        await handler.handleResponse('+1234567890', node, chatState);
-
-        expect(chatState.userPhone).toBe('+1234567890');
-      });
+    it('refuses a bad e-mail (incorrectEmailResponse) and keeps waiting', async () => {
+      const node = createNode('ask-email-node', { incorrectEmailResponse: '<p>Nope</p>' }, { id: 'q' });
+      const result: any = await new AskEmailHandler().handleResponse('not-an-email', node, chatState);
+      expect(result).toMatchObject({ type: 'invalid', message: '<p>Nope</p>' });
     });
 
-    describe('AskNumberHandler', () => {
-      let handler: any;
-
-      beforeEach(() => {
-        const { AskNumberHandler: Handler } = require('../../src/core/nodes/handlers/AskNodeHandlers');
-        handler = new Handler();
-      });
-
-      it('should handle ask number node with constraints', async () => {
-        const node = createNode('ask-number-node', {
-          question: 'Enter a number between 1 and 100',
-          variableName: 'quantity',
-          min: 1,
-          max: 100,
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.TextInput;
-          expect(uiState.inputType).toBe('number');
-          expect(uiState.validation?.min).toBe(1);
-          expect(uiState.validation?.max).toBe(100);
-        }
-      });
-
-      it('should parse number from response', async () => {
-        const node = createNode('ask-number-node', {
-          question: 'Enter quantity',
-          variableName: 'quantity',
-        });
-
-        await handler.handleResponse('42', node, chatState);
-
-        expect(chatState.getAnswer('quantity')).toBe(42);
-      });
+    it('offers the fix for a domain typo once, then keeps the address', async () => {
+      const node = createNode('ask-email-node', {}, { id: 'q' });
+      const first: any = await new AskEmailHandler().handleResponse('ana@gmial.com', node, chatState);
+      expect(first.message).toContain('ana@gmail.com');
+      expect((await new AskEmailHandler().handleResponse('ana@gmial.com', node, chatState)).type).toBe('proceed');
     });
 
-    describe('AskUrlHandler', () => {
-      let handler: any;
+    it('ask-name saves the full answer and greets by the first name after typing', async () => {
+      const node = createNode('ask-name-node', { answerVariable: 'name' }, { id: 'q' });
+      await ask(new AskNameHandler(), node);
+      await new AskNameHandler().handleResponse('  deepak gopal ', { ...node, ctx: { typing: async () => undefined } }, chatState);
+      expect(chatState.getAnswer('name')).toBe('deepak gopal');
+      expect(chatState.getTranscript().pop()?.text).toBe('Nice to meet you, Deepak');
+    });
 
-      beforeEach(() => {
-        const { AskUrlHandler: Handler } = require('../../src/core/nodes/handlers/AskNodeHandlers');
-        handler = new Handler();
-      });
+    it('ask-phone normalises the number; ask-number saves a number; ask-url adds https', async () => {
+      const phone = createNode('ask-phone-number-node', { answerVariable: 'phone' }, { id: 'p' });
+      await ask(new AskPhoneHandler(), phone);
+      await new AskPhoneHandler().handleResponse('+1 (555) 123-4567', phone, chatState);
+      expect(chatState.getAnswer('phone')).toBe('+15551234567');
 
-      it('should handle ask URL node', async () => {
-        const node = createNode('ask-url-node', {
-          question: 'Enter your website URL',
-          variableName: 'website',
-        });
+      const num = createNode('ask-number-node', { answerVariable: 'n', enableConditions: { minVal: 10, maxVal: 100 } }, { id: 'n' });
+      await ask(new AskNumberHandler(), num);
+      expect((await new AskNumberHandler().handleResponse('500', num, chatState)).type).toBe('invalid');
+      await new AskNumberHandler().handleResponse('1,0', num, chatState);
+      expect((await new AskNumberHandler().handleResponse('42', num, chatState)).type).toBe('proceed');
+      expect(chatState.getAnswer('n')).toBe(42);
 
-        const result = await handler.handle(node, chatState);
+      const url = createNode('ask-url-node', { answerVariable: 'site' }, { id: 'u' });
+      await ask(new AskUrlHandler(), url);
+      await new AskUrlHandler().handleResponse('conferbot.com/pricing', url, chatState);
+      expect(chatState.getAnswer('site')).toBe('https://conferbot.com/pricing');
+    });
 
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          expect((result.uiState as NodeUIState.TextInput).inputType).toBe('url');
-        }
-      });
+    it('ask-file refuses a file that is too big on the card and uploads the rest', async () => {
+      const upload = jest.fn(async () => ({ ok: true, url: 'https://cdn.example/f.pdf' }));
+      const node = { ...createNode('ask-file-node', { answerVariable: 'file', maxFileSizeMB: 1 }, { id: 'f' }), ctx: { upload } };
+      await ask(new AskFileHandler(), node);
+      const big: any = await new AskFileHandler().handleResponse({ file: { name: 'a.png', size: 3 * 1024 * 1024, type: 'image/png' } }, node, chatState);
+      expect(big).toMatchObject({ type: 'invalid', inCard: true });
+      await new AskFileHandler().handleResponse({ file: { name: 'a.pdf', size: 100, type: 'application/pdf' } }, node, chatState);
+      expect(chatState.getAnswer('file')).toBe('https://cdn.example/f.pdf');
     });
   });
 
@@ -544,156 +179,74 @@ describe('Node Handlers', () => {
   // ========================================
 
   describe('Choice Node Handlers', () => {
-    describe('ButtonsHandler', () => {
-      let handler: any;
-
-      beforeEach(() => {
-        const { ButtonsHandler: Handler } = require('../../src/core/nodes/handlers/ChoiceNodeHandlers');
-        handler = new Handler();
-      });
-
-      it('should have correct node type', () => {
-        expect(handler.nodeType).toBe('n-choices-node');
-      });
-
-      it('should handle buttons node', async () => {
-        const node = createButtonsNode('Choose an option:', [
-          { label: 'Option A', value: 'a' },
-          { label: 'Option B', value: 'b' },
-        ]);
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.Buttons;
-          expect(uiState.type).toBe('buttons');
-          expect(uiState.question).toBe('Choose an option:');
-          expect(uiState.buttons).toHaveLength(2);
-        }
-      });
-
-      it('should handle button selection response', async () => {
-        const node = createNode('n-choices-node', {
-          question: 'Choose:',
-          buttons: [
-            { id: 'btn-1', label: 'Yes', value: 'yes' },
-            { id: 'btn-2', label: 'No', value: 'no' },
-          ],
-          variableName: 'choice',
-        });
-
-        const result = await handler.handleResponse({ id: 'btn-1', value: 'yes' }, node, chatState);
-
-        expect(result.type).toBe('proceed');
-        // The answer may be stored differently depending on handler implementation
-        const answer = chatState.getAnswer('choice');
-        expect(answer === 'yes' || answer === undefined || answer?.value === 'yes').toBeTruthy();
-      });
+    it('n-choices reads choices[].choiceText (blank hidden) and leaves by "source-" + the choice id', async () => {
+      const node = createNode(
+        'n-choices-node',
+        { choicePrompt: '<p>Pick</p>', choices: [{ id: '1', choiceText: '<p>One</p>' }, { id: '2', choiceText: '' }, { id: 'u-3', choiceText: 'Three' }], answerVariable: 'pick' },
+        { id: 'c' }
+      );
+      const ui: any = await ask(new ButtonsHandler(), node);
+      expect(ui.uiState.buttons.map((b: any) => b.id)).toEqual(['1', 'u-3']);
+      const result = await new ButtonsHandler().handleResponse({ buttonId: 'u-3' }, node, chatState);
+      expect(result).toEqual(NodeResult.port('source-u-3'));
+      expect(chatState.getAnswer('pick')).toBe('Three');
     });
 
-    describe('RatingHandler', () => {
-      let handler: any;
-
-      beforeEach(() => {
-        const { RatingHandler: Handler } = require('../../src/core/nodes/handlers/ChoiceNodeHandlers');
-        handler = new Handler();
-      });
-
-      it('should handle rating node', async () => {
-        const node = createNode('rating-choice-node', {
-          question: 'Rate your experience',
-          maxRating: 5,
-          style: 'stars',
-          variableName: 'rating',
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.Rating;
-          expect(uiState.type).toBe('rating');
-          expect(uiState.maxRating).toBe(5);
-          expect(uiState.style).toBe('stars');
-        }
-      });
-
-      it('should handle rating response', async () => {
-        const node = createNode('rating-choice-node', {
-          question: 'Rate:',
-          maxRating: 5,
-          variableName: 'userRating',
-        });
-
-        await handler.handleResponse(4, node, chatState);
-
-        expect(chatState.getAnswer('userRating')).toBe(4);
-      });
+    it('image-choice reads data.images and leaves by "source-" + the image id', async () => {
+      const node = createNode('image-choice-node', { images: [{ id: 'i1', image: 'https://x/a.png', label: 'A' }], answerVariable: 'img' }, { id: 'ic' });
+      const ui: any = await ask(new PictureChoiceHandler(), node);
+      expect(ui.uiState.choices).toHaveLength(1);
+      expect(await new PictureChoiceHandler().handleResponse({ choiceId: 'i1' }, node, chatState)).toEqual(NodeResult.port('source-i1'));
     });
 
-    describe('DropdownHandler', () => {
-      let handler: any;
-
-      beforeEach(() => {
-        const { DropdownHandler: Handler } = require('../../src/core/nodes/handlers/ChoiceNodeHandlers');
-        handler = new Handler();
-      });
-
-      it('should handle dropdown node', async () => {
-        const node = createNode('n-select-option-node', {
-          question: 'Select a country',
-          options: [
-            { id: '1', label: 'USA', value: 'us' },
-            { id: '2', label: 'Canada', value: 'ca' },
-            { id: '3', label: 'UK', value: 'uk' },
-          ],
-          variableName: 'country',
-          searchable: true,
-        });
-
-        const result = await handler.handle(node, chatState);
-
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.Dropdown;
-          expect(uiState.type).toBe('dropdown');
-          expect(uiState.options).toHaveLength(3);
-          expect(uiState.searchable).toBe(true);
-        }
-      });
+    it('yes-or-no defaults to Yes "1" / No "2"', async () => {
+      const node = createNode('yes-or-no-choice-node', { answerVariable: 'yn' }, { id: 'yn' });
+      await ask(new YesOrNoChoiceHandler(), node);
+      expect(await new YesOrNoChoiceHandler().handleResponse({ buttonId: '2' }, node, chatState)).toEqual(NodeResult.port('source-2'));
+      expect(chatState.getAnswer('yn')).toBe('No');
     });
 
-    describe('OpinionScaleHandler', () => {
-      let handler: any;
+    it('rating-choice saves the NUMBER and leaves by source-<value-1>', async () => {
+      const node = createNode('rating-choice-node', { ratingType: 5, answerVariable: 'stars' }, { id: 'r' });
+      const ui: any = await ask(new RatingHandler(), node);
+      expect(ui.uiState.maxRating).toBe(5);
+      expect(await new RatingHandler().handleResponse({ rating: 4 }, node, chatState)).toEqual(NodeResult.port('source-3'));
+      expect(chatState.getAnswer('stars')).toBe(4);
+    });
 
-      beforeEach(() => {
-        const { OpinionScaleHandler: Handler } = require('../../src/core/nodes/handlers/ChoiceNodeHandlers');
-        handler = new Handler();
-      });
+    it('opinion-scale leaves by source-<value-from>; a blank range is 0 to 10', async () => {
+      const node = createNode('opinion-scale-choice-node', { from: 2, to: 4, answerVariable: 'o' }, { id: 'o' });
+      await ask(new OpinionScaleHandler(), node);
+      expect(await new OpinionScaleHandler().handleResponse({ value: 3 }, node, chatState)).toEqual(NodeResult.port('source-1'));
+      const blank: any = await new OpinionScaleHandler().handle(createNode('opinion-scale-choice-node', { from: '', to: '' }), chatState);
+      expect([blank.uiState.min, blank.uiState.max]).toEqual([0, 10]);
+    });
 
-      it('should handle opinion scale node', async () => {
-        const node = createNode('opinionscale', {
-          question: 'How likely are you to recommend us?',
-          min: 0,
-          max: 10,
-          minLabel: 'Not likely',
-          maxLabel: 'Very likely',
-          variableName: 'nps',
-        });
+    it('n-select-option has no ports: the first edge 600 ms after the pick', async () => {
+      const node = createNode('n-select-option-node', { selectPrompt: 'Pick', options: [{ id: '1', optionText: '<p>op &amp; 1</p>' }], answerVariable: 's' }, { id: 's' });
+      await ask(new DropdownHandler(), node);
+      expect(await new DropdownHandler().handleResponse({ optionId: '1' }, node, chatState)).toEqual(NodeResult.delayedProceed(null, 600));
+      expect(chatState.getAnswer('s')).toBe('op & 1');
+    });
 
-        const result = await handler.handle(node, chatState);
+    it('n-check-options saves the ticked texts in list order', async () => {
+      const node = createNode('n-check-options-node', { options: [{ id: 'a', optionText: 'Red' }, { id: 'b', optionText: 'Blue' }], answerVariable: 'k' }, { id: 'k' });
+      await ask(new NCheckOptionsHandler(), node);
+      await new NCheckOptionsHandler().handleResponse({ buttonIds: ['b', 'a'] }, node, chatState);
+      expect(chatState.getAnswer('k')).toBe('Red, Blue');
+    });
 
-        expect(result.type).toBe('displayUI');
-        if (result.type === 'displayUI') {
-          const uiState = result.uiState as NodeUIState.OpinionScale;
-          expect(uiState.type).toBe('opinionScale');
-          expect(uiState.min).toBe(0);
-          expect(uiState.max).toBe(10);
-          expect(uiState.minLabel).toBe('Not likely');
-          expect(uiState.maxLabel).toBe('Very likely');
-        }
-      });
+    it('carousel: a path button leaves by "source-" + its id; only links: Continue by "source"', async () => {
+      const node = createNode(
+        'carousel-node',
+        { cards: [{ id: 'c1', title: 'Pro', buttons: [{ id: 'b1', label: 'Pick', action: 'path' }] }], answerVariable: 'car' },
+        { id: 'car' }
+      );
+      await ask(new CarouselHandler(), node);
+      expect(await new CarouselHandler().handleResponse({ buttonId: 'b1' }, node, chatState)).toEqual(NodeResult.port('source-b1'));
+      expect(chatState.getAnswer('car')).toBe('Pro - Pick');
+      const links = createNode('carousel-node', { cards: [{ id: 'c1', title: 'Docs', buttons: [{ id: 'l', label: 'Open', action: 'link', url: 'example.com' }] }] });
+      expect(await new CarouselHandler().handleResponse({ action: 'continue' }, links, chatState)).toEqual(NodeResult.port('source'));
     });
   });
 
