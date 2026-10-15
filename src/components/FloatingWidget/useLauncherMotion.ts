@@ -9,6 +9,8 @@ let lastOpenedAt = 0;
 export const noteLauncherOpened = () => {
   lastOpenedAt = Date.now();
 };
+/** Opened within the rest window (the idle moments, attention and the idle call rest after an opening). */
+export const launcherOpenedRecently = (now = Date.now()): boolean => !!lastOpenedAt && now - lastOpenedAt < LAUNCHER_OPENED_REST_MS;
 
 const FRAME_MS = 33;
 
@@ -18,7 +20,9 @@ const FRAME_MS = 33;
  * a reaction when a message arrives while the chat is closed, nothing while
  * it is open, after it was opened, for "off", or with reduced motion on. Also
  * the ripple rings: three times after the launcher settles, and once more
- * for a new message.
+ * for a new message. While a launcher attention loop runs (`attention`),
+ * the idle moments hold off and the three ripples give way to it (a new
+ * message's ripple still plays), as on the web.
  */
 export function useLauncherMotion(opts: {
   iconId: string | null | undefined;
@@ -26,8 +30,11 @@ export function useLauncherMotion(opts: {
   chatOpen: boolean;
   unreadCount: number;
   enabled: boolean;
+  attention?: boolean;
 }): { frame: (OpFrame | null)[] | null; rings: ({ scale: number; opacity: number } | null)[] } {
   const { iconId, mode, chatOpen, unreadCount, enabled } = opts;
+  const attentionRef = useRef(!!opts.attention);
+  attentionRef.current = !!opts.attention;
   const [frame, setFrame] = useState<(OpFrame | null)[] | null>(null);
   const [rings, setRings] = useState<({ scale: number; opacity: number } | null)[]>([null, null]);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -88,7 +95,7 @@ export function useLauncherMotion(opts: {
 
   // The ripple after the launcher settles (three times), whatever the motion mode.
   useEffect(() => {
-    if (still) return undefined;
+    if (still || attentionRef.current) return undefined;
     ripple.current = { start: Date.now(), delay: RIPPLE.delay, iterations: RIPPLE.iter };
     run();
     return undefined;
@@ -105,7 +112,8 @@ export function useLauncherMotion(opts: {
       timer = setTimeout(() => {
         if (Date.now() - lastOpenedAt < LAUNCHER_OPENED_REST_MS && lastOpenedAt) return;
         played.current += 1;
-        play('idle');
+        // A launcher attention is moving the button: this moment holds off (it still counts).
+        if (!attentionRef.current) play('idle');
         schedule();
       }, delay);
     };
