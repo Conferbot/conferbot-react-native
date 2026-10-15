@@ -8,6 +8,8 @@ import {
   GestureResponderEvent,
   Linking,
   Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
@@ -21,6 +23,7 @@ import { ChatText } from '../AgentReply/ChatText';
 import { isAIAgentDetails } from '../../core/agentBot';
 import { fileNameOf, fileUrlOf, isImageUrl, resolveMediaUrl, translationLabels } from '../../core/liveChat';
 import { getApiOrigin } from '../../config/constants';
+import { HANDED_OVER_NOTE, handoverLineText, isHandoverOutcome } from '../../core/handoverState';
 import { MessageStatus } from '../../types/messageStatus';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Agent, Reaction, ReactionEmoji } from '../../types';
@@ -102,6 +105,40 @@ export interface MessageBubbleProps {
  *
  * @component
  */
+/**
+ * The typing dots of a pending "Connecting you with the team…" line (the
+ * web's .cb-sys__typing): three dots fading in turn, one native-driven loop.
+ */
+const PendingDots: React.FC<{ color: string }> = ({ color }) => {
+  const t = useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(t, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [t]);
+  const dot = (i: number) => ({
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginHorizontal: 1.5,
+    backgroundColor: color,
+    opacity: t.interpolate({
+      inputRange: [0, (i + 0.5) / 4, (i + 1.5) / 4, 1],
+      outputRange: [0.3, 1, 0.3, 0.3],
+      extrapolate: 'clamp',
+    }),
+  });
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 4 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" testID="cb-handover-dots">
+      {[0, 1, 2].map((i) => (
+        <Animated.View key={i} style={dot(i)} />
+      ))}
+    </View>
+  );
+};
+
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   showAvatar = true,
@@ -139,7 +176,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Determine message type
   const isUser = message.type === 'user-message' || message.type === 'user-input-response';
   const isAgent = message.type === 'agent-message' || message.type === 'agent-message-file' || message.type === 'agent-message-audio';
-  const isSystem = message.type === 'system-message' || message.type === 'agent-joined-message' || message.type === 'agent-left-chat' || message.type === 'agent-chat-ended';
+  const isSystem = message.type === 'system-message' || message.type === 'agent-joined-message' || message.type === 'agent-left-chat' || message.type === 'agent-chat-ended' || message.type === 'queue-self-resolved';
+  // "Connecting you with the team…" while an AI hands the visitor on, then
+  // how the wait ended (core/handoverState.ts); dots only while pending.
+  const isHandoverLine = message.type === 'agent-left-chat' && (message as any).handover === true;
+  const handoverPending = isHandoverLine && !isHandoverOutcome((message as any).settled);
+  // A person's join after an AI handover: "They can see your conversation so far".
+  const systemNote = isSystem
+    ? (message as any).note || (message.type === 'agent-joined-message' && (message as any).afterAI === true ? HANDED_OVER_NOTE : null)
+    : null;
 
   // Asymmetric bubble radius matching Android SDK
   const r = theme.borderRadius.bubble;
@@ -237,7 +282,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const fileIsImage = !!fileUrl && !imageFailed && isImageUrl(fileUrl, (message as any).fileType || (message as any).mimeType);
 
   // Get message text
-  const messageText = isDeleted
+  const messageText = isHandoverLine
+    ? handoverLineText((message as any).settled)
+    : isDeleted
     ? 'This message was deleted'
     : translation && showOriginal
       ? translation.original
@@ -401,6 +448,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             <Text style={[styles.agentName, { color: textColor }]}>{agentDetails.name}</Text>
           )}
 
+          {handoverPending ? <PendingDots color={textColor} /> : null}
+
           {/* Message text with links */}
           {messageText && formatted ? (
             <ChatText
@@ -433,6 +482,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Text style={[styles.fileIcon, { color: textColor }]}>{'\u{1F4CE}'}</Text>
               <Text style={[styles.fileName, { color: textColor }]} numberOfLines={1}>{fileNameOf(message, fileUrl)}</Text>
             </TouchableOpacity>
+          ) : null}
+          {systemNote ? (
+            <Text style={[styles.timestamp, { color: textColor, opacity: 0.7, marginTop: 2, textAlign: 'center' }]}>{systemNote}</Text>
           ) : null}
           {isEdited ? <Text style={[styles.timestamp, { color: textColor, opacity: 0.6, marginTop: 2 }]}>Edited</Text> : null}
           {translation ? (
