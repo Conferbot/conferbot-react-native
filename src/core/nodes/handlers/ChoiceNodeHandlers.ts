@@ -1,1083 +1,454 @@
 /**
  * ChoiceNodeHandlers.ts
  *
- * Choice/Selection Node Handlers for the Conferbot React Native SDK.
- * Handles all nodes that present choices to the user: buttons, cards, carousel,
- * picture choice, dropdown, rating, and opinion scale.
+ * The choice steps: n-choices, image-choice, yes-or-no, rating-choice,
+ * opinion-scale, n-select-option, n-check-options and carousel. Fields,
+ * ports, saved values and records follow the flow-node spec and the web
+ * widget (ts/chat/displayStep.ts, handlers/flowOperations.ts,
+ * handlers/askQuestions.ts):
+ *
+ * - n-choices / image-choice / yes-or-no / carousel leave by
+ *   "source-" + the picked item's id; rating by source-<value-1>; opinion
+ *   scale by source-<value-from>. No edge there ends the chat.
+ * - n-select-option and n-check-options have no ports: the first edge,
+ *   600 ms after the pick.
+ * - Labels are shown with the answers filled in; what is saved is the
+ *   option's own text, HTML stripped.
  */
 
-import {
-  BaseNodeHandler,
-  NodeResult,
-  NodeUIState,
-  NodeHandler,
-} from '../NodeHandler';
+import { BaseNodeHandler, NodeResult, NodeUIState, NodeHandler } from '../NodeHandler';
 import { ChatState } from '../../state/ChatState';
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
 import { DisplayNodes } from '../NodeTypes';
-
-/** Strip HTML tags from text */
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .trim();
-}
+import { inListOrder } from '../../flow/text';
+import { linkHref } from '../../flow/inputs';
+import { botSay, notBlank, pickedId, pushAnswer, savedText, shownLabel, shownText, userSay } from './flowKit';
 
 // ========================================
-// BUTTON OPTION INTERFACE
+// N CHOICES
 // ========================================
 
-interface ButtonOption {
-  id: string;
-  label: string;
-  value?: any;
-  icon?: string;
-  style?: 'primary' | 'secondary' | 'outline';
-  nextNodeId?: string;
-}
-
-interface CardOption {
-  id: string;
-  title: string;
-  description?: string;
-  imageUrl?: string;
-  buttons?: Array<{
-    id: string;
-    label: string;
-    value?: any;
-    url?: string;
-    nextNodeId?: string;
-  }>;
-}
-
-interface PictureOption {
-  id: string;
-  imageUrl: string;
-  label?: string;
-  value?: any;
-  nextNodeId?: string;
-}
-
-interface DropdownOption {
-  id: string;
-  label: string;
-  value?: any;
-}
-
-// ========================================
-// BUTTONS HANDLER
-// ========================================
-
-/**
- * Handles 'buttons' nodes - displays button choices
- */
+/** n-choices-node: choicePrompt, choices [{id, choiceText}] (blank ones hidden). */
 export class ButtonsHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.N_CHOICES;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Buttons node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get question text (server sends 'choicePrompt' field)
-    let question = this.getString(data, 'choicePrompt') ||
-                   this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   this.getString(data, 'message') ||
-                   'Please select an option';
-
-    question = stripHtml(question);
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'selection';
-
-    // Get buttons array — check each field until we find a non-empty array
-    // (can't use || because empty arrays are truthy in JS)
-    let buttonsData = this.getArray<any>(data, 'buttons');
-    if (!buttonsData.length) buttonsData = this.getArray<any>(data, 'options');
-    if (!buttonsData.length) buttonsData = this.getArray<any>(data, 'choices');
-
-    if (buttonsData.length === 0) {
-      return this.createError('Buttons node has no button options');
-    }
-
-    // Map buttons to standard format
-    const buttons: NodeUIState.Buttons['buttons'] = buttonsData.map((btn: any, index: number) => {
-      const id = btn.id || btn._id || `btn_${index}`;
-      let label = btn.choiceLabel || btn.choiceText || btn.label || btn.text || btn.title || `Option ${index + 1}`;
-      // Strip HTML from choice labels
-      label = stripHtml(label);
-      label = this.resolveText(label, state);
-
-      return {
-        id,
-        label,
-        value: btn.value ?? btn.label ?? label,
-        icon: btn.icon || btn.emoji,
-        style: btn.style || btn.variant || 'primary',
-      };
-    });
-
-    // Multi-select option
-    const multiSelect = this.getBoolean(data, 'multiSelect') ||
-                        this.getBoolean(data, 'multiple', false);
-
-    // Add question to transcript so it persists in the message list
-    // (the ButtonGroup UI will only show choice pills, not the question)
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Buttons = {
-      type: 'buttons',
-      nodeId,
-      question,
-      buttons,
-      variableName,
-      multiSelect,
-    };
-
-    return NodeResult.displayUI(uiState);
+  private choices(node: Record<string, any>): any[] {
+    return (Array.isArray(node.data?.choices) ? node.data.choices : []).filter((c: any) => String(c?.choiceText ?? '').trim() !== '');
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Buttons {
+    const buttons = this.choices(node).map((c: any) => ({ id: String(c.id), label: shownLabel(state, c.choiceText), value: savedText(c.choiceText) }));
+    return NodeUIState.buttons(this.getNodeId(node), shownText(state, node.data?.choicePrompt), buttons, node.data?.answerVariable);
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'selection';
-
-    // Validate response
-    if (response === undefined || response === null) {
-      return NodeResult.error('Please select an option', true);
-    }
-
-    // Get the selected button(s) data
-    let buttonsData = this.getArray<any>(data || {}, 'buttons');
-    if (!buttonsData.length) buttonsData = this.getArray<any>(data || {}, 'options');
-    if (!buttonsData.length) buttonsData = this.getArray<any>(data || {}, 'choices');
-
-    // Handle multi-select — ButtonGroup sends { buttonId, value, label, variableName }
-    let selectedIds: any[];
-    if (response?.buttonId) {
-      selectedIds = [response.buttonId];
-    } else if (response?.buttonIds) {
-      selectedIds = response.buttonIds;
-    } else if (Array.isArray(response)) {
-      selectedIds = response;
-    } else {
-      selectedIds = [response];
-    }
-
-    const selectedButtons = buttonsData.filter((btn: any) =>
-      selectedIds.includes(btn.id) ||
-      selectedIds.includes(btn._id) ||
-      selectedIds.includes(btn.value) ||
-      selectedIds.includes(btn.label) ||
-      selectedIds.includes(btn.choiceLabel) ||
-      selectedIds.includes(btn.choiceText)
-    );
-
-    // Get values and labels (strip HTML from server data)
-    const values = selectedButtons.map((btn: any) => btn.value ?? btn.choiceLabel ?? btn.choiceText ?? btn.label);
-    const labels = selectedButtons.map((btn: any) => {
-      const raw = btn.choiceLabel || btn.choiceText || btn.label || btn.text || '';
-      return stripHtml(raw);
-    });
-    const finalValue = Array.isArray(response) ? values : values[0];
-
-    // Store answer
-    state.setAnswer(nodeId, variableName, finalValue, nodeId);
-
-    // User selection is shown via frozen choice buttons in the UI
-    // and captured in the server record via submitResponse's addRecord.
-    // Do NOT add to transcript here — it would create a duplicate user bubble.
-
-    // Check for specific next node from button
-    const selectedButton = selectedButtons[0];
-    if (selectedButton?.nextNodeId) {
-      return NodeResult.jumpTo(selectedButton.nextNodeId, { [variableName]: finalValue });
-    }
-
-    // Port-based routing using the choice button's ID (edges use source-{choiceId} format)
-    if (selectedButton?.id) {
-      return this.proceedToPort(selectedButton.id, { [variableName]: finalValue });
-    }
-
-    return this.proceed(node, { [variableName]: finalValue });
+    const id = pickedId(response);
+    const choice = this.choices(node).find((c: any) => String(c.id) === id);
+    if (!choice) return NodeResult.displayUI(this.ui(node, state));
+    const text = savedText(choice.choiceText);
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-choice', choices: node.data, selectedChoice: text });
+    userSay(state, text, nodeId);
+    state.setAnswerVariable(nodeId, text);
+    return NodeResult.port(`source-${choice.id}`);
   }
 }
 
 // ========================================
-// CARDS HANDLER
+// IMAGE CHOICE
 // ========================================
 
-/**
- * Handles 'cards' nodes - displays card selections
- */
-export class CardsHandler extends BaseNodeHandler {
-  readonly nodeType = 'cards-node';
-
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Cards node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get optional question
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text', '');
-
-    if (question) {
-      question = this.resolveText(question, state);
-      state.addBotMessage(question, nodeId, this.nodeType);
-    }
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'cardSelection';
-
-    // Get cards array
-    const cardsData = this.getArray<any>(data, 'cards', []) ||
-                      this.getArray<any>(data, 'items', []);
-
-    if (cardsData.length === 0) {
-      return this.createError('Cards node has no card options');
-    }
-
-    // Map cards to standard format
-    const cards: NodeUIState.Cards['cards'] = cardsData.map((card: any, index: number) => {
-      const id = card.id || card._id || `card_${index}`;
-      let title = card.title || card.name || `Card ${index + 1}`;
-      title = this.resolveText(title, state);
-
-      let description = card.description || card.subtitle || card.text || '';
-      description = description ? this.resolveText(description, state) : '';
-
-      // Map card buttons
-      const cardButtons = this.getArray<any>(card, 'buttons', []).map((btn: any, btnIndex: number) => ({
-        id: btn.id || `${id}_btn_${btnIndex}`,
-        label: this.resolveText(btn.label || btn.text || 'Select', state),
-        value: btn.value,
-        url: btn.url || btn.href,
-      }));
-
-      return {
-        id,
-        title,
-        description: description || undefined,
-        imageUrl: card.imageUrl || card.image || card.img,
-        buttons: cardButtons.length > 0 ? cardButtons : undefined,
-      };
-    });
-
-    // Create UI state
-    const uiState: NodeUIState.Cards = {
-      type: 'cards',
-      nodeId,
-      question: question || undefined,
-      cards,
-      variableName,
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'cardSelection';
-
-    if (!response) {
-      return NodeResult.error('Please select a card', true);
-    }
-
-    // Parse response - could be card id, button id, or complex object
-    let selectedValue: any;
-    let selectedLabel: string;
-    let nextNodeId: string | null = null;
-
-    if (typeof response === 'object') {
-      selectedValue = response.value ?? response.id;
-      selectedLabel = response.label || response.title || String(selectedValue);
-      nextNodeId = response.nextNodeId;
-    } else {
-      selectedValue = response;
-      selectedLabel = String(response);
-    }
-
-    // Store answer
-    state.setAnswer(nodeId, variableName, selectedValue, nodeId);
-
-    if (nextNodeId) {
-      return NodeResult.jumpTo(nextNodeId, { [variableName]: selectedValue });
-    }
-
-    return this.proceed(node, { [variableName]: selectedValue });
-  }
-}
-
-// ========================================
-// CAROUSEL HANDLER
-// ========================================
-
-/**
- * Handles 'carousel' nodes - displays a horizontal carousel of cards
- */
-export class CarouselHandler extends BaseNodeHandler {
-  readonly nodeType = 'carousel-node';
-
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Carousel node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'carouselSelection';
-
-    // Get cards array
-    const cardsData = this.getArray<any>(data, 'cards', []) ||
-                      this.getArray<any>(data, 'items', []) ||
-                      this.getArray<any>(data, 'slides', []);
-
-    if (cardsData.length === 0) {
-      return this.createError('Carousel node has no cards');
-    }
-
-    // Map cards
-    const cards: NodeUIState.Carousel['cards'] = cardsData.map((card: any, index: number) => {
-      const id = card.id || card._id || `slide_${index}`;
-      let title = card.title || card.name || `Slide ${index + 1}`;
-      title = this.resolveText(title, state);
-
-      let description = card.description || card.subtitle || '';
-      description = description ? this.resolveText(description, state) : '';
-
-      const cardButtons = this.getArray<any>(card, 'buttons', []).map((btn: any, btnIndex: number) => ({
-        id: btn.id || `${id}_btn_${btnIndex}`,
-        label: this.resolveText(btn.label || btn.text || 'Select', state),
-        value: btn.value,
-        url: btn.url || btn.href,
-      }));
-
-      return {
-        id,
-        title,
-        description: description || undefined,
-        imageUrl: card.imageUrl || card.image || card.img,
-        buttons: cardButtons.length > 0 ? cardButtons : undefined,
-      };
-    });
-
-    // Add to transcript
-    state.addBotMessage('[Carousel]', nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Carousel = {
-      type: 'carousel',
-      nodeId,
-      cards,
-      variableName,
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'carouselSelection';
-
-    if (!response) {
-      return NodeResult.error('Please make a selection', true);
-    }
-
-    let selectedValue: any;
-    let selectedLabel: string;
-
-    if (typeof response === 'object') {
-      selectedValue = response.value ?? response.id;
-      selectedLabel = response.label || response.title || String(selectedValue);
-    } else {
-      selectedValue = response;
-      selectedLabel = String(response);
-    }
-
-    state.setAnswer(nodeId, variableName, selectedValue, nodeId);
-
-    return this.proceed(node, { [variableName]: selectedValue });
-  }
-}
-
-// ========================================
-// PICTURE CHOICE HANDLER
-// ========================================
-
-/**
- * Handles 'picturechoice' nodes - displays image-based choices
- */
+/** image-choice-node: questionText, images [{id, image, label}] (both non-blank to show). */
 export class PictureChoiceHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.IMAGE_CHOICE;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Picture Choice node has no data');
-    }
+  private images(node: Record<string, any>): any[] {
+    return (Array.isArray(node.data?.images) ? node.data.images : []).filter(
+      (i: any) => String(i?.image ?? '').trim() !== '' && String(i?.label ?? '').trim() !== ''
+    );
+  }
 
-    const nodeId = this.getNodeId(node);
-
-    // Get question
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   'Select an image';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'pictureChoice';
-
-    // Get choices
-    const choicesData = this.getArray<any>(data, 'choices', []) ||
-                        this.getArray<any>(data, 'options', []) ||
-                        this.getArray<any>(data, 'images', []);
-
-    if (choicesData.length === 0) {
-      return this.createError('Picture Choice node has no choices');
-    }
-
-    // Map choices
-    const choices: NodeUIState.PictureChoice['choices'] = choicesData.map((choice: any, index: number) => {
-      const id = choice.id || choice._id || `pic_${index}`;
-      const imageUrl = choice.imageUrl || choice.image || choice.src || choice.url || '';
-      let label = choice.label || choice.text || choice.title || '';
-      label = label ? this.resolveText(label, state) : '';
-
-      return {
-        id,
-        imageUrl,
-        label: label || undefined,
-        value: choice.value ?? choice.label ?? id,
-      };
-    });
-
-    // Options
-    const multiSelect = this.getBoolean(data, 'multiSelect') ||
-                        this.getBoolean(data, 'multiple', false);
-    const columns = this.getNumber(data, 'columns', 2);
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.PictureChoice = {
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.PictureChoice {
+    return {
       type: 'pictureChoice',
-      nodeId,
-      question,
-      choices,
-      variableName,
-      multiSelect,
-      columns,
+      nodeId: this.getNodeId(node),
+      question: shownText(state, node.data?.questionText),
+      choices: this.images(node).map((i: any) => ({ id: String(i.id), imageUrl: i.image, label: shownLabel(state, i.label), value: savedText(i.label) })),
+      variableName: node.data?.answerVariable,
     };
-
-    return NodeResult.displayUI(uiState);
   }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'pictureChoice';
-
-    if (!response) {
-      return NodeResult.error('Please select an image', true);
-    }
-
-    // Handle multi-select
-    const selectedIds = Array.isArray(response) ? response : [response];
-    const choicesData = this.getArray<any>(data || {}, 'choices', []) ||
-                        this.getArray<any>(data || {}, 'options', []);
-
-    const selectedChoices = choicesData.filter((c: any) =>
-      selectedIds.includes(c.id) ||
-      selectedIds.includes(c.value) ||
-      selectedIds.includes(c.label)
-    );
-
-    const values = selectedChoices.map((c: any) => c.value ?? c.label ?? c.id);
-    const labels = selectedChoices.map((c: any) => c.label || c.id);
-    const finalValue = Array.isArray(response) ? values : values[0];
-
-    state.setAnswer(nodeId, variableName, finalValue, nodeId);
-
-    // Check for specific routing
-    const firstChoice = selectedChoices[0];
-    if (firstChoice?.nextNodeId) {
-      return NodeResult.jumpTo(firstChoice.nextNodeId, { [variableName]: finalValue });
-    }
-
-    return this.proceed(node, { [variableName]: finalValue });
-  }
-}
-
-// ========================================
-// DROPDOWN HANDLER
-// ========================================
-
-/**
- * Handles 'dropdown' nodes - displays dropdown selection
- */
-export class DropdownHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.N_SELECT_OPTION;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Dropdown node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get question
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   this.getString(data, 'label') ||
-                   'Please select an option';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'dropdown';
-
-    // Get options
-    const optionsData = this.getArray<any>(data, 'options', []) ||
-                        this.getArray<any>(data, 'choices', []) ||
-                        this.getArray<any>(data, 'items', []);
-
-    if (optionsData.length === 0) {
-      return this.createError('Dropdown node has no options');
-    }
-
-    // Map options
-    const options: NodeUIState.Dropdown['options'] = optionsData.map((opt: any, index: number) => {
-      const id = opt.id || opt._id || `opt_${index}`;
-      let label = opt.label || opt.text || opt.name || `Option ${index + 1}`;
-      label = this.resolveText(label, state);
-
-      return {
-        id,
-        label,
-        value: opt.value ?? opt.label ?? label,
-      };
-    });
-
-    // Options
-    let placeholder = this.getString(data, 'placeholder', 'Select an option');
-    placeholder = this.resolveText(placeholder, state);
-
-    const searchable = this.getBoolean(data, 'searchable', false);
-    const multiSelect = this.getBoolean(data, 'multiSelect') ||
-                        this.getBoolean(data, 'multiple', false);
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Dropdown = {
-      type: 'dropdown',
-      nodeId,
-      question,
-      options,
-      variableName,
-      placeholder,
-      searchable,
-      multiSelect,
-    };
-
-    return NodeResult.displayUI(uiState);
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'dropdown';
-
-    if (response === undefined || response === null) {
-      const required = this.getBoolean(data || {}, 'required', true);
-      if (required) {
-        return NodeResult.error('Please select an option', true);
-      }
-    }
-
-    // Get selected option(s)
-    const optionsData = this.getArray<any>(data || {}, 'options', []);
-    const selectedIds = Array.isArray(response) ? response : [response];
-
-    const selectedOptions = optionsData.filter((opt: any) =>
-      selectedIds.includes(opt.id) ||
-      selectedIds.includes(opt.value) ||
-      selectedIds.includes(opt.label)
-    );
-
-    const values = selectedOptions.length > 0
-      ? selectedOptions.map((opt: any) => opt.value ?? opt.label)
-      : selectedIds;
-    const labels = selectedOptions.length > 0
-      ? selectedOptions.map((opt: any) => opt.label)
-      : selectedIds.map(String);
-
-    const finalValue = Array.isArray(response) ? values : values[0];
-
-    state.setAnswer(nodeId, variableName, finalValue, nodeId);
-
-    return this.proceed(node, { [variableName]: finalValue });
+    const id = pickedId(response);
+    const image = this.images(node).find((i: any) => String(i.id) === id);
+    if (!image) return NodeResult.displayUI(this.ui(node, state));
+    const label = savedText(image.label);
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-image-choice', images: node.data, selectedImageLabel: label, selectedImage: image.image });
+    userSay(state, label, nodeId);
+    state.setAnswerVariable(nodeId, label);
+    return NodeResult.port(`source-${image.id}`);
   }
 }
 
 // ========================================
-// RATING HANDLER
+// YES OR NO
 // ========================================
 
+const YES_NO_DEFAULT = [
+  { id: '1', label: 'Yes' },
+  { id: '2', label: 'No' },
+];
+
+/** yes-or-no-choice-node: questionText, options [{id, label}] (default Yes "1" / No "2"). */
+export class YesOrNoChoiceHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.YES_OR_NO_CHOICE;
+
+  private options(node: Record<string, any>): any[] {
+    return Array.isArray(node.data?.options) && node.data.options.length ? node.data.options : YES_NO_DEFAULT;
+  }
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Buttons {
+    const buttons = this.options(node).map((o: any) => ({ id: String(o.id), label: shownLabel(state, o.label), value: savedText(o.label) }));
+    return NodeUIState.buttons(this.getNodeId(node), shownText(state, node.data?.questionText), buttons, node.data?.answerVariable);
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const nodeId = this.getNodeId(node);
+    const id = pickedId(response);
+    const option = this.options(node).find((o: any) => String(o.id) === id);
+    if (!option) return NodeResult.displayUI(this.ui(node, state));
+    const text = savedText(option.label);
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-yes-or-no-choice', options: node.data, selectedYesOrNoChoice: text });
+    userSay(state, text, nodeId);
+    state.setAnswerVariable(nodeId, text);
+    return NodeResult.port(`source-${option.id}`);
+  }
+}
+
+// ========================================
+// RATING
+// ========================================
+
+/** What the faces have always recorded (web nodeKit FACE_VALUES). */
+export const FACE_VALUES = ['😡', '😐', '😊', '😀', '😁'];
+const FACE_LABELS = ['Very unhappy', 'Unhappy', 'Neutral', 'Happy', 'Very happy'];
+
+export const ratingCount = (ratingType: any): number =>
+  ratingType === 'smiley' ? 5 : Math.max(1, Math.min(10, Number(ratingType) || 5));
+
+/** What each score means (web nodeKit ratingWords, English). */
+export const ratingWords = (ratingType: any, n: number): string[] => {
+  if (ratingType === 'smiley') return FACE_LABELS;
+  if (n === 3) return ['Bad', 'Okay', 'Great'];
+  if (n === 5) return ['Terrible', 'Bad', 'Okay', 'Good', 'Amazing'];
+  return Array.from({ length: n }, (_, i) => `${i + 1} out of ${n}`);
+};
+
+/** The value a rating button records: stars, or the face. */
+export const ratingValue = (ratingType: any, i: number): string => (ratingType === 'smiley' ? FACE_VALUES[i - 1] || '😊' : '⭐'.repeat(i));
+
 /**
- * Handles 'rating' nodes - displays star/rating selection
+ * rating-choice-node: ratingType 1..10 stars or "smiley" (five faces).
+ * Saves the NUMBER; leaves by source-<value-1>.
  */
 export class RatingHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.RATING_CHOICE;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Rating node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get question
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   'How would you rate your experience?';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'rating';
-
-    // Rating configuration
-    const maxRating = this.getNumber(data, 'maxRating') ||
-                      this.getNumber(data, 'max') ||
-                      this.getNumber(data, 'stars', 5);
-
-    // Style: stars, hearts, thumbs, numbers
-    let style: NodeUIState.Rating['style'] = 'stars';
-    const styleValue = this.getString(data, 'style') ||
-                       this.getString(data, 'type', 'stars');
-
-    if (['stars', 'hearts', 'thumbs', 'numbers'].includes(styleValue)) {
-      style = styleValue as NodeUIState.Rating['style'];
-    }
-
-    const allowHalf = this.getBoolean(data, 'allowHalf') ||
-                      this.getBoolean(data, 'halfRatings', false);
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Rating = {
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Rating {
+    const ratingType = node.data?.ratingType;
+    return {
       type: 'rating',
-      nodeId,
-      question,
-      maxRating,
-      variableName,
-      style,
-      allowHalf,
+      nodeId: this.getNodeId(node),
+      question: shownText(state, node.data?.questionText),
+      maxRating: ratingCount(ratingType),
+      variableName: node.data?.answerVariable,
+      style: ratingType === 'smiley' ? 'thumbs' : ratingCount(ratingType) > 5 ? 'numbers' : 'stars',
+      ...({ ratingType, faces: ratingType === 'smiley' ? FACE_VALUES : undefined, labels: ratingWords(ratingType, ratingCount(ratingType)) } as any),
     };
-
-    return NodeResult.displayUI(uiState);
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'rating';
-
-    if (response === undefined || response === null) {
-      const required = this.getBoolean(data || {}, 'required', true);
-      if (required) {
-        return NodeResult.error('Please provide a rating', true);
-      }
-    }
-
-    // Parse and validate rating
-    const rating = parseFloat(String(response));
-    const maxRating = this.getNumber(data || {}, 'maxRating') ||
-                      this.getNumber(data || {}, 'max', 5);
-
-    if (isNaN(rating) || rating < 0 || rating > maxRating) {
-      return NodeResult.error(`Please select a rating between 0 and ${maxRating}`, true);
-    }
-
-    state.setAnswer(nodeId, variableName, rating, nodeId);
-
-    return this.proceed(node, { [variableName]: rating });
+    const ratingType = node.data?.ratingType;
+    const n = ratingCount(ratingType);
+    const value = Number(typeof response === 'object' && response !== null ? response.value ?? response.rating : response);
+    if (!Number.isInteger(value) || value < 1 || value > n) return NodeResult.displayUI(this.ui(node, state));
+    const selected = ratingValue(ratingType, value);
+    pushAnswer(state, {
+      id: nodeId,
+      shape: 'user-selected-rating-choice',
+      options: node.data,
+      selectedRatingChoice: selected,
+      value,
+      label: ratingWords(ratingType, n)[value - 1] || '',
+      ratingType,
+    });
+    userSay(state, selected, nodeId);
+    state.setAnswerVariable(nodeId, value);
+    return NodeResult.port(`source-${value - 1}`);
   }
 }
 
 // ========================================
-// OPINION SCALE HANDLER
+// OPINION SCALE
 // ========================================
 
-/**
- * Handles 'opinionscale' nodes - displays numeric scale selection
- */
+/** A scale's range; blank is 0 to 10 (web nodeKit scaleRange). */
+export const scaleRange = (rawFrom: any, rawTo: any): { from: number; to: number } => {
+  const blank = (v: any) => v === '' || v === null || v === undefined || !Number.isFinite(Number(v));
+  const from = blank(rawFrom) ? 0 : Number(rawFrom);
+  const to = blank(rawTo) || Number(rawTo) < from ? Math.max(from, 10) : Number(rawTo);
+  return { from, to };
+};
+
+/** opinion-scale-choice-node: from..to buttons; saves the NUMBER; leaves by source-<value-from>. */
 export class OpinionScaleHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.OPINION_SCALE_CHOICE;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Opinion Scale node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    // Get question
-    let question = this.getString(data, 'question') ||
-                   this.getString(data, 'text') ||
-                   'How likely are you to recommend us?';
-
-    question = this.resolveText(question, state);
-
-    // Get variable name
-    const variableName = this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         'opinionScale';
-
-    // Scale configuration
-    const min = this.getNumber(data, 'min', 0);
-    const max = this.getNumber(data, 'max', 10);
-
-    // Labels
-    let minLabel = this.getString(data, 'minLabel') ||
-                   this.getString(data, 'leftLabel', '');
-    let maxLabel = this.getString(data, 'maxLabel') ||
-                   this.getString(data, 'rightLabel', '');
-
-    minLabel = minLabel ? this.resolveText(minLabel, state) : '';
-    maxLabel = maxLabel ? this.resolveText(maxLabel, state) : '';
-
-    const showNumbers = this.getBoolean(data, 'showNumbers', true);
-
-    // Add to transcript
-    state.addBotMessage(question, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.OpinionScale = {
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.OpinionScale {
+    const { from, to } = scaleRange(node.data?.from, node.data?.to);
+    return {
       type: 'opinionScale',
-      nodeId,
-      question,
-      min,
-      max,
-      minLabel: minLabel || undefined,
-      maxLabel: maxLabel || undefined,
-      variableName,
-      showNumbers,
+      nodeId: this.getNodeId(node),
+      question: shownText(state, node.data?.questionText),
+      min: from,
+      max: to,
+      minLabel: node.data?.fromLabel,
+      maxLabel: node.data?.toLabel,
+      variableName: node.data?.answerVariable,
+      showNumbers: true,
     };
-
-    return NodeResult.displayUI(uiState);
   }
-
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         'opinionScale';
-
-    if (response === undefined || response === null) {
-      const required = this.getBoolean(data || {}, 'required', true);
-      if (required) {
-        return NodeResult.error('Please select a value', true);
-      }
-    }
-
-    // Parse and validate
-    const value = parseInt(String(response), 10);
-    const min = this.getNumber(data || {}, 'min', 0);
-    const max = this.getNumber(data || {}, 'max', 10);
-
-    if (isNaN(value) || value < min || value > max) {
-      return NodeResult.error(`Please select a value between ${min} and ${max}`, true);
-    }
-
-    state.setAnswer(nodeId, variableName, value, nodeId);
-
-    return this.proceed(node, { [variableName]: value });
-  }
-}
-
-// ========================================
-// YES OR NO CHOICE HANDLER
-// ========================================
-
-/**
- * Handles 'yes-or-no-choice-node' - binary yes/no choice with 2-port routing
- */
-export class YesOrNoChoiceHandler extends BaseNodeHandler {
-  readonly nodeType = DisplayNodes.YES_OR_NO_CHOICE;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Yes/No Choice node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data, 'answerVariable') ||
-                         this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         nodeId;
-
-    // Support custom options or default Yes/No
-    const optionsData = this.getArray<any>(data, 'options', []);
-
-    let buttons: NodeUIState.Buttons['buttons'];
-
-    if (optionsData.length > 0) {
-      buttons = optionsData.map((opt: any) => ({
-        id: opt.id || opt.value || '',
-        label: opt.label || opt.text || '',
-        value: opt.label || opt.text || opt.id || '',
-        style: 'primary' as const,
-      }));
-    } else {
-      buttons = [
-        { id: 'yes', label: 'Yes', value: 'Yes', style: 'primary' },
-        { id: 'no', label: 'No', value: 'No', style: 'primary' },
-      ];
-    }
-
-    state.addBotMessage('[Yes/No Choice]', nodeId, this.nodeType);
-
-    const uiState: NodeUIState.Buttons = {
-      type: 'buttons',
-      nodeId,
-      question: '',
-      buttons,
-      variableName,
-      multiSelect: false,
-    };
-
-    return NodeResult.displayUI(uiState);
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'answerVariable') ||
-                         this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         nodeId;
-
-    let optionId: string;
-    let label: string;
-
-    if (typeof response === 'object' && response !== null) {
-      optionId = response.id || '';
-      label = response.text || response.label || optionId;
-    } else {
-      optionId = String(response);
-      label = optionId;
-    }
-
-    state.setAnswer(nodeId, variableName, label, nodeId);
-
-    // Port-based routing: source-yes / source-no or source-{id}
-    const targetPort = `source-${optionId}`;
-
-    return NodeResult.delayedProceed(null, 600, {
-      [variableName]: label,
-      __targetPort: targetPort,
-    });
+    const { from, to } = scaleRange(node.data?.from, node.data?.to);
+    const value = Number(typeof response === 'object' && response !== null ? response.value : response);
+    if (!Number.isFinite(value) || value < from || value > to) return NodeResult.displayUI(this.ui(node, state));
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-opinion-scale-choice', options: node.data, selectedOpinionScaleChoice: String(value), value });
+    userSay(state, String(value), nodeId);
+    state.setAnswerVariable(nodeId, value);
+    return NodeResult.port(`source-${value - from}`);
   }
 }
 
 // ========================================
-// N CHECK OPTIONS HANDLER
+// N SELECT OPTION
+// ========================================
+
+/** n-select-option-node: selectPrompt, options [{id, optionText}]; no ports - first edge after 600 ms. */
+export class DropdownHandler extends BaseNodeHandler {
+  readonly nodeType = DisplayNodes.N_SELECT_OPTION;
+
+  private options(node: Record<string, any>): any[] {
+    return (Array.isArray(node.data?.options) ? node.data.options : []).filter((o: any) => String(o?.optionText ?? '').trim() !== '');
+  }
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Dropdown {
+    return {
+      type: 'dropdown',
+      nodeId: this.getNodeId(node),
+      question: shownText(state, node.data?.selectPrompt),
+      options: this.options(node).map((o: any) => ({ id: String(o.id), label: shownLabel(state, o.optionText), value: savedText(o.optionText) })),
+      variableName: node.data?.answerVariable,
+    };
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const nodeId = this.getNodeId(node);
+    const id = pickedId(response);
+    const option = this.options(node).find((o: any) => String(o.id) === id);
+    if (!option) return NodeResult.displayUI(this.ui(node, state));
+    const text = savedText(option.optionText);
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-option', options: node.data, selectedOption: text });
+    userSay(state, text, nodeId);
+    state.setAnswerVariable(nodeId, text);
+    return NodeResult.delayedProceed(null, 600);
+  }
+}
+
+// ========================================
+// N CHECK OPTIONS
 // ========================================
 
 /**
- * Handles 'n-check-options-node' - multi-checkbox selection, returns comma-separated values
+ * n-check-options-node: checkOptionsPrompt, options; the ticked texts in LIST
+ * order joined ", "; first edge after 600 ms.
  */
 export class NCheckOptionsHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.N_CHECK_OPTIONS;
 
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('N Check Options node has no data');
-    }
-
-    const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data, 'answerVariable') ||
-                         this.getString(data, 'variableName') ||
-                         this.getString(data, 'variable') ||
-                         nodeId;
-
-    // Get options array
-    const optionsData = this.getArray<any>(data, 'options', []);
-
-    if (optionsData.length === 0) {
-      return this.createError('N Check Options node has no options');
-    }
-
-    // Map options to button format with multi-select
-    const buttons: NodeUIState.Buttons['buttons'] = optionsData.map((opt: any, index: number) => {
-      const id = opt.id || String(index);
-      const text = opt.optionText || opt.text || opt.label || `Option ${index + 1}`;
-      return {
-        id,
-        label: text,
-        value: text,
-        style: 'primary' as const,
-      };
-    });
-
-    state.addBotMessage('[Check Options]', nodeId, this.nodeType);
-
-    const uiState: NodeUIState.Buttons = {
-      type: 'buttons',
-      nodeId,
-      question: '',
-      buttons,
-      variableName,
-      multiSelect: true,
-    };
-
-    return NodeResult.displayUI(uiState);
+  private options(node: Record<string, any>): any[] {
+    return (Array.isArray(node.data?.options) ? node.data.options : []).filter((o: any) => String(o?.optionText ?? '').trim() !== '');
   }
 
-  async handleResponse(
-    response: any,
-    node: Record<string, any>,
-    state: ChatState
-  ): Promise<NodeResult> {
-    const data = this.getNodeData(node);
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Buttons {
+    const buttons = this.options(node).map((o: any) => ({ id: String(o.id), label: shownLabel(state, o.optionText), value: savedText(o.optionText) }));
+    return { ...NodeUIState.buttons(this.getNodeId(node), shownText(state, node.data?.checkOptionsPrompt), buttons, node.data?.answerVariable), multiSelect: true };
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    botSay(state, ui.question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
-
-    const variableName = this.getString(data || {}, 'answerVariable') ||
-                         this.getString(data || {}, 'variableName') ||
-                         this.getString(data || {}, 'variable') ||
-                         nodeId;
-
-    // Response should be list of selected options
-    let selectedOptions: string[];
-    if (Array.isArray(response)) {
-      selectedOptions = response.map(String);
-    } else if (typeof response === 'string') {
-      selectedOptions = response.split(',').map((s: string) => s.trim());
-    } else {
-      selectedOptions = [String(response)];
-    }
-
-    const combinedText = selectedOptions.join(', ');
-
-    state.setAnswer(nodeId, variableName, combinedText, nodeId);
-
-    return this.proceed(node, {
-      [variableName]: combinedText,
-    });
+    const options = this.options(node);
+    const ids: string[] = (Array.isArray(response?.buttonIds) ? response.buttonIds : Array.isArray(response?.optionIds) ? response.optionIds : []).map(String);
+    const ticked = inListOrder(ids, options.map((o: any) => String(o.id)))
+      .map((id) => options.find((o: any) => String(o.id) === id))
+      .filter(Boolean);
+    if (!ticked.length) return NodeResult.displayUI(this.ui(node, state));
+    const text = ticked.map((o: any) => savedText(o.optionText)).join(', ');
+    pushAnswer(state, { id: nodeId, shape: 'user-selected-check-options', options: node.data, selectedCheckOptions: text });
+    userSay(state, text, nodeId);
+    state.setAnswerVariable(nodeId, text);
+    return NodeResult.delayedProceed(null, 600);
   }
 }
 
 // ========================================
-// CHOICE HANDLER COLLECTION
+// CAROUSEL
 // ========================================
 
+export const CAROUSEL_CONTINUE = 'Continue';
+
+/** The cards as the web reads them (nodeKit carouselCards): at most 10, 3 buttons each. */
+export const carouselCards = (data: any) =>
+  (Array.isArray(data?.cards) ? data.cards : [])
+    .map((card: any, ci: number) => ({
+      id: String(card?.id ?? `card-${ci}`),
+      image: String(card?.image ?? '').trim(),
+      title: String(card?.title ?? '').trim(),
+      description: String(card?.description ?? '').trim(),
+      price: String(card?.price ?? '').trim(),
+      buttons: (Array.isArray(card?.buttons) ? card.buttons : [])
+        .map((b: any, bi: number) => {
+          const action: 'path' | 'link' = b?.action === 'link' ? 'link' : 'path';
+          return { id: String(b?.id ?? `${ci}-${bi}`), label: String(b?.label ?? '').trim(), action, href: action === 'link' ? linkHref(b?.url) : '' };
+        })
+        .filter((b: any) => b.label && (b.action === 'path' || b.href))
+        .slice(0, 3),
+    }))
+    .filter((card: any) => card.title || card.description || card.image)
+    .slice(0, 10);
+
 /**
- * Array of all choice node handlers
+ * carousel-node: a path button leaves by "source-" + its id and saves
+ * "Card title - Button label"; link buttons only open their page. With no
+ * path button anywhere, Continue leaves by "source" and saves nothing.
+ * Answers: {buttonId} (cardId optional) or {action: "continue"}.
  */
+export class CarouselHandler extends BaseNodeHandler {
+  readonly nodeType = 'carousel-node';
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Carousel {
+    const cards = carouselCards(node.data);
+    const hasPath = cards.some((c: any) => c.buttons.some((b: any) => b.action === 'path'));
+    return {
+      type: 'carousel',
+      nodeId: this.getNodeId(node),
+      cards: cards.map((c: any) => ({
+        id: c.id,
+        title: shownLabel(state, c.title),
+        description: c.description ? shownLabel(state, c.description) : undefined,
+        imageUrl: c.image || undefined,
+        buttons: c.buttons.map((b: any) => ({ id: b.id, label: b.label, value: b.label, url: b.href || undefined })),
+      })),
+      variableName: node.data?.answerVariable,
+      ...({ question: shownText(state, node.data?.questionText), showContinue: !hasPath } as any),
+    };
+  }
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const ui = this.ui(node, state);
+    const question = (ui as any).question;
+    if (question) botSay(state, question, ui.nodeId, this.nodeType);
+    return NodeResult.displayUI(ui);
+  }
+
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const nodeId = this.getNodeId(node);
+    const cards = carouselCards(node.data);
+    const buttonId = response?.action === 'continue' ? undefined : pickedId(response);
+    let card: any;
+    let button: any;
+    for (const c of cards) {
+      const b = c.buttons.find((x: any) => x.id === buttonId && x.action === 'path');
+      if (b && (!response?.cardId || response.cardId === c.id)) {
+        card = c;
+        button = b;
+        break;
+      }
+    }
+    if (buttonId && !button) {
+      // A link button: it opens its page and the step keeps waiting.
+      return NodeResult.displayUI(this.ui(node, state));
+    }
+    if (!button && cards.some((c: any) => c.buttons.some((b: any) => b.action === 'path'))) return NodeResult.displayUI(this.ui(node, state));
+    const title = card?.title || '';
+    const label = button?.label || '';
+    const answer = button ? (title && label ? `${title} - ${label}` : title || label) : CAROUSEL_CONTINUE;
+    const text = savedText(answer);
+    pushAnswer(state, {
+      id: nodeId,
+      shape: 'user-selected-carousel',
+      carousel: node.data,
+      selectedChoice: text,
+      selectedCardId: card?.id ?? null,
+      selectedButtonId: button?.id ?? null,
+    });
+    userSay(state, text, nodeId);
+    if (button) state.setAnswerVariable(nodeId, text);
+    return NodeResult.port(button ? `source-${button.id}` : 'source');
+  }
+}
+
+// ========================================
+// REGISTRATION
+// ========================================
+
 export const choiceHandlers: NodeHandler[] = [
   new ButtonsHandler(),
-  new CardsHandler(),
   new CarouselHandler(),
   new PictureChoiceHandler(),
   new DropdownHandler(),
@@ -1087,11 +458,9 @@ export const choiceHandlers: NodeHandler[] = [
   new NCheckOptionsHandler(),
 ];
 
-/**
- * Registers all choice node handlers with the registry
- */
 export function registerChoiceHandlers(registry: NodeHandlerRegistry): void {
   registry.registerAll(choiceHandlers);
 }
 
+export { notBlank };
 export default choiceHandlers;
