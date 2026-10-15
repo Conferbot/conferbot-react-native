@@ -225,12 +225,11 @@ export function useSocketListeners({
             }
 
             setIsNodeProcessing(true);
-            const flowDefinition: FlowDefinition = {
-              nodes,
-              edges,
-              startNodeId: nodes[0]?.id || '',
-            };
+            // The engine starts at the first welcome-node, as the web widget does.
+            const flowDefinition: FlowDefinition = { nodes, edges };
             const engine = flowEngine.current;
+            // redactSensitive, chatLeaveMessage...: the steps read them.
+            engine.setCustomizations?.(customizations);
             engine.loadFlow(flowDefinition);
             const startFlow = () =>
               engine.start().catch((error) => {
@@ -469,22 +468,12 @@ export function useSocketListeners({
       setCurrentUIState(null);
       setIsNodeProcessing(false);
 
-      // A flow at its handover step, as the web widget does it: the owner's
-      // fallback as the bot's message, then "Leave a message" (the flow
-      // carries on once it is sent or skipped), or straight on when the
-      // owner turned that off.
+      // A flow at its handover step, as the web widget does it: the step
+      // itself says the owner's fallback and, with "leave a message" off,
+      // carries the flow on (HumanHandoverHandler); otherwise "Leave a
+      // message" carries it on once sent or skipped.
       const engine = flowEngine.current;
-      if (engine?.isAtHandover()) {
-        const node: any = engine.getNode(engine.getState().currentNodeId || '');
-        const fallback = stripHtml(chatStateRef.current?.resolveVariables(String(node?.data?.fallbackMessage || '')) || '');
-        if (fallback) {
-          const id = `agent-declined-${Date.now()}`;
-          setRecord((prev) => deduplicateMessages(trimMessages([...prev, { _id: id, type: 'bot-message', text: fallback, time: new Date().toISOString() } as any])));
-          chatStateRef.current?.addRecord({ id, type: 'agent-declined-message', message: fallback, renderedText: fallback, time: new Date().toISOString() } as any);
-        }
-        if (customizationsRef.current?.chatLeaveMessage === false) engine.submitResponse({ action: 'continue' });
-        return;
-      }
+      if (engine?.isAtHandover()) return;
 
       const noAgentsRecord: RecordItem = {
         _id: `no-agents-${Date.now()}`,
