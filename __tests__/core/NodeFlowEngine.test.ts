@@ -418,8 +418,13 @@ describe('NodeFlowEngine', () => {
       engine = new NodeFlowEngine(chatState, registry, { typingDelay: 0 });
     });
 
-    it("follows the builder's single-output handles (source-1, source, any one edge)", () => {
-      engine.loadFlow({
+    it("follows the FIRST edge from a step, whatever its handle", async () => {
+      const entered: string[] = [];
+      const traced = new NodeFlowEngine(chatState, registry, {
+        typingDelay: 0,
+        onTrace: (e) => e.kind === 'enter' && entered.push(`${e.node}:${e.via}`),
+      });
+      traced.loadFlow({
         nodes: [
           createNode('welcome-node', { text: 'Hi' }, { id: 'w' }),
           createNode('message-node', { text: 'One' }, { id: 'm1' }),
@@ -430,14 +435,15 @@ describe('NodeFlowEngine', () => {
           { id: 'e1', source: 'w', sourceHandle: 'source-1', target: 'm1' },
           { id: 'e2', source: 'm1', sourceHandle: 'source', target: 'm2' },
           { id: 'e3', source: 'm2', sourceHandle: 'out-a', target: 'm3' },
+          { id: 'e4', source: 'm2', sourceHandle: 'source', target: 'm1' },
         ],
-        startNodeId: 'w',
       } as any);
-      const next = (id: string) => (engine as any).resolveNextNode(id, null);
-      expect(next('w')).toBe('m1');
-      expect(next('m1')).toBe('m2');
-      expect(next('m2')).toBe('m3');
-      expect(next('m3')).toBeNull();
+      registry.register(new MockMessageHandler());
+      const run = traced.start();
+      await jest.runAllTimersAsync();
+      await run;
+      expect(entered).toEqual(['w:start', 'm1:edge:source-1', 'm2:edge:source', 'm3:edge:out-a']);
+      expect(traced.isEnded()).toBe(true);
     });
 
     it('should load a flow definition', () => {
