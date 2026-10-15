@@ -16,6 +16,9 @@ import type {
   PreChatFormConfig,
   PostChatSurveyConfig,
 } from './types';
+import { buildStandaloneHandoverPayload } from '../../core/handoverPayload';
+import { queueSelfResolvePayload } from '../../core/handoverState';
+import { surveyRatingPayload } from '../../core/liveChat';
 
 // ========================================
 // TYPES
@@ -34,6 +37,8 @@ interface UseHandoverOptions {
   sessionId: string;
   /** Bot ID */
   botId: string;
+  /** The bot's workspace (sent with initiate-handover; the server checks it against the bot) */
+  workspaceId?: string;
   /** Node ID for the handover node */
   nodeId: string;
   /** Pre-chat form configuration */
@@ -103,6 +108,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
     socketClient,
     sessionId,
     botId,
+    workspaceId,
     nodeId,
     preChatConfig,
     surveyConfig,
@@ -257,17 +263,22 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
         }
       }, timeout * 1000);
 
-      // Emit socket event
-      socketClient?.emitToServer('handover:request', {
-        sessionId,
-        botId,
-        nodeId,
-        preChatData: data,
-        department: selectedDepartment || department,
-        priority,
-      });
+      // Ask for a person: initiate-handover, as the web widget does (the
+      // server has no handover:request).
+      socketClient?.emitToServer(
+        'initiate-handover',
+        buildStandaloneHandoverPayload({
+          sessionId,
+          botId,
+          workspaceId,
+          preChatData: data as Record<string, unknown>,
+          department: selectedDepartment || department,
+          priority,
+          maxWaitMinutes: timeout / 60,
+        })
+      );
     },
-    [socketClient, sessionId, botId, nodeId, department, priority, timeout]
+    [socketClient, sessionId, botId, workspaceId, department, priority, timeout]
   );
 
   // Cancel handover
@@ -278,10 +289,8 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
     }
     isActive.current = false;
 
-    socketClient?.emitToServer('handover:cancel', {
-      sessionId,
-      conversationId: conversationIdRef.current,
-    });
+    // Out of the queue: the team stops seeing the visitor waiting.
+    socketClient?.emitToServer('queue-self-resolve', queueSelfResolvePayload(sessionId));
 
     onComplete?.({ ended: true });
   }, [socketClient, sessionId, onComplete]);
@@ -298,48 +307,40 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
     }
   }, [state.preChatData, state.selectedDepartment, submitPreChat]);
 
-  // Send message
+  // Send message. The server has no handover:message: a visitor's live
+  // message travels in the conversation's record (response-record), which
+  // only the provider holds - use useConferBot().sendMessage.
   const sendMessage = useCallback(
-    (message: string, attachments?: any[]) => {
-      if (!conversationIdRef.current) return;
-
-      socketClient?.emitToServer('handover:message', {
-        sessionId,
-        conversationId: conversationIdRef.current,
-        message,
-        attachments,
-      });
+    (_message: string, _attachments?: any[]) => {
+      if (__DEV__) {
+        console.warn('[ConferBot] useHandover.sendMessage sends nothing: use useConferBot().sendMessage for live messages');
+      }
     },
-    [socketClient, sessionId]
+    []
   );
 
-  // Set typing state
+  // Set typing state (visitor-typing, as the web widget sends it)
   const setTyping = useCallback(
     (isTyping: boolean) => {
-      if (!conversationIdRef.current) return;
-
-      socketClient?.emitToServer('handover:typing', {
-        sessionId,
-        conversationId: conversationIdRef.current,
-        isTyping,
-      });
+      socketClient?.emitToServer('visitor-typing', { chatSessionId: sessionId, isTyping });
     },
     [socketClient, sessionId]
   );
 
   // End chat
   const endChat = useCallback(
-    (reason?: string) => {
+    (_reason?: string) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
 
-      socketClient?.emitToServer('handover:end', {
-        sessionId,
-        conversationId: conversationIdRef.current,
-        reason,
-      });
+      // The server has no visitor end-chat (only an agent ends a live
+      // chat). Still waiting: leave the queue. With a person on it the
+      // server answers agent_joined and keeps the chat.
+      if (state.stage !== 'connected') {
+        socketClient?.emitToServer('queue-self-resolve', queueSelfResolvePayload(sessionId));
+      }
 
       isActive.current = false;
       setState((prev) => ({
@@ -348,21 +349,15 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
         endedAt: new Date().toISOString(),
       }));
     },
-    [socketClient, sessionId]
+    [socketClient, sessionId, state.stage]
   );
 
   // Submit survey
   const submitSurvey = useCallback(
     (response: SurveyResponse) => {
-      socketClient?.emitToServer('handover:survey', {
-        sessionId,
-        conversationId: conversationIdRef.current,
-        response: {
-          ...response,
-          sessionId,
-          agentId: state.agent?.id,
-        },
-      });
+      // The rating as the web widget sends it (no handover:survey on the server).
+      const rating = surveyRatingPayload(sessionId, state.surveyConfig?.ratingStyle, response);
+      if (rating) socketClient?.emitToServer('submit-chat-rating', rating);
 
       setState((prev) => ({
         ...prev,
@@ -372,7 +367,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
 
       onComplete?.({ ended: true, surveySubmitted: true });
     },
-    [socketClient, sessionId, state.agent, onComplete]
+    [socketClient, sessionId, state.surveyConfig, onComplete]
   );
 
   // Skip survey
