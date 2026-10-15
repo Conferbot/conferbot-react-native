@@ -122,6 +122,12 @@ export interface ConferBotUser {
   name?: string;
   email?: string;
   phone?: string;
+  /**
+   * Identity verification: HMAC-SHA256 of the user's id (or email when there
+   * is no id) with your workspace's identity secret, hex, made on your
+   * server. With it the chat is filed under the verified user.
+   */
+  hash?: string;
   metadata?: Record<string, any>;
 }
 
