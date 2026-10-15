@@ -2,7 +2,7 @@
 
 This compares each SDK's flow engine, as it is today, against `nodes.spec.json` and the fixtures.
 
-- **How it was found:** by reading each SDK's code. React Native now runs all 156 fixtures (`__tests__/parity/flows.test.ts`, all pass), so its section lists only what remains; Android, iOS and Flutter have not run them yet. Paths are relative to each SDK repo.
+- **How it was found:** by reading each SDK's code. React Native and Flutter now run all 156 fixtures (`__tests__/parity/flows.test.ts`, `test/parity/flows_test.dart`, all pass), so their sections list only what remains; Android and iOS have not run them yet. Paths are relative to each SDK repo.
 - **Spot-checks:** I re-read the items marked ✓ myself.
 - **No SDK code was changed** for this report.
 - **Severity:**
@@ -12,7 +12,7 @@ This compares each SDK's flow engine, as it is today, against `nodes.spec.json` 
 
 ## All four SDKs
 
-The same gaps appeared in every SDK; React Native has fixed all of them (see its section). File these once per repo.
+The same gaps appeared in every SDK; React Native and Flutter have fixed all of them (see their sections). File these once per repo.
 
 | # | Area | Web (spec) | SDKs today | Fixtures |
 |---|---|---|---|---|
@@ -99,28 +99,17 @@ The engine is in `Sources/Conferbot/Core/NodeFlowEngine.swift` (NFE). The handle
 
 ## Flutter
 
-The engine is in `lib/src/core/node_flow_engine.dart`. The handlers are in `lib/src/core/nodes/handlers/**`. The renderer is in `lib/src/ui/widgets/node_widgets.dart`.
+All 156 fixtures pass through `lib/src/core/node_flow_engine.dart` and the handlers in `lib/src/core/nodes/handlers/*` (`test/parity/flows_test.dart`, a port of the RN driver with a Zone-based virtual clock); none is pending. The A1-A10 and FL1-FL18 gaps found by reading are fixed (conferbot-flutter #23, #29-#34, #48, #55, #66-#70). The engine, `core/flow/*` and the handlers are ports of RN's. What remains is outside what the fixtures check:
 
-| # | Node / area | Web | Flutter today |
+| # | Area | Web | Flutter today |
 |---|---|---|---|
-| FL1 S1 | node type lookup | `node.type` | Reads `data['type']` first ✓ (`node_flow_engine.dart:232`), so `user-input-node` with `data.type:"email"` finds no handler. The answer path reads only `data['type']` (`:593`), but saved nodes keep `type` on the node, so **no answer handler runs on builder data**. Test fixtures put `type` inside `data` and hide this (`test/fixtures/test_fixtures.dart:211`) |
-| FL2 S1 | start | first `welcome-node` | `_steps[0]` (`:183`) |
-| FL3 S1 | missing handle, target or unknown | ends | The next node in array order (`:741-753,270-279`); also matches without the `source-` prefix (`:782`) |
-| FL4 S1 | cycle guard | none | 100 distinct nodes stop the flow (`:41,218`), which cuts off big bots |
-| FL5 S1 | condition-node | bare variable names looked up | Compared as literal text; `customLeftValue`/`customRightValue` ignored; operators missing as on Android (`logic_handlers.dart:21`) |
-| FL6 S1 | stripe / payment | payment-node is a gate | stripe takes the first edge with no paid check. The composer stays visible, so typed text gets past the payment (`other_handlers.dart:181-192`, `conferbot_provider.dart:1585`) |
-| FL7 S1 | typed text on choice nodes | ignored by choices | Sends `source-<typed>`, which falls back to the next node in array order |
-| FL8 S1 | redirect / navigate / n-select / image-choice / rating / opinion UI | drawn | Legacy UI states the renderer doesn't handle: nothing is drawn (`node_widgets.dart:117-140`). Redirect and navigate stall |
-| FL9 S1 | quiz-node | "optionN" | Parsed as an int (`legacy_handlers.dart:562`) |
-| FL10 S1 | random-flow-node | `source-<branch.id>` | `source-<index>`, no wiring check (`logic_handlers.dart:246`) |
-| FL11 S2 | math-operation-node | saved by name | `setAnswerVariable(nodeId)` finds no entry, so the result is lost (`logic_handlers.dart:181`) |
-| FL12 S2 | two/three-choices, prompts | `choiceText1..3`; `questionText`/`selectPrompt`/`checkOptionsPrompt` | `choice1..3`; prompts not read |
-| FL13 S2 | yes-or-no ids / rating type / opinion `from` | "1"/"2"; 1..10; 0 | yes/no; only smiley or 10; 1 |
-| FL14 S2 | ask-* validation and storage | as web | Default variable keys; phone 7-15 digits, not normalised; `double.tryParse`; URL needs a scheme; name greeting 500 ms, transcript only (`ask_question_handlers.dart:43-257`) |
-| FL15 S2 | ask-multiple-questions / calendar / ask-file | as web | `<nodeId>_q<i>` keys, no `data.message`; `questionText`/`botTimeZone`; `maxSize` (`ask_question_handlers.dart:365-616`) |
-| FL16 S2 | jump-to-node | `jumpTo` read; a missing target ends | `jumpTo` not read; a missing target moves to the next node (`logic_handlers.dart:301-304`) |
-| FL17 S3 | business-hours zones | IANA with DST | A fixed offset table with no DST (`logic_handlers.dart:433`) |
-| FL18 S3 | pacing | `paceFor` | 800 ms after every auto-advance node (`:433`) |
+| FL1 S3 | Rich step UI | Each rich step draws its own card (`richNodesView.ts`). | Native cards for carousel and product card, slider, ranking (up/down buttons, no drag), matrix (chips per row), address (search list and manual form, no map), payment (Pay now, I've paid, Cancel), date/time. Consent, dynamic choices and navigate draw as buttons; OTP, AI, KB and signature use the bottom bar, and OTP shows its Skip chip. No OTP digit boxes and no signature drawing pad (#48). |
+| FL2 S3 | signature-node | A typed name is drawn on a canvas and uploaded as PNG. | Uploaded as an SVG of the typed name, as RN; a drawn signature needs the UI to hand over the image. |
+| FL3 S3 | hidden-fields-node | The page's query, URL and referrer. | An app has no page: nothing is captured unless the engine is given `NodeFlowEngineConfig.page` (the provider passes none). |
+| FL4 S2 | webhook-node | Called from the browser (spec `webOnly`). | Called from the device in the background, as RN; the flow does not wait for it. |
+| FL5 S3 | google-calendar-node "book" | A slot picker. | Waits for the server's result, then moves on (spec `webOnly`). |
+| FL6 S3 | Visitor time zone | The browser's IANA zone. | Dart does not expose the device's IANA name: the device's offset as a fixed `Etc/GMT` zone unless `NodeFlowEngineConfig.visitorTimeZone` is set (the provider does not set it). Owner zones (business hours, calendar) are IANA with DST through `package:timezone`. |
+| FL7 S3 | Pacing | Media move on when they load. | Images move on at load through `engine.mediaSettled` (wired in `MessageBubble`); a video moves on once its player is drawn. |
 
 ## Suggested order of work (per SDK)
 
