@@ -1,4 +1,5 @@
 import {
+  surveyRatingPayload,
   backAtLabel,
   csatConfigOf,
   fileNameOf,
@@ -158,5 +159,16 @@ describe('liveChat', () => {
     expect(knownEmail('', [])).toBe('');
     expect(lastQuestion([{ shape: 'user-live-message', text: 'Do you ship to <b>Oman</b>?' }, { shape: 'user-input-response', text: 'Jo' }])).toBe('Do you ship to Oman ?');
     expect(lastQuestion([{ shape: 'user-live-message', text: 'jo@example.com' }])).toBe('');
+  });
+});
+
+describe('surveyRatingPayload (handover survey as submit-chat-rating)', () => {
+  it('maps each rating style to the server fields', () => {
+    expect(surveyRatingPayload('s', 'stars', { rating: 5, comment: ' ok ' })).toEqual({ chatSessionId: 's', source: 'post_chat_survey', csatScore: 5, feedback: 'ok' });
+    expect(surveyRatingPayload('s', 'thumbs', { rating: 1 })).toEqual({ chatSessionId: 's', source: 'post_chat_survey', thumbsUp: true });
+    expect(surveyRatingPayload('s', 'thumbs', { rating: 0 })).toEqual({ chatSessionId: 's', source: 'post_chat_survey', thumbsUp: false });
+    expect(surveyRatingPayload('s', 'numbers', { rating: 9 })).toEqual({ chatSessionId: 's', source: 'post_chat_survey', npsScore: 9 });
+    expect(surveyRatingPayload('s', 'stars', {})).toBeNull();
+    expect(surveyRatingPayload('', 'stars', { rating: 3 })).toBeNull();
   });
 });
