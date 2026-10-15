@@ -42,6 +42,8 @@ import {
   QuickActionsStrip,
   SystemLine,
 } from '../LiveChat/LiveChatCards';
+import { handoverPhase, talkToPersonAllowed } from '../../core/handoverState';
+import { headerStatus } from '../../core/replyTime';
 import type { VoiceRecordingResult } from '../VoiceRecorder';
 import type { ConferBotTheme } from '../../theme/types';
 import type { SocketEvents, RecordItem } from '../../types';
@@ -736,20 +738,14 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     return '\uD83D\uDCC1'; // Folder
   };
 
-  // Determine subtitle based on connection and agent
-  const getSubtitle = (): string | undefined => {
-    if (!isConnected) {
-      return 'Reconnecting...';
-    }
-    // An AI agent is the bot itself: no "Live Agent" under its name.
-    if (currentAgent && !currentAgent.isAIAgent) {
-      return currentAgent.email || 'Live Agent';
-    }
-    if (!isConnected) {
-      return 'Reconnecting...';
-    }
-    return undefined;
-  };
+  // Under the bot's name: "Reconnecting..." while offline. The header keeps
+  // the bot (never the agent), as the web widget does.
+  const getSubtitle = (): string | undefined => (!isConnected ? 'Reconnecting...' : undefined);
+
+  // "Online", the team's reply time, or plain "Online" once a person is in
+  // the chat (core/replyTime.ts, the web's replyTime.ts / headerPresence.ts).
+  const personInChat = handoverPhase(record) === 'joined' || (!!currentAgent && currentAgent.isAIAgent === false);
+  const status = headerStatus(serverCustomizations?.replyTime, { personInChat, agentBot: !!agentBot });
 
   /**
    * Determine if the chat input should be shown
@@ -928,8 +924,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           logoUrl={customizations.logo}
           hideLogo={customizations.hideLogo}
           showOnline={!!serverCustomizations && customizations.showOnline}
+          statusText={status?.text}
           subtitle={getSubtitle()}
-          agent={currentAgent}
           botAvatarUrl={botAvatarUrl || undefined}
           onClose={handleClose}
           showConnectionStatus={true}
@@ -975,7 +971,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
         {agentConnectionLost ? (
           <SystemLine text={`${agentConnectionLost}'s connection dropped. Hang on, they should be right back.`} testID={`${testID}-agent-lost`} />
         ) : null}
-        <QuickActionsStrip offerHuman={!!agentBot && !(currentAgent && !currentAgent.isAIAgent)} />
+        {/* "Talk to a person" only while nobody is coming or here (core/handoverState.ts). */}
+        <QuickActionsStrip offerHuman={!!agentBot && talkToPersonAllowed(record) && !(currentAgent && currentAgent.isAIAgent === false)} />
 
         {/* Unified input + footer — one seamless bottom bar */}
         {shouldShowInput() && (
