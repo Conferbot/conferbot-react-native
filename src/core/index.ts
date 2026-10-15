@@ -18,7 +18,7 @@ export * from './nodes';
 
 // Flow engine
 export { NodeFlowEngine } from './NodeFlowEngine';
-export type { NodeFlowEngineConfig, EngineState } from './NodeFlowEngine';
+export type { NodeFlowEngineConfig, EngineState, FlowTraceEvent } from './NodeFlowEngine';
 
 // Utilities
 export * from './utils/ValidationUtils';
