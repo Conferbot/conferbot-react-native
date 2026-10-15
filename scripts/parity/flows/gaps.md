@@ -2,7 +2,7 @@
 
 This compares each SDK's flow engine, as it is today, against `nodes.spec.json` and the fixtures.
 
-- **How it was found:** by reading each SDK's code. React Native, Flutter, Android and iOS now run all 156 fixtures (`__tests__/parity/flows.test.ts`, `test/parity/flows_test.dart`, `FlowFixturesTest.kt`, `FlowFixtureTests.swift`, all pass), so their sections list only what remains; iOS has not run them yet. Paths are relative to each SDK repo.
+- **How it was found:** by reading each SDK's code. React Native, Flutter, Android and iOS now run all 156 fixtures (`__tests__/parity/flows.test.ts`, `test/parity/flows_test.dart`, `FlowFixturesTest.kt`, `FlowFixtureTests.swift`, all pass), so their sections list only what remains. Paths are relative to each SDK repo.
 - **Spot-checks:** I re-read the items marked ✓ myself.
 - **No SDK code was changed** for this report.
 - **Severity:**
