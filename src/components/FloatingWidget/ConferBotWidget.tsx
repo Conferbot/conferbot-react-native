@@ -15,6 +15,7 @@ import type { ChatWidgetProps } from '../ChatWidget/ChatWidget';
 import { getBubbleIcon, CloseIcon } from './WidgetBubbleIcons';
 import { resolveLauncher } from '../../core/launcher';
 import { launcherIconSvg } from '../../core/launcherIcons';
+import { useLauncherMotion, noteLauncherOpened } from './useLauncherMotion';
 
 // react-native-svg draws a gradient launcher when the app has it; else its first colour.
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
@@ -161,9 +162,11 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
 
   // Try to get server customizations from context
   let serverCustomizations: any = null;
+  let unreadCount = 0;
   try {
     const ctx = useConferBot();
     serverCustomizations = (ctx as any).serverCustomizations;
+    unreadCount = (ctx as any).unreadCount || 0;
   } catch {
     // Context not available — widget used outside provider, that's fine
   }
@@ -198,6 +201,15 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   const avatarUrl = !iconImageUrl && look.style === 'avatar' ? look.avatar : null;
   const showLabel = !iconImageUrl && look.style === 'label';
 
+  // The icon's idle and new-message moments and the ripple rings (core/launcherMotion).
+  const motion = useLauncherMotion({
+    iconId: iconName,
+    mode: look.animation,
+    chatOpen: isChatOpen,
+    unreadCount,
+    enabled: !!serverCustomizations && !!SvgXml && !iconImageUrl && !avatarUrl,
+  });
+
   // CTA: only when the owner turned the greeting on; border radius capped at 20 (as the web).
   const ctaText = widgetConfig.ctaText || look.ctaText || '';
   const ctaBorderRadius = Math.min(sc.widgetBorderRadius ?? 50, 20);
@@ -224,6 +236,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   // Toggle chat with rotation animation
   const toggleChat = useCallback(() => {
     const opening = !isChatOpen;
+    if (opening) noteLauncherOpened();
     setIsChatOpen(opening);
     setShowCta(false);
 
@@ -298,7 +311,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     const glyphSize = showLabel ? Math.round(size * 0.52) : iconSize;
     // The web's launcher icons (core/launcherIcons) when react-native-svg is there; else the simple set.
     const glyph = SvgXml ? (
-      <SvgXml xml={launcherIconSvg(iconName, iconColor, look.solid, glyphSize)} width={glyphSize} height={glyphSize} />
+      <SvgXml xml={launcherIconSvg(iconName, iconColor, look.solid, glyphSize, motion.frame || undefined)} width={glyphSize} height={glyphSize} />
     ) : (
       <IconComponent size={glyphSize} color={iconColor} />
     );
@@ -396,6 +409,29 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         ]}
         pointerEvents="box-none"
       >
+        {/* The ripple: rings of the launcher's colour growing out from behind it. */}
+        {motion.rings.map((ring, k) =>
+          ring ? (
+            <View
+              key={k}
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                [position === 'left' ? 'left' : 'right']: 0,
+                width,
+                height: size,
+                backgroundColor: bgColor,
+                opacity: ring.opacity,
+                transform: [{ scale: ring.scale }],
+                borderTopLeftRadius: corners.topLeft,
+                borderTopRightRadius: corners.topRight,
+                borderBottomRightRadius: corners.bottomRight,
+                borderBottomLeftRadius: corners.bottomLeft,
+              }}
+            />
+          ) : null
+        )}
         {/* FAB Button */}
         <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, shadowStyle]}>
           <TouchableOpacity
