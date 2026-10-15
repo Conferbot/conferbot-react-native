@@ -39,7 +39,7 @@ orig.forEach((o, i) => {
 html += '</body></html>';
 fs.writeFileSync('compare.html', html);
 (async () => {
-  const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+  const b = await puppeteer.launch({ executablePath: require('../chrome'), args: ['--no-sandbox'] });
   const p = await b.newPage();
   await p.setViewport({ width: 1600, height: 1200 });
   await p.goto('file://' + __dirname + '/compare.html');
