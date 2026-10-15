@@ -19,6 +19,15 @@ import { launcherIconSvg } from '../../core/launcherIcons';
 import { useLauncherMotion, noteLauncherOpened } from './useLauncherMotion';
 import { GreetingCard } from './GreetingCard';
 import { useGreeting } from './useGreeting';
+import { useReducedMotion } from './fxAnimated';
+import { useLauncherEntrance } from './useLauncherEntrance';
+import { useLauncherAttention, ORBIT_DOT, GLOSS, HAND } from './useLauncherAttention';
+import { useLauncherIdleCall } from './useLauncherIdleCall';
+import { FxSpriteView } from './FxSprites';
+import { IdleCallStage, IdleCallBubble } from './IdleCallView';
+import { mascotColor } from '../../core/mascotArt';
+import { WAVING_HAND } from '../../core/launcherAttention';
+import { linearBox, radialDisc, stops } from '../../core/fxPaint';
 
 // react-native-svg draws a gradient launcher when the app has it; else its first colour.
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
@@ -28,6 +37,9 @@ try {
 } catch {
   SvgXml = null;
 }
+
+// Attention "shine": the gloss band, clear - white - clear across it.
+const glossXml = (w: number, h: number) => linearBox(w, h, 90, stops('rgba(255,255,255,0)', 'rgba(255,255,255,0.75)', 'rgba(255,255,255,0)'));
 
 // Left to right, stretched to whatever size the button is (as the web's linear-gradient(to right)).
 const gradientXml = (a: string, b: string) =>
@@ -182,7 +194,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
 
   const sc = serverCustomizations || {};
   // The launcher as the web draws it on a phone (core/launcher); props win.
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const look = resolveLauncher(serverCustomizations, screenWidth);
   const position = widgetConfig.position || look.position;
   const flipped = position !== look.position;
@@ -210,6 +222,57 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   const avatarUrl = !iconImageUrl && look.style === 'avatar' ? look.avatar : null;
   const showLabel = !iconImageUrl && look.style === 'label';
 
+  // A host-app CTA text (widgetConfig.ctaText) keeps the simple tooltip; the
+  // bot's own greeting is the web's greeting card (core/greeting).
+  const ctaText = widgetConfig.ctaText || '';
+  const ctaBorderRadius = Math.min(sc.widgetBorderRadius ?? 50, 20);
+  const greeting = useGreeting({ customizations: serverCustomizations, chatOpen: isChatOpen, botId, agentBot, enabled: !ctaText });
+  const cardShown = !!greeting.card && !isChatOpen;
+
+  // The launcher's entrance, attention loop and idle call (core/launcherEntrance,
+  // launcherAttention, launcherIdleCall): all off unless the owner chose one.
+  const reduced = useReducedMotion();
+  const [launcherSize, setLauncherSize] = useState<{ w: number; h: number } | null>(null);
+  const [moment, setMoment] = useState(false);
+  const edge = offsetX - look.tucked;
+  const launcherLeft = launcherSize ? (position === 'right' ? screenWidth - edge - launcherSize.w : edge) : 0;
+  const entrance = useLauncherEntrance({
+    mode: look.entrance,
+    botId,
+    enabled: !!serverCustomizations,
+    reduced,
+    chatOpen: isChatOpen,
+    size: launcherSize,
+    position,
+    screen: { width: screenWidth, height: screenHeight },
+    side: edge,
+    bottom: offsetBottom,
+    accent: bgColor,
+  });
+  const attention = useLauncherAttention({
+    mode: look.attention,
+    enabled: !!serverCustomizations,
+    reduced,
+    chatOpen: isChatOpen,
+    cardShown,
+    moment,
+    entranceBusy: entrance.busy,
+    size: launcherSize,
+    wide: showLabel,
+  });
+  const idleCall = useLauncherIdleCall({
+    mode: look.idleCall,
+    delay: look.idleCallDelay,
+    enabled: !!serverCustomizations && !!SvgXml,
+    reduced,
+    chatOpen: isChatOpen,
+    cardShown,
+    entranceBusy: entrance.busy,
+    botId,
+    size: launcherSize,
+    position,
+  });
+
   // The icon's idle and new-message moments and the ripple rings (core/launcherMotion).
   const motion = useLauncherMotion({
     iconId: iconName,
@@ -217,13 +280,11 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     chatOpen: isChatOpen,
     unreadCount,
     enabled: !!serverCustomizations && !!SvgXml && !iconImageUrl && !avatarUrl,
+    attention: attention.onLauncher,
   });
-
-  // A host-app CTA text (widgetConfig.ctaText) keeps the simple tooltip; the
-  // bot's own greeting is the web's greeting card (core/greeting).
-  const ctaText = widgetConfig.ctaText || '';
-  const ctaBorderRadius = Math.min(sc.widgetBorderRadius ?? 50, 20);
-  const greeting = useGreeting({ customizations: serverCustomizations, chatOpen: isChatOpen, botId, agentBot, enabled: !ctaText });
+  // A moment playing pauses the attention loop.
+  const momentNow = !!motion.frame;
+  useEffect(() => setMoment(momentNow), [momentNow]);
 
   // Show CTA after a short delay
   useEffect(() => {
@@ -381,9 +442,37 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
           </View>
         ) : null}
         {innerContent}
+        {/* Attention: the gloss band sweeping across, the spark circling it. */}
+        {attention.styles?.shine && launcherSize ? (
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderTopLeftRadius: corners.topLeft, borderTopRightRadius: corners.topRight, borderBottomRightRadius: corners.bottomRight, borderBottomLeftRadius: corners.bottomLeft }]}>
+            <Animated.View style={[{ position: 'absolute', left: 0, top: launcherSize.h * GLOSS.top, width: launcherSize.w * GLOSS.width, height: launcherSize.h * GLOSS.height }, attention.styles.shine]}>
+              {SvgXml ? <SvgXml xml={glossXml(launcherSize.w * GLOSS.width, launcherSize.h * GLOSS.height)} width="100%" height="100%" /> : null}
+            </Animated.View>
+          </View>
+        ) : null}
+        {attention.styles?.orbit ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              { position: 'absolute', left: 0, top: 0, width: ORBIT_DOT, height: ORBIT_DOT, borderRadius: ORBIT_DOT / 2, backgroundColor: '#fff' },
+              Platform.select({ ios: { shadowColor: bgColor, shadowOpacity: 1, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } }, default: {} }),
+              attention.styles.orbit,
+            ]}
+          />
+        ) : null}
       </View>
     );
   };
+
+  // The entrance's stage over (or, for the portal, just behind) the launcher.
+  const renderStage = () =>
+    entrance.plan && launcherSize && SvgXml ? (
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: launcherSize.w, height: launcherSize.h, zIndex: entrance.plan.behind ? 0 : 10000, elevation: entrance.plan.behind ? 0 : 7 }}>
+        {entrance.plan.sprites.map((sp, i) => (
+          <FxSpriteView key={i} sp={sp} clock={entrance.clock} end={entrance.end} Svg={SvgXml!} />
+        ))}
+      </View>
+    ) : null;
 
   // CTA offset from edge: FAB offset + FAB size + gap
   const ctaEdgeOffset = offsetX - look.tucked + width + 10;
@@ -417,6 +506,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
           style={[styles.ctaWrapper, position === 'right' ? { right: Math.max(8, offsetX - look.tucked) } : { left: Math.max(8, offsetX - look.tucked) }, { bottom: offsetBottom + size + 12, maxWidth: screenWidth - 24 }]}
           pointerEvents="box-none"
         >
+          <Animated.View style={entrance.styles?.greeting}>
+          <Animated.View style={attention.target === 'greeting' ? attention.styles?.self : null}>
           <GreetingCard
             {...greeting.card}
             onPress={() => {
@@ -429,13 +520,24 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
               if (!isChatOpen) toggleChat();
               if (g.click === 'send' && sendMessage) setTimeout(() => sendMessage!(g.text).catch(() => {}), 400);
             }}
-            onClose={greeting.dismiss}
+            onClose={() => {
+              greeting.dismiss();
+              idleCall.greetingClosed();
+            }}
             onStarter={(text) => {
               greeting.closeForNow();
               if (!isChatOpen) toggleChat();
               if (sendMessage) setTimeout(() => sendMessage!(text).catch(() => {}), 400);
             }}
           />
+          {/* Attention "wave": a waving hand on the card's corner (unless the text has its own). */}
+          {attention.styles?.hand && !greeting.card.text.includes(WAVING_HAND) ? (
+            <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: -13, left: -9, width: HAND.w, height: HAND.h, zIndex: 3 }, attention.styles.hand]}>
+              <Text style={{ fontSize: 20, lineHeight: 20 }}>{WAVING_HAND}</Text>
+            </Animated.View>
+          ) : null}
+          </Animated.View>
+          </Animated.View>
         </View>
       ) : null}
 
@@ -448,6 +550,30 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         ]}
         pointerEvents="box-none"
       >
+        {/* Attention "bounce": the contact shadow on the screen under it. */}
+        {attention.styles?.shadow && launcherSize && SvgXml ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[{ position: 'absolute', left: launcherSize.w * 0.12, top: launcherSize.h * 0.9, width: launcherSize.w * 0.76, height: Math.max(6, launcherSize.h * 0.2) }, attention.styles.shadow]}
+          >
+            <SvgXml xml={radialDisc(launcherSize.w * 0.76, Math.max(6, launcherSize.h * 0.2), stops('rgba(15,23,42,.55)', 'rgba(15,23,42,0)'))} width="100%" height="100%" />
+          </Animated.View>
+        ) : null}
+        {/* The idle call's mascot, hidden behind the button until it slides out. */}
+        {idleCall.perf && idleCall.styles && !idleCall.perf.front && SvgXml && launcherSize ? (
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: launcherSize.w, height: launcherSize.h }}>
+            <IdleCallStage perf={idleCall.perf} styles={idleCall.styles} accent={mascotColor(serverCustomizations, bgColor)} launcherAccent={bgColor} Svg={SvgXml} />
+          </View>
+        ) : null}
+        {entrance.plan && entrance.plan.behind && SvgXml ? renderStage() : null}
+        <Animated.View onLayout={(e) => {
+          const { width: w, height: h } = e.nativeEvent.layout;
+          if (!launcherSize || Math.abs(launcherSize.w - w) > 0.5 || Math.abs(launcherSize.h - h) > 0.5) setLauncherSize({ w, h });
+        }} style={entrance.styles?.launcher}>
+        <Animated.View style={entrance.styles?.wipe ? { overflow: 'hidden', transform: entrance.styles.wipe.outer } : null}>
+        <Animated.View style={entrance.styles?.wipe ? { transform: entrance.styles.wipe.inner } : null}>
+        <Animated.View style={attention.target === 'launcher' ? attention.styles?.self : null}>
+        <Animated.View style={idleCall.styles?.jolt}>
         {/* The ripple: rings of the launcher's colour growing out from behind it. */}
         {motion.rings.map((ring, k) =>
           ring ? (
@@ -456,9 +582,9 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
               pointerEvents="none"
               style={{
                 position: 'absolute',
-                bottom: 0,
-                [position === 'left' ? 'left' : 'right']: 0,
-                width,
+                top: 0,
+                left: 0,
+                width: launcherSize ? launcherSize.w : width,
                 height: size,
                 backgroundColor: bgColor,
                 opacity: ring.opacity,
@@ -468,6 +594,32 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
                 borderBottomRightRadius: corners.bottomRight,
                 borderBottomLeftRadius: corners.bottomLeft,
               }}
+            />
+          ) : null
+        )}
+        {/* Attention "pulse": two sonar rings in the launcher's colour. */}
+        {(['ring', 'ring2'] as const).map((part) =>
+          attention.styles?.[part] && launcherSize ? (
+            <Animated.View
+              key={part}
+              pointerEvents="none"
+              style={[
+                {
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: launcherSize.w,
+                  height: launcherSize.h,
+                  borderWidth: 2.5,
+                  borderColor: bgColor,
+                  borderTopLeftRadius: corners.topLeft,
+                  borderTopRightRadius: corners.topRight,
+                  borderBottomRightRadius: corners.bottomRight,
+                  borderBottomLeftRadius: corners.bottomLeft,
+                },
+                Platform.select({ ios: { shadowColor: bgColor, shadowOpacity: 1, shadowRadius: 7, shadowOffset: { width: 0, height: 0 } }, default: {} }),
+                attention.styles[part],
+              ]}
             />
           ) : null
         )}
@@ -484,6 +636,34 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
             {renderButtonContent()}
           </TouchableOpacity>
         </Animated.View>
+        </Animated.View>
+        </Animated.View>
+        </Animated.View>
+        </Animated.View>
+        </Animated.View>
+        {/* Knock and tap: the mascot in front of the button, its paw on it. */}
+        {idleCall.perf && idleCall.styles && idleCall.perf.front && SvgXml && launcherSize ? (
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: launcherSize.w, height: launcherSize.h, zIndex: 10001, elevation: 7 }}>
+            <IdleCallStage perf={idleCall.perf} styles={idleCall.styles} accent={mascotColor(serverCustomizations, bgColor)} launcherAccent={bgColor} Svg={SvgXml} />
+          </View>
+        ) : null}
+        {entrance.plan && !entrance.plan.behind && SvgXml ? renderStage() : null}
+        {/* The idle call's speech bubble (none while the greeting is up). */}
+        {idleCall.perf && idleCall.styles && idleCall.perf.talks && launcherSize ? (
+          <IdleCallBubble
+            perf={idleCall.perf}
+            style={idleCall.styles.bubble}
+            line={look.idleCallText}
+            launcherLeft={launcherLeft}
+            launcherHeight={launcherSize.h}
+            screenWidth={screenWidth}
+            font={null}
+            onPress={() => {
+              idleCall.stop();
+              if (!isChatOpen) toggleChat();
+            }}
+          />
+        ) : null}
       </View>
 
       {/* Chat Widget */}
