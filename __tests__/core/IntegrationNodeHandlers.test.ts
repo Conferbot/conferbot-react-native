@@ -607,6 +607,48 @@ describe('Integration Node Handlers', () => {
       expect(chatState.getVariable('_surveyResponse')).toEqual(response.surveyResponse);
     });
 
+    describe('only events the server handles (#58)', () => {
+      const emitted = () => (mockSocket.emit as jest.Mock).mock.calls.map((c) => c[0]);
+
+      it('cancel leaves the queue with queue-self-resolve, unless the provider already did', async () => {
+        const handler = new HumanHandoverHandler();
+        handler.setSocketClient(mockSocket);
+        mockSocket.connected = true;
+        const node = createNode('human-handover-node', {});
+        await handler.handleResponse({ action: 'cancel' }, node, chatState);
+        expect(mockSocket.emit).toHaveBeenCalledWith('queue-self-resolve', { chatSessionId: 'test-session' });
+        (mockSocket.emit as jest.Mock).mockClear();
+        await handler.handleResponse({ action: 'cancel', queueLeft: true }, node, chatState);
+        expect(emitted()).not.toContain('queue-self-resolve');
+      });
+
+      it('end chat sends queue-self-resolve, never handover:end', async () => {
+        const handler = new HumanHandoverHandler();
+        handler.setSocketClient(mockSocket);
+        mockSocket.connected = true;
+        await handler.handleResponse({ action: 'endChat' }, createNode('human-handover-node', {}), chatState);
+        expect(emitted()).toEqual(['queue-self-resolve']);
+      });
+
+      it('the survey goes out as submit-chat-rating, never handover:survey', async () => {
+        const handler = new HumanHandoverHandler();
+        handler.setSocketClient(mockSocket);
+        mockSocket.connected = true;
+        await handler.handleResponse(
+          { action: 'surveySubmit', surveyResponse: { rating: 4, feedback: 'Nice' } },
+          createNode('human-handover-node', {}),
+          chatState
+        );
+        expect(mockSocket.emit).toHaveBeenCalledWith('submit-chat-rating', {
+          chatSessionId: 'test-session',
+          source: 'post_chat_survey',
+          csatScore: 4,
+          feedback: 'Nice',
+        });
+        expect(emitted().some((e: string) => e.startsWith('handover:'))).toBe(false);
+      });
+    });
+
     it('should handle survey skip', async () => {
       const handler = new HumanHandoverHandler();
       const node = createNode('human-handover-node', {});
