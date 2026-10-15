@@ -284,7 +284,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
       // The photo fills the button inside a thin ring of its colour, with an online dot.
       const dot = Math.max(10, Math.round(size * 0.24));
       return (
-        <View style={{ width: size, height: size, padding: 3 }}>
+        <View style={{ width, height: size, padding: 3 }}>
           <Image
             source={{ uri: avatarUrl }}
             style={{ flex: 1, backgroundColor: '#fff', borderTopLeftRadius: corners.topLeft, borderTopRightRadius: corners.topRight, borderBottomRightRadius: corners.bottomRight, borderBottomLeftRadius: corners.bottomLeft }}
