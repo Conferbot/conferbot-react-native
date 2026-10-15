@@ -17,6 +17,7 @@ import { registerLegacyHandlers } from './LegacyNodeHandlers';
 import { registerLogicHandlers } from './LogicNodeHandlers';
 import { registerIntegrationHandlers } from './IntegrationNodeHandlers';
 import { registerSpecialFlowHandlers } from './SpecialNodeHandlers';
+import { registerRichHandlers } from './RichNodeHandlers';
 
 // ========================================
 // DISPLAY NODE HANDLERS
@@ -45,8 +46,6 @@ export {
   AskPhoneHandler,
   AskNumberHandler,
   AskUrlHandler,
-  AskDateHandler,
-  AskAddressHandler,
   AskFileHandler,
   AskLocationHandler,
   AskCustomQuestionHandler,
@@ -60,7 +59,6 @@ export {
 
 export {
   ButtonsHandler,
-  CardsHandler,
   CarouselHandler,
   PictureChoiceHandler,
   DropdownHandler,
@@ -134,16 +132,14 @@ export {
   GmailHandler,
   SlackHandler,
   DiscordHandler,
-  WhatsAppHandler,
-  TelegramHandler,
   GoogleSheetsHandler,
   GoogleCalendarHandler,
-  GoogleAnalyticsHandler,
   GoogleMeetHandler,
   GoogleDocsHandler,
   GoogleDriveHandler,
   HubSpotHandler,
   SalesforceHandler,
+  SegmentHandler,
   ZohoCRMHandler,
   MailchimpHandler,
   ZapierHandler,
@@ -152,6 +148,30 @@ export {
   StripeHandler,
   registerIntegrationHandlers,
 } from './IntegrationNodeHandlers';
+
+// ========================================
+// RICH STEP HANDLERS
+// ========================================
+
+export {
+  DynamicChoicesHandler,
+  HiddenFieldsHandler,
+  ConsentHandler,
+  ProductCardHandler,
+  SliderNodeHandler,
+  DateTimeNodeHandler,
+  RankingNodeHandler,
+  OtpNodeHandler,
+  AddressNodeHandler,
+  MatrixNodeHandler,
+  AiExtractNodeHandler,
+  AiRouteNodeHandler,
+  KbAnswerNodeHandler,
+  SignatureNodeHandler,
+  PaymentNodeHandler,
+  richHandlers,
+  registerRichHandlers,
+} from './RichNodeHandlers';
 
 // ========================================
 // ENHANCED GPT HANDLER (Multi-provider, Streaming)
@@ -231,12 +251,11 @@ export function registerAllHandlers(
 
   // Integration handlers (24 handlers including google-meet, google-docs, google-drive)
   //
-  // 'gpt-node' collision resolution: the default GPTHandler (registered by
-  // registerIntegrationHandlers) calls OpenAI client-side with nodeData.apiKey,
-  // matching the web widget - the server does NOT handle gpt-node. When
-  // config.useEnhancedGPT is set, the EnhancedGPTHandler is registered AFTER
-  // it and deliberately wins (NodeHandlerRegistry.register overwrites by
-  // nodeType, last registration wins).
+  // 'gpt-node': the default GPTHandler asks the server (POST
+  // /api/v1/bot/:id/gpt, as the web widget does) - the server holds the
+  // owner's key and strips it from the flow. config.useEnhancedGPT
+  // registers the EnhancedGPTHandler after it instead (an app's own AI
+  // provider and key; last registration wins).
   if (config?.useEnhancedGPT) {
     registerIntegrationHandlersWithEnhancedGPT(
       registry,
@@ -250,6 +269,9 @@ export function registerAllHandlers(
 
   // Special flow handlers (2 handlers)
   registerSpecialFlowHandlers(registry);
+
+  // Rich steps (payment, OTP, consent, AI and KB steps...)
+  registerRichHandlers(registry);
 }
 
 /**
@@ -279,7 +301,7 @@ function registerIntegrationHandlersWithEnhancedGPT(
 /**
  * Total number of registered handlers across all categories.
  */
-const TOTAL_HANDLER_COUNT = 69;
+const TOTAL_HANDLER_COUNT = 80;
 
 /**
  * Returns the total number of handlers registered by registerAllHandlers.
