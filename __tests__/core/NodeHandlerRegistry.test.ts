@@ -361,11 +361,11 @@ describe('NodeHandlerRegistry', () => {
     });
 
     it('should register expected number of handlers', () => {
-      // We skip integration handlers in tests, so count will be lower
-      // Display: 8, Ask: 10, Choice: 9, Advanced: 2, Legacy: 7, Logic: 7, Special: 2 = 45
-      expect(registry.size).toBeGreaterThanOrEqual(45);
-      // The full count including integrations is 69
-      expect(getHandlerCount()).toBe(69);
+      // Integration and rich handlers are skipped here, so the count is lower:
+      // Display 9, Ask 8, Choice 8, Advanced 2, Legacy 7, Logic 7, Special 2 = 43
+      expect(registry.size).toBeGreaterThanOrEqual(43);
+      // The full count, integrations (22) and rich steps (15) included
+      expect(getHandlerCount()).toBe(80);
     });
 
     describe('Display Nodes', () => {
