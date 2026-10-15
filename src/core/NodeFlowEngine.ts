@@ -701,6 +701,25 @@ export class NodeFlowEngine {
     return this.nodes.get(nodeId);
   }
 
+  /**
+   * A restored chat that was waiting on a step (a handover still in the
+   * queue): back on that step showing `uiState`, without running the step
+   * again - a second run would ask the server for a person a second time.
+   * The visitor's answer (Cancel, the flow carrying on) then goes through
+   * submitResponse as usual. False when the step is not in the flow.
+   */
+  waitAt(nodeId: string, uiState: NodeUIState): boolean {
+    if (!this.nodes.has(nodeId)) return false;
+    this._currentNodeId = nodeId;
+    this._isProcessing = false;
+    this._isWaitingForInput = true;
+    this._currentUIState = uiState;
+    this.chatState.setCurrentNode(nodeId);
+    this.config.onUIStateChange?.(uiState);
+    this.notifyStateListeners();
+    return true;
+  }
+
   /** Waiting on its handover step (for a person, or after nobody came). */
   isAtHandover(): boolean {
     const node = this._currentNodeId ? this.nodes.get(this._currentNodeId) : undefined;
