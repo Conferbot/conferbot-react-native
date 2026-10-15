@@ -1,473 +1,245 @@
 /**
  * DisplayNodeHandlers.ts
  *
- * Display Node Handlers for the Conferbot React Native SDK.
- * Handles basic display nodes: message, image, video, audio, file, html, redirect.
- * These nodes display content to the user and auto-continue to the next node.
+ * The steps that show something and move on: welcome, message, image,
+ * video, audio, file, html, user-redirect - and navigate, which waits for
+ * Done. Field names and behaviour follow the flow-node spec
+ * (scripts/parity/flows/nodes.spec.json) and the web widget's
+ * ts/chat/displayStep.ts. The engine paces the typing dots and moves on
+ * (images and videos when their media settles, at 4000 ms at most).
  */
 
-import {
-  BaseNodeHandler,
-  NodeResult,
-  NodeUIState,
-  NodeHandler,
-} from '../NodeHandler';
+import { BaseNodeHandler, NodeResult, NodeUIState, NodeHandler } from '../NodeHandler';
 import { ChatState } from '../../state/ChatState';
 import { NodeHandlerRegistry } from '../NodeHandlerRegistry';
 import { DisplayNodes } from '../NodeTypes';
+import { fillLinkVariables, fillVariables, sanitizeOwnerHtml, stripHtmlAndDecode } from '../../flow/text';
+import { botSay, pushAnswer, shownText, userSay } from './flowKit';
+import { linkHref } from '../../flow/inputs';
+
+export { linkHref };
+
+/** Where a redirect / navigate link goes: answers filled in, a same-site path kept (web redirectHref). */
+export const redirectHref = (link: any, state: ChatState): string => {
+  const filled = fillLinkVariables(link, (k) => state.lookupVariable(k));
+  return linkHref(filled) || (/^[/#?](?!\/)/.test(filled) ? filled : '');
+};
+
+/** The file name a download card shows, from the URL. */
+const fileNameOf = (url: string): string => {
+  try {
+    const path = url.split(/[?#]/)[0];
+    const name = decodeURIComponent(path.substring(path.lastIndexOf('/') + 1));
+    return name || 'download';
+  } catch {
+    return 'download';
+  }
+};
 
 // ========================================
-// MESSAGE HANDLER
+// WELCOME
 // ========================================
 
-/**
- * Handles 'message' nodes - displays a text message to the user
- */
+/** welcome-node: data.text, then data.image unless disableImage. */
+export class WelcomeNodeHandler extends BaseNodeHandler {
+  readonly nodeType = 'welcome-node';
+
+  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = node.data || {};
+    const nodeId = this.getNodeId(node);
+    const text = shownText(state, data.text);
+    botSay(state, text, nodeId, this.nodeType);
+    const image = typeof data.image === 'string' ? data.image.trim() : '';
+    if (image && !data.disableImage) botSay(state, '', nodeId, this.nodeType, { imageUrl: image });
+    return NodeResult.displayUI({ type: 'message', nodeId, text, showAvatar: true });
+  }
+}
+
+// ========================================
+// MESSAGE
+// ========================================
+
+/** message-node: data.text, filled from the answers. Blank text is skipped by the engine. */
 export class MessageHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.MESSAGE;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Message node has no data');
-    }
-
     const nodeId = this.getNodeId(node);
-
-    // Get message text - support multiple possible field names
-    let text = this.getString(data, 'text') ||
-               this.getString(data, 'message') ||
-               this.getString(data, 'content', '');
-
-    // Strip HTML tags
-    text = stripHtml(text);
-
-    // Resolve variables in the message text
-    text = this.resolveText(text, state);
-
-    // Skip message-nodes that just echo the user's choice (e.g. ${selection} → "A").
-    // Returns proceed instead of displayUI so handleDisplayUI is never called →
-    // no chatState._record push, no addBotMessage, no UI bubble, no admin entry.
-    const lastChoice = state.getVariable('_lastUserChoice');
-    if (__DEV__) {
-      console.log('[ConferBot] MessageHandler: text=', JSON.stringify(text), 'lastChoice=', JSON.stringify(lastChoice));
-    }
-    if (lastChoice && text.trim() === String(lastChoice).trim()) {
-      state.setVariable('_lastUserChoice', null);
-      if (__DEV__) {
-        console.log('[ConferBot] MessageHandler: SKIPPING echo message');
-      }
-      return this.proceed(node);
-    }
-
-    // Check for typing indicator delay
-    const typingDelay = this.getNumber(data, 'typingDelay', 0);
-    const showTyping = this.getBoolean(data, 'showTyping', true);
-
-    // Add to transcript
-    state.addBotMessage(text, nodeId, this.nodeType);
-
-    // Create UI state for message display
-    const uiState: NodeUIState.Message = {
-      type: 'message',
-      nodeId,
-      text,
-      showAvatar: this.getBoolean(data, 'showAvatar', true),
-      typing: showTyping && typingDelay > 0,
-    };
-
-    // If typing delay, use delayed proceed
-    if (typingDelay > 0) {
-      return NodeResult.delayedProceed(
-        this.getNextNodeId(node),
-        typingDelay,
-        { displayedMessage: text }
-      );
-    }
-
-    // For messages, we display and auto-proceed
-    // The flow engine will handle the transition after displaying
-    return NodeResult.displayUI(uiState);
+    const text = shownText(state, node.data?.text);
+    botSay(state, text, nodeId, this.nodeType);
+    return NodeResult.displayUI({ type: 'message', nodeId, text, showAvatar: true });
   }
 }
 
 // ========================================
-// IMAGE HANDLER
+// MEDIA
 // ========================================
 
-/**
- * Handles 'image' nodes - displays an image with optional caption
- */
+/** image-node: data.image (not filled). Moves on when it loads, or at the cap. */
 export class ImageHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.IMAGE;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Image node has no data');
-    }
-
     const nodeId = this.getNodeId(node);
-
-    // Get image URL ('image' is the field the server actually sends)
-    const url = this.getString(data, 'url') ||
-                this.getString(data, 'src') ||
-                this.getString(data, 'image') ||
-                this.getString(data, 'imageUrl', '');
-
-    if (!url) {
-      return this.createError('Image node has no URL');
-    }
-
-    // Get optional caption and alt text
-    let caption = this.getString(data, 'caption', '');
-    const alt = this.getString(data, 'alt') ||
-                this.getString(data, 'altText', 'Image');
-
-    // Resolve variables in caption
-    caption = caption ? this.resolveText(caption, state) : '';
-
-    // Add to transcript
-    const transcriptText = caption ? `[Image: ${caption}]` : '[Image]';
-    state.addBotMessage(transcriptText, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Image = {
-      type: 'image',
-      nodeId,
-      url,
-      alt,
-      caption: caption || undefined,
-    };
-
-    return NodeResult.displayUI(uiState);
+    const url = String(node.data?.image ?? '').trim();
+    botSay(state, '', nodeId, this.nodeType, { imageUrl: url, mediaNodeId: nodeId });
+    return NodeResult.displayUI({ type: 'image', nodeId, url, alt: 'Image' });
   }
 }
 
-// ========================================
-// VIDEO HANDLER
-// ========================================
-
-/**
- * Handles 'video' nodes - displays a video player
- */
+/** video-node: data.video (an mp4), allowDownload only when true. */
 export class VideoHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.VIDEO;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Video node has no data');
-    }
-
     const nodeId = this.getNodeId(node);
-
-    // Get video URL - support multiple sources
-    const url = this.getString(data, 'url') ||
-                this.getString(data, 'src') ||
-                this.getString(data, 'videoUrl') ||
-                this.getString(data, 'embedUrl', '');
-
-    if (!url) {
-      return this.createError('Video node has no URL');
-    }
-
-    // Get optional poster/thumbnail
-    const poster = this.getString(data, 'poster') ||
-                   this.getString(data, 'thumbnail') ||
-                   this.getString(data, 'thumbnailUrl', '');
-
-    // Autoplay settings
-    const autoplay = this.getBoolean(data, 'autoplay', false);
-
-    // Add to transcript
-    state.addBotMessage('[Video]', nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Video = {
-      type: 'video',
-      nodeId,
-      url,
-      poster: poster || undefined,
-      autoplay,
-    };
-
-    return NodeResult.displayUI(uiState);
+    const url = typeof node.data?.video === 'string' ? node.data.video.trim() : '';
+    botSay(state, url, nodeId, this.nodeType, { videoUrl: url, mediaNodeId: nodeId, allowDownload: node.data?.allowDownload === true });
+    return NodeResult.displayUI({ type: 'video', nodeId, url, autoplay: true });
   }
 }
 
-// ========================================
-// AUDIO HANDLER
-// ========================================
-
 /**
- * Handles 'audio' nodes - displays an audio player
+ * audio-node: data.audio. Some live nodes saved a list there, which the web
+ * does not read (a broken player) - the step still moves on.
  */
 export class AudioHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.AUDIO;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Audio node has no data');
-    }
-
     const nodeId = this.getNodeId(node);
-
-    // Get audio URL
-    const url = this.getString(data, 'url') ||
-                this.getString(data, 'src') ||
-                this.getString(data, 'audioUrl', '');
-
-    if (!url) {
-      return this.createError('Audio node has no URL');
-    }
-
-    // Autoplay settings
-    const autoplay = this.getBoolean(data, 'autoplay', false);
-
-    // Add to transcript
-    state.addBotMessage('[Audio]', nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.Audio = {
-      type: 'audio',
-      nodeId,
-      url,
-      autoplay,
-    };
-
-    return NodeResult.displayUI(uiState);
+    const url = typeof node.data?.audio === 'string' ? node.data.audio.trim() : '';
+    botSay(state, url, nodeId, this.nodeType, { audioUrl: url });
+    return NodeResult.displayUI({ type: 'audio', nodeId, url });
   }
 }
 
-// ========================================
-// FILE HANDLER
-// ========================================
-
-/**
- * Handles 'file' nodes - displays a file download link
- */
+/** file-node: a download card for data.file, named from the URL. */
 export class FileHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.FILE;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('File node has no data');
-    }
-
     const nodeId = this.getNodeId(node);
-
-    // Get file URL
-    const url = this.getString(data, 'url') ||
-                this.getString(data, 'src') ||
-                this.getString(data, 'fileUrl', '');
-
-    if (!url) {
-      return this.createError('File node has no URL');
-    }
-
-    // Get filename - try to extract from URL if not provided
-    let filename = this.getString(data, 'filename') ||
-                   this.getString(data, 'name', '');
-
-    if (!filename) {
-      // Try to extract filename from URL
-      try {
-        const urlPath = new URL(url).pathname;
-        filename = urlPath.split('/').pop() || 'download';
-      } catch {
-        filename = 'download';
-      }
-    }
-
-    // Get file metadata
-    const size = this.getNumber(data, 'size', 0);
-    const mimeType = this.getString(data, 'mimeType') ||
-                     this.getString(data, 'type', '');
-
-    // Add to transcript
-    state.addBotMessage(`[File: ${filename}]`, nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.File = {
-      type: 'file',
-      nodeId,
-      url,
-      filename,
-      size: size || undefined,
-      mimeType: mimeType || undefined,
-    };
-
-    return NodeResult.displayUI(uiState);
+    const url = typeof node.data?.file === 'string' ? node.data.file.trim() : '';
+    const filename = url ? fileNameOf(url) : 'download';
+    botSay(state, url, nodeId, this.nodeType, { fileUrl: url, fileName: filename });
+    return NodeResult.displayUI({ type: 'file', nodeId, url, filename });
   }
 }
 
 // ========================================
-// HTML HANDLER
+// HTML
 // ========================================
 
-/**
- * Handles 'html' nodes - displays custom HTML content
- */
+/** html-node: data.html, answers filled (escaped), then sanitised. */
 export class HTMLHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.HTML;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('HTML node has no data');
-    }
-
     const nodeId = this.getNodeId(node);
-
-    // Get HTML content
-    let content = this.getString(data, 'html') ||
-                  this.getString(data, 'content') ||
-                  this.getString(data, 'code', '');
-
-    if (!content) {
-      return this.createError('HTML node has no content');
-    }
-
-    // Resolve variables in HTML content
-    content = this.resolveText(content, state);
-
-    // Sanitization should be handled by the UI layer
-    // Here we just pass through the content
-
-    // Add to transcript (simplified representation)
-    state.addBotMessage('[HTML Content]', nodeId, this.nodeType);
-
-    // Create UI state
-    const uiState: NodeUIState.HTML = {
-      type: 'html',
-      nodeId,
-      content,
-    };
-
-    return NodeResult.displayUI(uiState);
+    const content = sanitizeOwnerHtml(fillVariables(node.data?.html ?? '', (k) => state.lookupVariable(k)));
+    botSay(state, shownText(state, content), nodeId, this.nodeType, { html: content });
+    return NodeResult.displayUI({ type: 'html', nodeId, content });
   }
 }
 
 // ========================================
-// REDIRECT HANDLER
+// REDIRECT
 // ========================================
 
 /**
- * Handles 'redirect' nodes - redirects the user to a URL
+ * user-redirect-node: a link card - redirectPrompt as its label, data.link
+ * as where it goes. It never navigates by itself; the flow moves on.
  */
 export class RedirectHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.REDIRECT;
 
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Redirect node has no data');
-    }
-
+    const data = node.data || {};
     const nodeId = this.getNodeId(node);
-
-    // Get redirect URL
-    let url = this.getString(data, 'url') ||
-              this.getString(data, 'redirectUrl') ||
-              this.getString(data, 'href', '');
-
-    if (!url) {
-      return this.createError('Redirect node has no URL');
-    }
-
-    // Resolve variables in URL
-    url = this.resolveText(url, state);
-
-    // Get redirect options
-    const openInNewTab = this.getBoolean(data, 'openInNewTab') ||
-                         this.getBoolean(data, 'newWindow') ||
-                         this.getBoolean(data, 'target', true);
-
-    const delay = this.getNumber(data, 'delay', 0);
-
-    // Add to transcript
-    state.addBotMessage(`[Redirect: ${url}]`, nodeId, this.nodeType);
-
-    // Store redirect info in state for the UI to handle
-    state.setVariable('_redirect', {
-      url,
-      openInNewTab,
-      delay,
-      timestamp: new Date().toISOString(),
+    const href = redirectHref(data.link, state);
+    const label = fillVariables(stripHtmlAndDecode(data.redirectPrompt || ''), (k) => state.lookupVariable(k), { mode: 'raw' }).trim();
+    botSay(state, href ? `${label}\n${href}` : label, nodeId, this.nodeType, {
+      linkUrl: href,
+      linkLabel: label,
+      openInNewTab: data.openInNewTab ?? true,
     });
-
-    // In React Native, the UI component will handle the actual navigation
-    // We proceed to the next node after triggering the redirect
-    if (delay > 0) {
-      return NodeResult.delayedProceed(
-        this.getNextNodeId(node),
-        delay,
-        { redirectUrl: url, openInNewTab }
-      );
-    }
-
-    return NodeResult.proceed(this.getNextNodeId(node), {
-      redirectUrl: url,
-      openInNewTab,
-    });
+    return NodeResult.displayUI({ type: 'message', nodeId, text: label, showAvatar: true });
   }
 }
 
 // ========================================
-// NAVIGATE HANDLER
+// NAVIGATE
 // ========================================
 
 /**
- * Handles 'navigate-node' - in-app navigation prompt with URL, auto-proceeds
+ * navigate-node: the prompt, one button per navigateOptions link (blank
+ * ones hidden) and Done. A link opens its page and does not move on;
+ * Done moves on after 600 ms.
  */
 export class NavigateHandler extends BaseNodeHandler {
   readonly nodeType = DisplayNodes.NAVIGATE;
 
+  private options(data: any): any[] {
+    return (Array.isArray(data?.navigateOptions) ? data.navigateOptions : []).filter(
+      (o: any) => String(o?.navigateText ?? '').trim() !== ''
+    );
+  }
+
+  private doneLabel(data: any): string {
+    return String(data?.doneNavigatingText || '').trim() || 'Done';
+  }
+
+  private ui(node: Record<string, any>, state: ChatState): NodeUIState.Buttons {
+    const data = node.data || {};
+    const buttons = this.options(data).map((o: any, i: number) => ({
+      id: `link-${i}`,
+      label: fillVariables(stripHtmlAndDecode(o.navigateText || ''), (k) => state.lookupVariable(k), { mode: 'raw' }).trim(),
+      value: redirectHref(o.navigateLink, state),
+      style: 'outline' as const,
+    }));
+    buttons.push({ id: 'done', label: this.doneLabel(data), value: 'done', style: 'primary' as any });
+    return { ...NodeUIState.buttons(this.getNodeId(node), shownText(state, data.navigatePrompt), buttons), awaitInput: true };
+  }
+
   async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    if (!data) {
-      return this.createError('Navigate node has no data');
-    }
-
     const nodeId = this.getNodeId(node);
+    const prompt = shownText(state, node.data?.navigatePrompt);
+    if (prompt) botSay(state, prompt, nodeId, this.nodeType);
+    return NodeResult.displayUI(this.ui(node, state));
+  }
 
-    let url = this.getString(data, 'url', '');
-
-    if (!url) {
-      return this.createError('Navigate node has no URL');
+  async handleResponse(response: any, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
+    const data = node.data || {};
+    const nodeId = this.getNodeId(node);
+    const id = String(response?.buttonId ?? '');
+    const isLink = response?.action === 'link' || id.startsWith('link-');
+    if (isLink) {
+      const index = response?.action === 'link' ? Number(response.index) : Number(id.slice(5));
+      const option = this.options(data)[index];
+      if (option) {
+        const text = fillVariables(stripHtmlAndDecode(option.navigateText || ''), (k) => state.lookupVariable(k), { mode: 'raw' }).trim();
+        pushAnswer(state, { id: nodeId, shape: 'user-navigate-link-click', text, url: redirectHref(option.navigateLink, state) });
+      }
+      // A link opens its page; the step keeps waiting for Done.
+      return NodeResult.displayUI(this.ui(node, state));
     }
-
-    // Resolve variables in URL
-    url = this.resolveText(url, state);
-
-    // Add to transcript
-    state.addBotMessage(`[Navigate: ${url}]`, nodeId, this.nodeType);
-
-    // Store navigation info in state for the UI to handle
-    state.setVariable('_navigate', {
-      url,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Auto-proceed after displaying navigation prompt
-    return NodeResult.proceed(this.getNextNodeId(node), {
-      navigateUrl: url,
-    });
+    const text = this.doneLabel(data);
+    pushAnswer(state, { id: nodeId, shape: 'user-navigate-done', text });
+    userSay(state, text, nodeId);
+    return NodeResult.delayedProceed(null, 600);
   }
 }
 
 // ========================================
-// WELCOME NODE HANDLER
+// DISPLAY HANDLER COLLECTION
 // ========================================
 
 /**
  * Strips HTML tags from text, leaving only plain text content
  */
 export function stripHtml(html: string): string {
-  return html
+  return String(html ?? '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
     .replace(/<[^>]+>/g, '')
@@ -480,72 +252,6 @@ export function stripHtml(html: string): string {
     .trim();
 }
 
-/**
- * Handles 'welcome-node' type — the initial greeting from the bot.
- * Treats it as a message node: strips HTML, adds to transcript, auto-proceeds.
- */
-export class WelcomeNodeHandler extends BaseNodeHandler {
-  readonly nodeType = 'welcome-node';
-
-  async handle(node: Record<string, any>, state: ChatState): Promise<NodeResult> {
-    const data = this.getNodeData(node);
-    const nodeId = this.getNodeId(node);
-
-    // Get welcome message text
-    let text = '';
-    if (data) {
-      text = this.getString(data, 'text') ||
-             this.getString(data, 'message') ||
-             this.getString(data, 'content', '');
-    }
-
-    // Strip HTML tags
-    text = stripHtml(text);
-
-    if (text) {
-      // Resolve variables
-      text = this.resolveText(text, state);
-      // Add to transcript
-      state.addBotMessage(text, nodeId, this.nodeType);
-    }
-
-    // Welcome image/GIF renders BELOW the text bubble as a standalone
-    // rounded image (matches the web widget, which reads nodeData.image)
-    if (data) {
-      const imageUrl = this.getString(data, 'image') ||
-                       this.getString(data, 'imageUrl') ||
-                       this.getString(data, 'gif', '');
-      if (imageUrl) {
-        state.addToTranscript({
-          type: 'bot',
-          nodeId,
-          nodeType: this.nodeType,
-          timestamp: new Date().toISOString(),
-          data: { imageUrl },
-        });
-      }
-    }
-
-    // Create UI state for display (auto-proceed like message node)
-    const uiState: NodeUIState.Message = {
-      type: 'message',
-      nodeId,
-      text: text || 'Welcome!',
-      showAvatar: true,
-      typing: false,
-    };
-
-    return NodeResult.displayUI(uiState);
-  }
-}
-
-// ========================================
-// DISPLAY HANDLER COLLECTION
-// ========================================
-
-/**
- * Array of all display node handlers
- */
 export const displayHandlers: NodeHandler[] = [
   new WelcomeNodeHandler(),
   new MessageHandler(),
