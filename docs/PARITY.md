@@ -43,7 +43,7 @@ The data files shared by the 4 SDKs are generated from the widget's own CSS and 
 
 ## How to test
 
-- **Unit tests:** `npx jest --maxWorkers=2`, plus `npx tsc --noEmit -p .`.
+- **Unit tests:** `npx jest --maxWorkers=2` (2026-10-16: 74 suites, 2102 pass, 22 skipped), plus `npx tsc --noEmit -p .`.
 - **On a device:**
   - Run the example app (`example/`) against a local embed-server. Uncomment `ConferBotEndpoints.configure(...)` in `example/App.tsx` and set `BOT_ID`.
   - Run `npx react-native start --port 8081`, then `adb reverse tcp:8081 tcp:8081` and `adb reverse tcp:8001 tcp:8001`.
@@ -68,7 +68,7 @@ Every web widget feature works the same in the 4 mobile SDKs: customization, lau
 | Launcher entrance / attention / idle call (#57) | done | todo | todo | todo |
 | Handover lifecycle: Connecting line + outcomes, 20s waiting signal, Talk to a person rules, leave queue on the server, restore after restart (#28-#31, #58) | done | todo | todo | todo |
 | Header: bot name + Online + reply time, Online again when a person joins (#32) | done | todo | todo | todo |
-| Flow nodes: shared spec, 156 fixtures (`scripts/parity/flows/`) | 156/156 | todo | todo | todo |
+| Flow nodes: shared spec, 156 fixtures (`scripts/parity/flows/`) | 156/156, every step card native (#52) | todo | todo | todo |
 | Home screen | todo | todo | todo | todo |
 | Mascots (incl. `mascotInGreeting`) | todo | todo | todo | todo |
 | `widgetLanguage` (i18n) | todo | todo | todo | todo |
@@ -107,7 +107,7 @@ The flow engine follows `scripts/parity/flows/nodes.spec.json`, and `__tests__/p
   - Times the visitor acted at (`consent_at`, `signature_at`): compared as timestamps.
   - Emits of `response-record` and `join-chat-room-visitor` (transport, not flow).
 - **Engine rules** (spec `engine`): start at the first `welcome-node`; a step that does not branch takes its first edge; a branch takes its exact handle or ends the chat; a wired edge to a missing node stops the chat where it is; unknown types (and a welcome reached again) pass along their first edge; a jump to a missing node ends; rich steps' `goPort` fallback; loops and sub-flows; answer variables registered per step and saved by name; `{var}` unknown shows nothing; masking (`redactSensitive`); typing pace (`paceFor`) unless a fixed `typingDelay` is set; images and videos move on when they load (`engine.mediaSettled`) or at 4000 ms.
-- **The rich steps** draw through the SDK's existing UI states: dynamic choices, consent, payment, ranking and navigate as buttons; product card as a one-card carousel; slider; date/time as the calendar; matrix as the form (one select per row); OTP, AI extract / route, KB answer and signature (typed) in the text input; address in the location picker. Each handler also takes the explicit actions in its comment (OTP skip and resend, address search and pick, a drawn signature's image), for custom renderers.
+- **The step cards** (`src/components/NodeComponents/steps/`, #52): each step the web draws as a card has its own native card, picked by `stepViewFor(uiState)` from the step type the engine stamps on every waiting state (`stepType`, `stepData`). Consent (box to tick, links open), OTP (e-mail, six digit boxes, Resend after its wait, Change email, Skip), address (suggestions while typing, confirm; the fields by hand), signature (finger pad sent as SVG through `react-native-svg`, Undo / Clear, Type instead; typed name only without `react-native-svg`), ranking (drag by the handle or the arrows), matrix (each row's columns, n of total answered), payment (Pay now opens Checkout, I've paid, Cancel, time left), slider, date / time (a month of days, hours and minutes on `timeStep`), carousel / product cards (link buttons open their page, Continue with no path), picture choices. They use the bot's option colours, radius and font size. Not drawn: the address map and "Use my location" (no browser map or location in an app). `__tests__/components/FlowStepViews.test.tsx` plays every fixture action for these steps on the cards (22 cases) and compares the outcome as `flows.test.ts` does.
 
 ### Porting the flow engine (from RN)
 
