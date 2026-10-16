@@ -46,6 +46,7 @@ import {
   LoadingIndicator,
   QuizQuestion,
 } from './SpecialComponents';
+import { stepViewFor } from './steps';
 
 /**
  * Props for the NodeRenderer component
@@ -86,6 +87,14 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
 
   if (!uiState) {
     return null;
+  }
+
+  // A step with its own card (consent, OTP, address, signature, ranking,
+  // matrix, payment, slider, date / time, cards, pictures): the card stays
+  // while its answer is on the way, so what was typed or moved is kept.
+  const Step = stepViewFor(uiState);
+  if (Step) {
+    return <Step key={uiState.nodeId} ui={uiState} onSubmit={onSubmit} busy={isLoading} />;
   }
 
   // If loading, show loading indicator
