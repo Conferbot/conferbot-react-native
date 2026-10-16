@@ -2,11 +2,15 @@
  * Waiting games: the rules and the words, with no UI, so they can be tested
  * on their own. Ported from the web widget:
  * conferbot-widget src/ts/chat/games/logic.ts (every rule as it is) and
- * src/ts/chat/games/content.ts (the English lists; the other languages come
- * with i18n). The English strings of the web's i18n/en.ts "games.*" keys are
- * inlined where logic.ts called t(). Every random choice takes an `rng`
+ * src/ts/chat/games/content.ts (the quiz and scramble per language come from
+ * i18n/games.data.ts, generated from it; the emoji riddles are English
+ * wordplay). Words are the web's "games.*" keys, read with t() as logic.ts
+ * does. Every random choice takes an `rng`
  * (Math.random by default) so tests can pin it.
  */
+import { t, localized, I18nKey, WidgetLanguage } from './i18n';
+import { TRIVIA_BY_LANG, WORDS_BY_LANG, Trivia, Word } from './i18n/games.data';
+
 export type Rng = () => number;
 
 /** A shuffled copy (Fisher-Yates). */
@@ -21,31 +25,12 @@ export const shuffle = <T>(items: readonly T[], rng: Rng = Math.random): T[] => 
 
 export const pick = <T>(items: readonly T[], rng: Rng = Math.random): T => items[Math.floor(rng() * items.length) % items.length];
 
-// ---------------------------------------------------------------- content (web content.ts, English)
+// ---------------------------------------------------------------- content (web content.ts)
 
-export type Trivia = { q: string; a: string; wrong: string[] };
-export type Word = { w: string; hint: string };
+export type { Trivia, Word };
 
-export const TRIVIA: readonly Trivia[] = [
-  { q: 'Which planet is known as the Red Planet?', a: 'Mars', wrong: ['Venus', 'Jupiter'] },
-  { q: 'How many legs does a spider have?', a: '8', wrong: ['6', '10'] },
-  { q: 'What is the largest ocean on Earth?', a: 'Pacific', wrong: ['Atlantic', 'Indian'] },
-  { q: 'Which animal is called the ship of the desert?', a: 'Camel', wrong: ['Horse', 'Elephant'] },
-  { q: 'How many continents are there?', a: '7', wrong: ['5', '6'] },
-  { q: 'What do bees make?', a: 'Honey', wrong: ['Silk', 'Butter'] },
-  { q: 'Which instrument has 88 keys?', a: 'Piano', wrong: ['Guitar', 'Violin'] },
-  { q: 'Mix blue and yellow paint and you get...', a: 'Green', wrong: ['Purple', 'Orange'] },
-  { q: 'How many minutes are there in a day?', a: '1,440', wrong: ['1,200', '2,400'] },
-  { q: 'Which is the fastest land animal?', a: 'Cheetah', wrong: ['Horse', 'Greyhound'] },
-  { q: 'What is the hardest natural substance?', a: 'Diamond', wrong: ['Gold', 'Granite'] },
-  { q: 'Which gas do plants take in from the air?', a: 'Carbon dioxide', wrong: ['Oxygen', 'Helium'] },
-  { q: 'How many sides does a hexagon have?', a: '6', wrong: ['5', '8'] },
-  { q: 'What is the tallest animal?', a: 'Giraffe', wrong: ['Elephant', 'Ostrich'] },
-  { q: 'Where does the sun rise?', a: 'In the east', wrong: ['In the west', 'In the north'] },
-  { q: 'Water boils at sea level at how many degrees Celsius?', a: '100', wrong: ['90', '120'] },
-  { q: 'Which is the smallest prime number?', a: '2', wrong: ['1', '3'] },
-  { q: 'What is a baby kangaroo called?', a: 'A joey', wrong: ['A kit', 'A cub'] },
-];
+/** The English quiz (web content.ts TRIVIA; every language in i18n/games.data.ts). */
+export const TRIVIA: readonly Trivia[] = TRIVIA_BY_LANG.en;
 
 export const RIDDLES: readonly { e: string; a: string; wrong: string[] }[] = [
   { e: '☀️🌻', a: 'Sunflower', wrong: ['Daisy', 'Sunrise', 'Sunscreen'] },
@@ -66,23 +51,14 @@ export const RIDDLES: readonly { e: string; a: string; wrong: string[] }[] = [
   { e: '🌊🏄', a: 'Surfing', wrong: ['Swimming', 'Sailing', 'Beach day'] },
 ];
 
-export const WORDS: readonly Word[] = [
-  { w: 'PLANET', hint: '🪐' },
-  { w: 'BANANA', hint: '🍌' },
-  { w: 'ROCKET', hint: '🚀' },
-  { w: 'MUFFIN', hint: '🧁' },
-  { w: 'TURTLE', hint: '🐢' },
-  { w: 'PENCIL', hint: '✏️' },
-  { w: 'PICNIC', hint: '🧺' },
-  { w: 'DRAGON', hint: '🐉' },
-  { w: 'COOKIE', hint: '🍪' },
-  { w: 'GALAXY', hint: '🌌' },
-  { w: 'JUNGLE', hint: '🌴' },
-  { w: 'KITTEN', hint: '🐱' },
-  { w: 'WAFFLE', hint: '🧇' },
-  { w: 'BRIDGE', hint: '🌉' },
-  { w: 'PUZZLE', hint: '🧩' },
-];
+/** The English scramble words (web content.ts WORDS). */
+export const WORDS: readonly Word[] = WORDS_BY_LANG.en;
+
+/** The quiz in a language, English for any other (web content.ts triviaFor). */
+export const triviaFor = (lang: string): readonly Trivia[] => TRIVIA_BY_LANG[lang as WidgetLanguage] || TRIVIA;
+
+/** The scramble words in a language (web content.ts wordsFor). */
+export const wordsFor = (lang: string): readonly Word[] => WORDS_BY_LANG[lang as WidgetLanguage] || WORDS;
 
 export const MEMORY_FACES: readonly string[] = ['🍕', '🚀', '🌵', '🐙', '🎈', '🍩', '🦊', '🌈', '⚽', '🎧', '🍉', '🐢', '🦄', '🍦'];
 
@@ -91,7 +67,8 @@ export const MEMORY_FACES: readonly string[] = ['🍕', '🚀', '🌵', '🐙', 
 export type Hand = 'rock' | 'paper' | 'scissors';
 export const HANDS: readonly Hand[] = ['rock', 'paper', 'scissors'];
 export const HAND_EMOJI: Record<Hand, string> = { rock: '✊', paper: '✋', scissors: '✌️' };
-export const HAND_NAME: Record<Hand, string> = { rock: 'Rock', paper: 'Paper', scissors: 'Scissors' };
+/** Each hand's name in the active language (web ui.ts handName, games.rps.*). */
+export const HAND_NAME: Record<Hand, string> = localized({ rock: 'games.rps.rock', paper: 'games.rps.paper', scissors: 'games.rps.scissors' });
 const BEATS: Record<Hand, Hand> = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
 
 /** From the visitor's side. */
@@ -258,10 +235,10 @@ export const quizFromArticles = (categories: any[], recent: any[], rng: Rng = Ma
     if (out.length >= count) break;
     const others = shuffle(items.filter((o) => o !== it), rng).map((o) => o.title).slice(0, 2);
     if (it.desc && it.desc.toLowerCase() !== it.title.toLowerCase() && others.length === 2) {
-      out.push(asQuestion(`Which of our articles helps with: "${it.desc}"`, it.title, others, 'kb', rng));
+      out.push(asQuestion(t('games.quiz.kbWhich', { desc: it.desc }), it.title, others, 'kb', rng));
     } else if (it.cat && cats.length >= 3) {
       const wrong = shuffle(cats.filter((c) => c !== it.cat), rng).slice(0, 2);
-      out.push(asQuestion(`Where in our help centre would you find "${it.title}"?`, it.cat, wrong, 'kb', rng));
+      out.push(asQuestion(t('games.quiz.kbWhere', { title: it.title }), it.cat, wrong, 'kb', rng));
     }
   }
   return out;
@@ -275,9 +252,9 @@ export const buildQuiz = (
   count = 3
 ): QuizQuestion[] => {
   const out = kb.slice(0, count);
-  for (const t of shuffle(trivia, rng)) {
+  for (const one of shuffle(trivia, rng)) {
     if (out.length >= count) break;
-    out.push(asQuestion(t.q, t.a, t.wrong.slice(0, 2), 'trivia', rng));
+    out.push(asQuestion(one.q, one.a, one.wrong.slice(0, 2), 'trivia', rng));
   }
   return out;
 };
@@ -286,13 +263,14 @@ export const buildQuiz = (
 export const quizScore = (questions: QuizQuestion[], picks: number[]): number =>
   questions.reduce((n, q, i) => n + (picks[i] === q.answer ? 1 : 0), 0);
 
-export const VERDICT = {
-  perfect: 'Perfect score! 🏆',
-  tough: 'Tough round - have another go? 🙈',
-  close: 'So close! 🌟',
-  notBad: 'Not bad at all 👍',
-  nice: 'Nicely done 👍',
-} as const;
+/** The verdicts in the active language (web logic.ts, games.verdict.*). */
+export const VERDICT = localized({
+  perfect: 'games.verdict.perfect',
+  tough: 'games.verdict.tough',
+  close: 'games.verdict.close',
+  notBad: 'games.verdict.notBad',
+  nice: 'games.verdict.nice',
+});
 
 export const quizVerdict = (score: number, total: number): string =>
   score === total ? VERDICT.perfect : score === 0 ? VERDICT.tough : score >= total - 1 ? VERDICT.close : VERDICT.notBad;
@@ -307,7 +285,7 @@ export const REACTION_MIN_MS = 100;
 export const reactionCounts = (ms: number) => ms >= REACTION_MIN_MS;
 
 export const reactionVerdict = (ms: number): string =>
-  ms < 250 ? 'Lightning fast ⚡' : ms < 350 ? 'Sharp reflexes 🎯' : ms < 500 ? VERDICT.nice : 'Slow and steady 🐢';
+  t((ms < 250 ? 'games.reaction.fast' : ms < 350 ? 'games.reaction.sharp' : ms < 500 ? 'games.verdict.nice' : 'games.reaction.steady') as I18nKey);
 
 export const average = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
 
