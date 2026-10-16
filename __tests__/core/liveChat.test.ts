@@ -20,7 +20,9 @@ import {
   agentTranslationOf,
   knownEmail,
   lastQuestion,
+  waitCardLines,
 } from '../../src/core/liveChat';
+import { t } from '../../src/core/i18n';
 
 describe('liveChat', () => {
   describe('queue', () => {
@@ -33,7 +35,29 @@ describe('liveChat', () => {
         ahead: 1,
         agentsOnline: 3,
         estimateLabel: '2 min',
+        estimateBucket: null,
+        typical: null,
       });
+    });
+
+    it('keeps the estimate bucket and the team\'s usual wait (web queueCard.ts)', () => {
+      const q = queueStatusOf({ status: 'waiting', position: 2, estimate: { label: '2 min', bucket: 'about_2' }, typical: { bucket: 'few_minutes' } });
+      expect(q).toMatchObject({ estimateBucket: 'about_2', typical: { bucket: 'few_minutes' } });
+    });
+
+    it('words the wait card as the web: the estimate, else the usual wait, else a calm promise', () => {
+      const live = queueStatusOf({ status: 'waiting', position: 2, estimate: { label: '2 min', bucket: 'about_2' } });
+      // The server's bucket in the visitor's words, the usual wait under it.
+      expect(waitCardLines(live, 'Typical wait: a few minutes')).toEqual({ estimate: 'About 2 min', typical: 'Typical wait: a few minutes' });
+      // An unknown bucket keeps the server's label.
+      expect(waitCardLines(queueStatusOf({ status: 'waiting', estimate: { label: '7 min', bucket: 'new' } }), null)).toEqual({ estimate: '7 min', typical: '' });
+      // No estimate: the usual wait takes its place, shown once.
+      expect(waitCardLines(queueStatusOf({ status: 'waiting', position: 1 }), 'Typical wait: a few minutes')).toEqual({
+        estimate: 'Typical wait: a few minutes',
+        typical: '',
+      });
+      // Nothing known: the calm promise.
+      expect(waitCardLines(null, null).estimate).toBe(t('queue.soon'));
     });
 
     it('says where the visitor stands', () => {
