@@ -12,6 +12,8 @@
  * Pure: the request's path and body, and how its answer reads.
  */
 
+import { t, localized, widgetLanguage } from './i18n';
+
 /** The web's address check (emailTranscript.ts EMAIL_RE). */
 export const TRANSCRIPT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -22,20 +24,22 @@ export const TRANSCRIPT_EMAIL_PATH = '/chat/transcript-email';
 
 export const transcriptEmailBody = (chatSessionId: string, email: string) => ({ chatSessionId, email: String(email).trim() });
 
-/** The web's English strings (i18n en: chat.menu.emailChat, mailchat.*, form.*). */
-export const MAILCHAT_TEXT = {
-  menu: 'Email me this chat',
-  title: 'Email me this chat',
-  sub: "We'll send the whole conversation to your inbox.",
-  placeholder: 'you@company.com',
-  label: 'Your email',
-  send: 'Send',
-  sending: 'Sending…',
-  cancel: 'Cancel',
-  checkEmail: 'Please check the email address.',
-  sendFailed: "We couldn't send it just now. Please try again.",
-  sent: (email: string) => `Sent! Check your inbox at ${email}`,
-} as const;
+/** The web's strings (ts/chat/emailTranscript.ts: chat.menu.emailChat, mailchat.*, form.*, common.*), in the active language. */
+export const MAILCHAT_TEXT = Object.assign(
+  localized({
+    menu: 'chat.menu.emailChat',
+    title: 'chat.menu.emailChat',
+    sub: 'mailchat.sub',
+    placeholder: 'form.emailPlaceholder',
+    label: 'form.yourEmail',
+    send: 'common.send',
+    sending: 'common.sendingEllipsis',
+    cancel: 'common.cancel',
+    checkEmail: 'form.checkEmail',
+    sendFailed: 'form.sendFailed',
+  }),
+  { sent: (email: string): string => t('mailchat.sent', { email }) }
+);
 
 export interface TranscriptEmailResult {
   ok: boolean;
@@ -59,4 +63,5 @@ export const transcriptEmailResult = (status: number, data: any): TranscriptEmai
  * in English, as the SDK is), else ours.
  */
 export const transcriptEmailError = (r: TranscriptEmailResult | null | undefined): string =>
-  (r && !r.ok && r.message) || MAILCHAT_TEXT.sendFailed;
+  // The server words its reasons in English: other languages get ours (web emailTranscript.ts).
+  (widgetLanguage() === 'en' && r && !r.ok && r.message) || MAILCHAT_TEXT.sendFailed;
