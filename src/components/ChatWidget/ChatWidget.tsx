@@ -37,6 +37,7 @@ import { visitorUploadsOn } from '../../core/liveChat';
 import {
   ClosedChatCard,
   CsatCard,
+  PostChatRedirectLine,
   EmailTranscriptCard,
   FileRequestCard,
   HandoverWaitingCard,
@@ -252,6 +253,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     fileRequestedBy,
     leadCardOpen,
     csatOpen,
+    postChatRedirect,
     sendLiveFile,
     visitorBlocked,
     emailTranscriptOpen,
@@ -1085,6 +1087,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
                   <CsatCard />
                   <EmailTranscriptCard />
                   <ClosedChatCard closed={closed} onNewChat={() => resetConversation()} />
+                  <PostChatRedirectLine />
                 </>
               }
               footerExtrasKey={[
@@ -1098,6 +1101,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
                 emailTranscriptSentTo || '',
                 closed?.kind || '',
                 stallHint || '',
+                postChatRedirect ? `${postChatRedirect.phase}${postChatRedirect.secondsLeft}` : '',
               ].join(':')}
             />
             </View>
