@@ -11,6 +11,7 @@ import { normalizeLauncherAttention } from './launcherAttention';
 import type { LauncherAttention } from './launcherAttention';
 import { idleCallLine, normalizeIdleCallDelay, normalizeLauncherIdleCall } from './launcherIdleCall';
 import type { LauncherIdleCall } from './launcherIdleCall';
+import { mascotLookOf, mascotScaleOf, mixColor, type MascotLook } from './mascotArt';
 
 export type LauncherShape = 'circle' | 'squircle' | 'bubble' | 'tab' | 'peek';
 export type LauncherStyle = 'icon' | 'label' | 'avatar' | 'mascot';
@@ -55,6 +56,14 @@ export interface ResolvedLauncher {
   style: LauncherStyle;
   label: string;
   avatar: string | null;
+  /**
+   * The "mascot" style (launcherStyle.ts): the owner's mascot, its bust at
+   * `scale`% of the button, centred and lifted 6% so its ears and hat peek
+   * over the rim, in `accent` (widgetIconBgColor, else the header's), on a
+   * soft light button (`glow`: a radial white to the launcher colour at 14%
+   * from 35% 30%). Open, the button is the brand colour with its cross.
+   */
+  mascot: { look: MascotLook; scale: number; accent: string; light: string };
   imageUrl: string | null;
   iconId: string | null;
   /** Icon size inside the button (the glyph). */
@@ -182,6 +191,12 @@ export function resolveLauncher(raw: Record<string, any> | null | undefined, scr
     style,
     label: normalizeLauncherLabel(c.launcherLabel) || DEFAULT_LAUNCHER_LABEL,
     avatar,
+    mascot: {
+      look: mascotLookOf(c),
+      scale: mascotScaleOf(c),
+      accent: str(c.widgetIconBgColor) || str(c.headerBgColor) || '#4f46e5',
+      light: mixColor(solid, 14, '#ffffff'),
+    },
     imageUrl,
     iconId,
     // The icon at 70% of the round button (css/liveChat/index.css), 50% of a tab.
