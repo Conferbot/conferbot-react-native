@@ -14,6 +14,7 @@ import type {
   ArticleEngagementPayload,
 } from './types';
 import { useConferBot } from '../../context/ConferBotContext';
+import { t } from '../../core/i18n';
 
 /**
  * Safe context access - the KB screen can be rendered standalone
@@ -162,7 +163,7 @@ export const KBProvider: React.FC<KBProviderProps> = ({ children }) => {
         socketRef.current.emit('get-chatbot-data');
       }
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to load knowledge base' });
+      dispatch({ type: 'SET_ERROR', payload: t('sdk.kb.loadFailed') });
     }
   }, []);
 
@@ -318,11 +319,11 @@ export const KBProvider: React.FC<KBProviderProps> = ({ children }) => {
 
   // Calculate reading time
   const calculateReadingTime = useCallback((content: string): string => {
-    if (!content) return '1 min read';
+    if (!content) return t('kb.minRead', { n: 1 });
     const text = content.replace(/<[^>]*>/g, ''); // Strip HTML
     const wordCount = text.split(/\s+/).filter((word) => word.length > 0).length;
     const minutes = Math.ceil(wordCount / 200);
-    return minutes <= 1 ? '1 min read' : `${minutes} min read`;
+    return t('kb.minRead', { n: Math.max(1, minutes) });
   }, []);
 
   // Check if article has been rated
