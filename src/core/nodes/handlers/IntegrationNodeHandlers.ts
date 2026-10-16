@@ -94,6 +94,7 @@ import { queueSelfResolvePayload } from '../../handoverState';
 import { surveyRatingPayload } from '../../liveChat';
 import { stripHtml } from './DisplayNodeHandlers';
 import { ctxOf, FlowContext } from '../../flow/context';
+import { t } from '../../i18n';
 import { EN, isValidEmail, isValidPhone, normalizePhone, ownerTextOr } from '../../flow/inputs';
 import { liveEventId } from '../../liveEvents';
 
@@ -814,7 +815,7 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
     const handoverMessage = this.getString(
       data,
       'handoverMessage',
-      this.getString(data, 'waitMessage', 'Please wait while we connect you with an agent...')
+      this.getString(data, 'waitMessage', t('sdk.flow.handoverWait'))
     );
     // The builder writes it as rich text (<p>...</p>).
     const resolvedMessage = stripHtml(state.resolveVariables(handoverMessage, 'html'));
@@ -1016,8 +1017,8 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
 
     const surveyConfig: PostChatSurveyConfig = data?.surveyConfig as PostChatSurveyConfig || {
       enabled: this.getBoolean(data || {}, 'showPostChatSurvey', true),
-      title: this.getString(data || {}, 'surveyTitle', 'How was your experience?'),
-      ratingQuestion: this.getString(data || {}, 'surveyRatingQuestion', 'Please rate your conversation'),
+      title: this.getString(data || {}, 'surveyTitle', t('csat.title')),
+      ratingQuestion: this.getString(data || {}, 'surveyRatingQuestion', t('sdk.flow.rateConversation')),
       ratingStyle: 'stars' as const,
       maxRating: 5,
     };
@@ -1143,7 +1144,7 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
           agent: response.agent as AgentInfo,
           agentName: (response.agent as AgentInfo)?.name || response.agentName as string,
           agentAvatar: (response.agent as AgentInfo)?.avatar || response.agentAvatar as string,
-          connectedMessage: state.resolveVariables(this.getString(data || {}, 'connectedMessage', 'You are now connected.')),
+          connectedMessage: state.resolveVariables(this.getString(data || {}, 'connectedMessage', t('sdk.flow.connected'))),
         } as NodeUIState.HumanHandover));
 
       case 'ended':
@@ -1175,7 +1176,7 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
           type: 'humanHandover',
           nodeId,
           stage: 'noAgents',
-          noAgentsMessage: response.message as string || state.resolveVariables(this.getString(data || {}, 'noAgentsMessage', 'No agents available.')),
+          noAgentsMessage: response.message as string || state.resolveVariables(this.getString(data || {}, 'noAgentsMessage', t('sdk.flow.noAgents'))),
         } as NodeUIState.HumanHandover));
       }
 
@@ -1189,7 +1190,7 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
           type: 'humanHandover',
           nodeId,
           stage: 'timeout',
-          timeoutMessage: response.message as string || state.resolveVariables(this.getString(data || {}, 'timeoutMessage', 'Connection timed out.')),
+          timeoutMessage: response.message as string || state.resolveVariables(this.getString(data || {}, 'timeoutMessage', t('sdk.flow.timedOut'))),
         } as NodeUIState.HumanHandover));
       }
 
