@@ -5,7 +5,7 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useFlowEngine } from '../../src/context/hooks/useFlowEngine';
 
-const setup = () => {
+const setup = (onConversationEnd?: () => void) => {
   const setRecord = jest.fn();
   const chatStateRef = { current: null as any };
   const flowEngine = { current: null as any };
@@ -19,6 +19,7 @@ const setup = () => {
       setRecord,
       persistAnswerVariables: jest.fn().mockResolvedValue(undefined),
       persistFlowState: jest.fn().mockResolvedValue(undefined),
+      onConversationEnd,
     } as any)
   );
   return { hook, setRecord, chatStateRef, flowEngine };
@@ -82,6 +83,21 @@ describe('useFlowEngine', () => {
     // The rating card took the answer: the step's own words are the visitor's bubble.
     const answer = rows(setRecord).find((r: any) => r.type === 'user-message');
     expect(answer).toMatchObject({ text: '⭐⭐⭐⭐⭐', answerOf: { nodeId: 'r', type: 'rating-choice-node', text: '5/5' } });
+  });
+
+  it('the flow\'s end is the conversation\'s end (the post-chat redirect, #74)', async () => {
+    jest.useRealTimers();
+    const ended = jest.fn();
+    const { hook, flowEngine } = setup(ended);
+    act(() => hook.result.current.initializeFlowEngine('s1'));
+    const engine = flowEngine.current;
+    (engine as any).config.typingDelay = 0;
+    engine.loadFlow({ nodes: [node('m', 'message-node', { text: '<p>Bye</p>' })], edges: [] });
+    await act(async () => {
+      await engine.start();
+      await settle();
+    });
+    expect(ended).toHaveBeenCalledTimes(1);
   });
 
   it('shows the conversation again from a question gone back to', () => {
