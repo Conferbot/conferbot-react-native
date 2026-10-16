@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import type { StyleProp, ViewStyle, TextStyle } from 'react-native';
 import type { AIResponseUIState, StreamingState } from '../../services/ai/types';
+import { t } from '../../core/i18n';
 
 // ========================================
 // TYPES
@@ -227,7 +228,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           activeOpacity={0.7}
         >
           <Text style={[styles.actionButtonText, { color: theme.buttonText }]}>
-            Stop
+            {t('sdk.ai.stop')}
           </Text>
         </TouchableOpacity>
       )}
@@ -239,7 +240,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           activeOpacity={0.7}
         >
           <Text style={[styles.actionButtonText, { color: theme.buttonText }]}>
-            Regenerate
+            {t('sdk.ai.regenerate')}
           </Text>
         </TouchableOpacity>
       )}
@@ -282,7 +283,7 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({
     return (
       <View style={styles.statusContainer}>
         <Text style={[styles.statusText, { color: theme.secondaryTextColor }]}>
-          Generation stopped
+          {t('sdk.ai.stopped')}
         </Text>
       </View>
     );
@@ -365,7 +366,7 @@ export const StreamingMessage: React.FC<StreamingMessageProps> = ({
 
         {!showTyping && !hasContent && state === 'ERROR' && (
           <Text style={[styles.text, { color: theme.errorColor }]}>
-            {error?.message || 'An error occurred'}
+            {t('common.somethingWrong')}
           </Text>
         )}
 
