@@ -4,7 +4,8 @@
  * owner's quick actions and "Talk to a person" above the composer, the AI's
  * follow-up email card, the queue position, the "nobody could join" email
  * ask, leave a message, a locked conversation, an agent's dropped
- * connection, an agent asking for a file, and the post-chat rating.
+ * connection, an agent asking for a file, the post-chat rating, "Email me
+ * this chat" and the closed chat (blocked, or ended with a new chat).
  */
 import React, { useContext, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
@@ -12,6 +13,8 @@ import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
 import { conversionEventOf, isAIAgentDetails, quickActionsOf } from '../../core/agentBot';
 import { backAtLabel, isEmail, knownEmail, lastQuestion, queueLine, type CsatConfig } from '../../core/liveChat';
+import { MAILCHAT_TEXT, isTranscriptEmail, transcriptEmailError } from '../../core/emailTranscript';
+import { NEW_CHAT_TEXT, type ClosedState } from '../../core/liveEvents';
 
 const TALK_TO_PERSON_ASK = "I'd like to talk to a person, please.";
 
@@ -272,6 +275,99 @@ export const LeaveMessageCard: React.FC = () => {
         </>
       )}
     </Card>
+  );
+};
+
+/**
+ * "Email me this chat" (web emailTranscript.ts): one card, the visitor's
+ * email filled in when known; Send, Cancel; the server's reason when it did
+ * not go; "Sent! Check your inbox at ..." once it did.
+ */
+export const EmailTranscriptCard: React.FC = () => {
+  const { s, theme } = useStyles();
+  const ctx = useContext(ConferBotContext);
+  const known = knownEmail(ctx?.chatState?.getUserMetadata?.()?.email, ctx?.chatState?.getAnswerVariables?.()) || '';
+  const [email, setEmail] = useState(known);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const sentTo = ctx?.emailTranscriptSentTo || null;
+  if (!ctx?.emailTranscriptOpen && !sentTo) return null;
+  if (sentTo) {
+    return (
+      <Card testID="cb-mailchat">
+        <Text style={s.title}>{MAILCHAT_TEXT.sent(sentTo)}</Text>
+      </Card>
+    );
+  }
+  const submit = async () => {
+    if (!isTranscriptEmail(email)) return setError(MAILCHAT_TEXT.checkEmail);
+    setError(null);
+    setBusy(true);
+    const r = await ctx.emailTranscript(email.trim());
+    setBusy(false);
+    if (!r?.ok) setError(transcriptEmailError(r));
+  };
+  return (
+    <Card testID="cb-mailchat">
+      <Text style={s.title}>{MAILCHAT_TEXT.title}</Text>
+      <Text style={s.sub}>{MAILCHAT_TEXT.sub}</Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+        <TextInput
+          value={email}
+          onChangeText={(v) => {
+            setEmail(v);
+            setError(null);
+          }}
+          placeholder={MAILCHAT_TEXT.placeholder}
+          placeholderTextColor={theme.colors.textSecondary}
+          accessibilityLabel={MAILCHAT_TEXT.label}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          maxLength={120}
+          onSubmitEditing={submit}
+          style={[s.input, { flex: 1 }]}
+          testID="cb-mailchat-email"
+        />
+        <TouchableOpacity style={s.primary} onPress={submit} disabled={busy} accessibilityRole="button" testID="cb-mailchat-send">
+          <Text style={s.primaryText}>{busy ? MAILCHAT_TEXT.sending : MAILCHAT_TEXT.send}</Text>
+        </TouchableOpacity>
+      </View>
+      {error ? (
+        <Text style={[s.error, { marginTop: 6 }]} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+      <TouchableOpacity onPress={ctx.closeEmailTranscript} accessibilityRole="button" style={{ marginTop: 8, alignSelf: 'flex-start' }} testID="cb-mailchat-cancel">
+        <Text style={s.sub}>{MAILCHAT_TEXT.cancel}</Text>
+      </TouchableOpacity>
+    </Card>
+  );
+};
+
+/**
+ * The closed chat (core/liveEvents.ts closedStateOf): a blocked visitor's
+ * neutral line, or, under an ended chat's own line, a button to start a
+ * new chat.
+ */
+export const ClosedChatCard: React.FC<{ closed: ClosedState | null; onNewChat?: () => void }> = ({ closed, onNewChat }) => {
+  const { s } = useStyles();
+  if (!closed) return null;
+  return (
+    <View style={{ alignItems: 'center', marginVertical: 8, gap: 8 }} testID={`cb-closed-${closed.kind}`} accessibilityRole="summary">
+      {/* An ended chat's "Chat has ended" line is in the record already. */}
+      {closed.kind === 'blocked' ? (
+        <View style={s.systemLine}>
+          <Text style={s.systemText}>{closed.text}</Text>
+        </View>
+      ) : null}
+      {closed.newChat && onNewChat ? (
+        <TouchableOpacity style={s.primary} onPress={onNewChat} accessibilityRole="button" testID="cb-new-chat">
+          <Text style={s.primaryText}>{NEW_CHAT_TEXT}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
   );
 };
 
