@@ -29,6 +29,7 @@ import {
 } from 'react-native';
 
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import {
   AudioRecorder,
   AudioRecorderResult,
@@ -202,7 +203,7 @@ const RecordButton: React.FC<RecordButtonProps> = ({
       disabled={disabled}
       style={styles.recordButtonWrapper}
       accessibilityRole="button"
-      accessibilityLabel={isRecording ? 'Stop recording' : isPreviewing ? 'Play preview' : 'Start recording'}
+      accessibilityLabel={isRecording ? t('sdk.voice.stop') : isPreviewing ? t('sdk.voice.playPreview') : t('sdk.voice.start')}
     >
       <Animated.View
         style={[
@@ -258,10 +259,11 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   compact = false,
   onExpand,
   onCollapse,
-  recordButtonText = 'Tap microphone to record',
+  recordButtonText: recordButtonTextProp,
   accessibilityLabel,
   testID,
 }) => {
+  const recordButtonText = recordButtonTextProp ?? t('sdk.voice.tapToRecord');
   const theme = useTheme();
   const stylesWithTheme = createStyles(theme);
 
@@ -283,7 +285,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   // Check availability on mount
   useEffect(() => {
     if (!isAudioRecorderAvailable()) {
-      setError('Voice recording is not available. Please install expo-av or react-native-audio-recorder-player.');
+      setError(t('sdk.voice.unavailable'));
     }
   }, []);
 
@@ -361,9 +363,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         }
       }, 100);
     } catch (err) {
-      const errorMessage = err instanceof AudioRecorderError
-        ? err.message
-        : 'Failed to start recording. Please try again.';
+      const errorMessage = t('sdk.voice.startFailed');
 
       if (err instanceof AudioRecorderError && err.code === 'PERMISSION_DENIED') {
         // Permission alert is already shown by AudioRecorder
@@ -371,7 +371,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       }
 
       setError(errorMessage);
-      Alert.alert('Recording Error', errorMessage);
+      Alert.alert(t('sdk.voice.errorTitle'), errorMessage);
     }
   }, [maxDuration, handleRecordingStatus, handleMeteringUpdate]);
 
@@ -386,11 +386,11 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       const result = await AudioRecorder.stopRecording();
 
       if (result.duration < minDuration) {
-        setError(`Recording too short. Minimum duration is ${formatDuration(minDuration)}.`);
+        setError(t('sdk.voice.tooShort', { duration: formatDuration(minDuration) }));
         Alert.alert(
-          'Recording Too Short',
-          `Please record for at least ${formatDuration(minDuration)}.`,
-          [{ text: 'OK' }]
+          t('sdk.voice.tooShortTitle'),
+          t('sdk.voice.recordAtLeast', { duration: formatDuration(minDuration) }),
+          [{ text: t('sdk.common.ok') }]
         );
         setState('idle');
         setMeteringLevels([]);
@@ -401,11 +401,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       setDuration(result.duration);
       setState('preview');
     } catch (err) {
-      const errorMessage = err instanceof AudioRecorderError
-        ? err.message
-        : 'Failed to stop recording. Please try again.';
+      const errorMessage = t('sdk.voice.stopFailed');
       setError(errorMessage);
-      Alert.alert('Recording Error', errorMessage);
+      Alert.alert(t('sdk.voice.errorTitle'), errorMessage);
       setState('idle');
     }
   }, [minDuration]);
@@ -427,10 +425,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       });
     } catch (err) {
       setIsPlaying(false);
-      const errorMessage = err instanceof AudioRecorderError
-        ? err.message
-        : 'Failed to play recording.';
-      Alert.alert('Playback Error', errorMessage);
+      Alert.alert(t('sdk.voice.playbackErrorTitle'), t('sdk.voice.playFailed'));
     }
   }, [recording, handlePlaybackStatus]);
 
@@ -499,7 +494,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         onCollapse?.();
       }
     } catch (err) {
-      Alert.alert('Send Error', 'Failed to send voice message. Please try again.');
+      Alert.alert(t('sdk.send.failedTitle'), t('voice.messageFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -541,7 +536,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         onPress={handleMainButtonPress}
         disabled={disabled || !!error}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel || 'Record voice message'}
+        accessibilityLabel={accessibilityLabel || t('chat.composer.voice')}
         testID={testID}
       >
         <View style={styles.micIconContainer}>
@@ -576,9 +571,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
             style={stylesWithTheme.actionButton}
             onPress={handleCancel}
             accessibilityRole="button"
-            accessibilityLabel="Cancel recording"
+            accessibilityLabel={t('sdk.voice.cancel')}
           >
-            <Text style={stylesWithTheme.cancelText}>Cancel</Text>
+            <Text style={stylesWithTheme.cancelText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         )}
 
@@ -628,13 +623,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
             onPress={handleSend}
             disabled={isLoading}
             accessibilityRole="button"
-            accessibilityLabel="Send voice message"
+            accessibilityLabel={t('sdk.voice.send')}
           >
             {isLoading ? (
               <ActivityIndicator size="small" color={theme.colors.textInverse} />
             ) : (
               <Text style={[stylesWithTheme.sendText, { color: theme.colors.textInverse }]}>
-                Send
+                {t('common.send')}
               </Text>
             )}
           </TouchableOpacity>
@@ -645,7 +640,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       {state === 'recording' && (
         <View style={stylesWithTheme.recordingIndicator}>
           <View style={[stylesWithTheme.recordingDot, { backgroundColor: theme.colors.error }]} />
-          <Text style={stylesWithTheme.recordingText}>Recording...</Text>
+          <Text style={stylesWithTheme.recordingText}>{t('sdk.voice.recording')}</Text>
         </View>
       )}
     </View>
