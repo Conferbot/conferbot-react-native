@@ -12,6 +12,7 @@ import type { LauncherAttention } from './launcherAttention';
 import { idleCallLine, normalizeIdleCallDelay, normalizeLauncherIdleCall } from './launcherIdleCall';
 import type { LauncherIdleCall } from './launcherIdleCall';
 import { mascotLookOf, mascotScaleOf, mixColor, type MascotLook } from './mascotArt';
+import { t } from './i18n';
 
 export type LauncherShape = 'circle' | 'squircle' | 'bubble' | 'tab' | 'peek';
 export type LauncherStyle = 'icon' | 'label' | 'avatar' | 'mascot';
@@ -189,7 +190,7 @@ export function resolveLauncher(raw: Record<string, any> | null | undefined, scr
     ink,
     glow: str(c.headerBgColor) || solid,
     style,
-    label: normalizeLauncherLabel(c.launcherLabel) || DEFAULT_LAUNCHER_LABEL,
+    label: normalizeLauncherLabel(c.launcherLabel) || t('home.chatWithUs'),
     avatar,
     mascot: {
       look: mascotLookOf(c),
