@@ -35,8 +35,10 @@ The root provider component that wraps your application and provides Conferbot f
 
 ```typescript
 interface ConferBotConfig {
-  enableNotifications?: boolean;      // Default: false
-  enableOfflineMode?: boolean;        // Default: false
+  /** @deprecated No effect: push is on once you call setPushToken(token). */
+  enableNotifications?: boolean;
+  enableOfflineMode?: boolean;        // Default: true (queue sends made offline, send on reconnect)
+  offlineQueueConfig?: OfflineQueueConfig;
   autoConnect?: boolean;              // Default: true
   reconnectionAttempts?: number;      // Default: 5
   reconnectionDelay?: number;         // Default: 1000 (ms)
