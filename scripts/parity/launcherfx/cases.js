@@ -6,6 +6,8 @@
 const { attentionTracks, ATTENTION_BASE, LAUNCHER_ATTENTIONS } = require('./js/launcherAttention');
 const { idleCallPerformance, idleCallGeometry, MASCOT_PART_BASE, LAUNCHER_IDLE_CALLS } = require('./js/launcherIdleCall');
 const { entrancePlan, entranceStage, entranceTimeline, LAUNCHER_ENTRANCES, SETTLE_REVEAL } = require('./js/launcherEntrance');
+const { cssTrack, MASCOT_KEYFRAMES, moodPlan, TYPING_MASCOT, TYPING_PENCIL } = require('./js/mascotMoods');
+const { CARD_KEYFRAMES, cardEnterTrack, cardLeaveTrack, gestureTrack, talkTrack, BREATH, PING, wordFade } = require('./js/mascotMotion');
 
 // A 50px launcher, 16px from the right and bottom of a 390 x 844 screen.
 const GEOMETRY = { width: 50, height: 50, position: 'right', screenWidth: 390, screenHeight: 844, side: 16, bottom: 16, accent: '#4f46e5' };
@@ -79,4 +81,76 @@ function entranceCases() {
   return out;
 }
 
-module.exports = { GEOMETRY, LEFT, SEED, cases: () => [...attentionCases(), ...idleCases(), ...entranceCases()], ends };
+// The mascot: its moods and the typing mascot (CSS @keyframes, played by
+// Chrome as CSS animations from the web's own text: `css`), the greeting
+// card's figure gestures (element.animate) and the card's own CSS moves.
+// A transform list is read back as its matrix (`matrix`).
+function mascotCases() {
+  const out = [];
+  const span = (tr) => {
+    const o = tr.options;
+    const d = o.delay || 0;
+    return d + o.duration * (o.iterations === Infinity ? 2 : o.iterations || 1) + 120;
+  };
+  const css = (src, name, keyframes, tr, base, box, fill = 'none') => {
+    const o = tr.options;
+    const timing = tr.keyframes[0].easing;
+    out.push({
+      src,
+      box,
+      base,
+      tracks: [tr],
+      times: grid(0, span(tr), 60),
+      css: { name, body: keyframes[name], duration: o.duration, timing, delay: o.delay || 0, iterations: o.iterations === Infinity ? 'infinite' : o.iterations || 1, fill: o.fill || fill },
+      ...(name.includes('blink') ? { transformScale: true } : tr.keyframes.some((k) => k.transform !== undefined) ? { matrix: true } : {}),
+    });
+  };
+  // Moods: wave (an arm drawn waving, and a resting arm lifting first), think, happy, the blink.
+  const moods = [
+    ['wave', { arm: 'wave', waveCount: 2 }],
+    ['wave', { arm: 'down' }],
+    ['think', {}],
+    ['happy', { arm: 'down' }],
+  ];
+  for (const [mood, o] of moods) {
+    const plan = moodPlan(mood, o);
+    for (const [part, tracks] of Object.entries(plan.parts)) {
+      tracks.forEach((tr) => {
+        const name =
+          part === 'lid' ? 'cb-m-blink' : part === 'arm' ? (mood === 'happy' ? 'cb-m-cheer' : o.arm === 'down' ? 'cb-m-wave-up' : 'cb-m-wave') :
+          part === 'body' ? (mood === 'happy' ? 'cb-m-hop' : 'cb-m-bob') : part === 'shadow' ? 'cb-m-hop-shadow' : part === 'look' ? 'cb-m-glance' : 'cb-m-ponder';
+        if (part === 'lid' && mood !== 'wave') return;
+        css(`mascot:mood-${mood}${o.arm ? `@${o.arm}` : ''}:${part}`, name, MASCOT_KEYFRAMES, tr, part === 'lid' ? { sy: 0 } : {}, { w: 22, h: 26 });
+      });
+    }
+  }
+  // The typing mascot and the pencil.
+  css('mascot:typing:sway', 'cb-typing-sway', MASCOT_KEYFRAMES, TYPING_MASCOT.sway, {}, { w: 32, h: 32 });
+  css('mascot:typing:blink', 'cb-typing-blink', MASCOT_KEYFRAMES, TYPING_MASCOT.blink, { sy: 0 }, { w: 22, h: 26 });
+  css('mascot:typing:glance', 'cb-typing-glance', MASCOT_KEYFRAMES, TYPING_MASCOT.glance, {}, { w: 20, h: 20 });
+  TYPING_MASCOT.dots.forEach((d, i) => css(`mascot:typing:dot${i}`, 'cb-typing-dot', MASCOT_KEYFRAMES, d.track, { o: 0.25 }, { w: d.d, h: d.d }));
+  css('mascot:pencil:line', 'cb-typing-write', MASCOT_KEYFRAMES, TYPING_PENCIL.write, { dash: 60 }, { w: 44, h: 16 });
+  css('mascot:pencil:pencil', 'cb-typing-pencil', MASCOT_KEYFRAMES, TYPING_PENCIL.pencil, {}, { w: 16, h: 16 });
+  // The card: in (lively / the rest), out, the collapse, the ping, a word.
+  css('mascot:card:spring', 'cb-greet-spring', CARD_KEYFRAMES, cardEnterTrack('lively', 'card'), {}, { w: 296, h: 120 });
+  css('mascot:card:in', 'cb-greet-in', CARD_KEYFRAMES, cardEnterTrack('subtle', 'card'), {}, { w: 296, h: 120 });
+  css('mascot:card:collapse', 'cb-greet-collapse', CARD_KEYFRAMES, cardLeaveTrack('lively', 'open'), {}, { w: 296, h: 120 });
+  css('mascot:card:out', 'cb-greet-out', CARD_KEYFRAMES, cardLeaveTrack('off', 'close'), {}, { w: 296, h: 120 });
+  css('mascot:card:ping-dot', 'cb-mm-dot', CARD_KEYFRAMES, PING.dot, {}, { w: 7, h: 7 });
+  css('mascot:card:ping-ring', 'cb-mm-ring', CARD_KEYFRAMES, PING.ring, {}, { w: 7, h: 7 });
+  css('mascot:card:word3', 'cb-mm-word', CARD_KEYFRAMES, wordFade('Hi there, how can we help you today?').tracks[3], {}, { w: 40, h: 18 });
+  // The figure's gestures (Web Animations), at full and a photo's amplitude.
+  for (const amp of [1, 0.75, 0.55]) {
+    for (const g of ['pop', 'rise', 'fadeIn', 'wave', 'tilt', 'nod', 'hop', 'handoff', 'bow']) {
+      if (amp !== 1 && (g === 'rise' || g === 'fadeIn')) continue;
+      const tr = gestureTrack(g, g === 'fadeIn' ? 0 : amp, g === 'pop' ? 140 : g === 'rise' ? 80 : 0, g === 'handoff' ? { x: -40, y: 60 } : undefined);
+      out.push({ src: `mascot:gesture:${g}@${amp}`, box: { w: 40, h: 40 }, base: {}, tracks: [tr], times: grid(0, span(tr), 48), matrix: true });
+    }
+    const t = talkTrack(amp);
+    out.push({ src: `mascot:gesture:talk@${amp}`, box: { w: 40, h: 40 }, base: {}, tracks: [t], times: grid(0, span(t), 48), matrix: true });
+  }
+  out.push({ src: 'mascot:gesture:breath', box: { w: 40, h: 40 }, base: {}, tracks: [BREATH], times: grid(0, span(BREATH), 48) });
+  return out;
+}
+
+module.exports = { GEOMETRY, LEFT, SEED, cases: () => [...attentionCases(), ...idleCases(), ...entranceCases(), ...mascotCases()], ends };
