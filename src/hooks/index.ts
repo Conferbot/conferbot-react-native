@@ -61,3 +61,6 @@ export {
 
 // "Your requests": the visitor's conversations with the team
 export { useRequests, type UseRequestsReturn } from './useRequests';
+
+// The home screen: what it shows and where each tap goes
+export { useHome, type UseHomeReturn } from './useHome';
