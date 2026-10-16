@@ -31,6 +31,8 @@ The complete flow recorded live on an Android emulator against production: open 
 - **Node Flow Engine** - Runs the flows you build in the Conferbot flow builder exactly as the web widget does: all 82 step types (questions, choices, conditions, loops and sub-flows, AI route / extract, knowledge-base answers, OTP, consent, payment and more), checked against 156 shared cases produced by running the widget's own code
 - **Server-driven Theming** - Colors, bot name, and avatar configured in the dashboard apply automatically
 - **Live Agent Handover** - Seamless transition between bot and human agents, as on the web widget: a "Connecting you with the team…" line that settles to how the wait ended, the queue, leaving it, agent typing indicators, and a live chat picked back up after an app restart
+- **AI answers as on the web** - Tables, headings, quotes, code blocks and strikethrough in replies; "Helpful?" under each answer (a No is sent at once, then reasons, a comment, "Talk to a person", "Ask another way"; the vote can change); a notice when a reply takes longer than 45s; the device language sent so short messages are answered in it
+- **Email me this chat** - From the chat menu, the visitor gets the whole conversation in their inbox (`POST /api/v1/mobile/chat/transcript-email`)
 - **Offline Support** - Messages are queued locally and retried when connectivity returns
 - **Session Persistence** - Conversations survive app restarts via AsyncStorage
 - **Push Token Registration** - Register device tokens for background message delivery
@@ -506,6 +508,9 @@ How a handover reads in the chat:
 - The header keeps the bot's name with "Online" and the team's reply time ("Typically replies in a few minutes", "Online · team back at 9 AM"), and goes back to "Online" when a person joins.
 - Cancel on the wait card leaves the queue on the server (`queue-self-resolve`), so the team stops seeing the visitor waiting. `leaveQueue()` does the same from your own UI.
 - After an app restart the SDK asks the server where the chat stands (`live-chat-state`): a person's chat comes back live with its agent, a visitor still in the queue goes back to the same wait, and a chat that ended meanwhile says so.
+- When the agent leaves and the chat goes back to the queue, "Connecting you to another agent..." (or "Connecting you to Sales..." after a team transfer) is drawn, and a flow at its handover step waits again. A transfer is kept in the conversation's record.
+- The same end twice (an agent's double click) draws one "Chat ended" line and one survey. Once the chat has ended and nothing is going on, the composer turns off and "Start a new chat" starts a fresh conversation.
+- A visitor the workspace blocked sees "This conversation has been closed." (mid-chat, or at connect: the visitor id goes with the socket handshake) and can't type or start a new chat.
 
 ## Bot Flows
 
@@ -586,7 +591,7 @@ ConferBotEndpoints.configure({
 
 ### useConferBot() - state and actions
 
-State: `isInitialized`, `isConnected`, `isOpen`, `chatSessionId?`, `unreadCount`, `currentAgent?: Agent`, `record: RecordItem[]`, `chatbotConfig?`, `reactions: Map<string, Reaction[]>`, `isRestoring`, `hasPersistedSession`, `messageStatuses`, `readReceiptsEnabled`, `isOnline`, `pendingMessageCount`, `failedMessageCount`, `serverCustomizations`, `botName`, `botAvatarUrl`, `currentUIState`, `isNodeProcessing`, `isLiveChatMode`, `agentTyping`.
+State: `isInitialized`, `isConnected`, `isOpen`, `chatSessionId?`, `unreadCount`, `currentAgent?: Agent`, `record: RecordItem[]`, `chatbotConfig?`, `reactions: Map<string, Reaction[]>`, `isRestoring`, `hasPersistedSession`, `messageStatuses`, `readReceiptsEnabled`, `isOnline`, `pendingMessageCount`, `failedMessageCount`, `serverCustomizations`, `botName`, `botAvatarUrl`, `currentUIState`, `isNodeProcessing`, `isLiveChatMode`, `agentTyping`, `visitorBlocked` (the closed line when the workspace blocked this visitor, else `null`), `emailTranscriptOpen`, `emailTranscriptSentTo`.
 
 Actions:
 
@@ -608,6 +613,8 @@ Actions:
 | `sendVisitorTyping` | `(isTyping: boolean) => void` | Emit visitor typing status |
 | `leaveQueue` | `() => Promise<boolean>` | Leave the queue for a person (`queue-self-resolve`), then the flow carries on. `false` when a person already has the chat |
 | `onWidgetSignal` | `(name, (detail) => void) => () => void` | Listen to `cb:waiting-for-human`, `cb:human-joined`, `cb:wait-over` (see Waiting for a person) |
+| `openEmailTranscript` / `closeEmailTranscript` | `() => void` | Show / hide the "Email me this chat" card (the chat menu has it) |
+| `emailTranscript` | `(email: string) => Promise<{ ok: boolean; message?: string }>` | Email the transcript to this address; on success the address is kept as the visitor's |
 
 ### Utilities and services
 
