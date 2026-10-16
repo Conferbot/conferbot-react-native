@@ -39,6 +39,7 @@ import {
   DEFAULT_MAX_FILE_MB,
 } from '../../flow/inputs';
 import { botSay, pushAnswer, shownText, typedText, userSay } from './flowKit';
+import { t } from '../../i18n';
 
 type InputType = NodeUIState.TextInput['inputType'];
 
@@ -46,7 +47,10 @@ type InputType = NodeUIState.TextInput['inputType'];
 abstract class BaseAskHandler extends BaseNodeHandler {
   protected abstract readonly inputType: InputType;
   protected abstract readonly shape: string;
-  protected readonly placeholder: string = 'Type your answer...';
+  // The composer's hints in the active language (web i18n composer.*).
+  protected get placeholder(): string {
+    return t('composer.answer');
+  }
 
   protected ui(node: Record<string, any>, state: ChatState): NodeUIState.TextInput {
     return NodeUIState.textInput(this.getNodeId(node), shownText(state, node.data?.questionText), String(node.data?.answerVariable || ''), this.inputType, {
@@ -102,7 +106,9 @@ export class AskNameHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_NAME;
   protected readonly inputType: InputType = 'text';
   protected readonly shape = 'user-ask-name-response';
-  protected readonly placeholder = 'Your name';
+  protected get placeholder(): string {
+    return t('composer.name');
+  }
 
   protected async after(value: string, node: Record<string, any>, state: ChatState): Promise<NodeResult> {
     const nodeId = this.getNodeId(node);
@@ -137,7 +143,9 @@ export class AskEmailHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_EMAIL;
   protected readonly inputType: InputType = 'email';
   protected readonly shape = 'user-ask-email-response';
-  protected readonly placeholder = 'name@company.com';
+  protected get placeholder(): string {
+    return t('composer.email');
+  }
 
   protected problem(value: string, node: Record<string, any>, state: ChatState): string | null {
     if (!isValidEmail(value)) {
@@ -173,7 +181,9 @@ export class AskPhoneHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_PHONE;
   protected readonly inputType: InputType = 'phone';
   protected readonly shape = 'user-ask-phone-number-response';
-  protected readonly placeholder = 'Phone number';
+  protected get placeholder(): string {
+    return t('composer.phone');
+  }
 
   protected problem(value: string, node: Record<string, any>): string | null {
     return isValidPhone(value) ? null : phoneErrorText(node.data);
@@ -202,7 +212,9 @@ export class AskNumberHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_NUMBER;
   protected readonly inputType: InputType = 'number';
   protected readonly shape = 'user-ask-number-response';
-  protected readonly placeholder = 'Enter a number';
+  protected get placeholder(): string {
+    return t('composer.number');
+  }
 
   protected problem(value: string, node: Record<string, any>): string | null {
     return numberProblem(value, node.data);
@@ -243,7 +255,9 @@ export class AskLocationHandler extends BaseAskHandler {
   readonly nodeType = DisplayNodes.ASK_LOCATION;
   protected readonly inputType: InputType = 'text';
   protected readonly shape = 'user-ask-location-response';
-  protected readonly placeholder = 'City or address';
+  protected get placeholder(): string {
+    return t('composer.location');
+  }
 }
 
 /** ask-custom-question-node: any text. */
