@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native
 import { useTheme } from '../../theme';
 import { useConferBot } from '../../context/ConferBotContext';
 import type { ConferBotTheme } from '../../theme/types';
+import { t } from '../../core/i18n';
 
 export type ConnectionStatusValue =
   | 'connected'
@@ -70,20 +71,20 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
   status,
   variant = 'badge',
   position = 'bottom-right',
-  onlineLabel = 'Online',
-  offlineLabel = 'Offline',
+  onlineLabel = t('status.online'),
+  offlineLabel = t('sdk.status.offline'),
   showWhenOnline = false,
   showText = false,
   showIcon = true,
   compact = false,
-  connectedText = 'Connected',
-  connectingText = 'Connecting...',
-  disconnectedText = 'Disconnected',
-  reconnectingText = 'Reconnecting...',
-  errorText = 'Connection error',
+  connectedText = t('sdk.status.connected'),
+  connectingText = t('screenshare.connecting'),
+  disconnectedText = t('sdk.status.disconnected'),
+  reconnectingText = t('sdk.status.reconnecting'),
+  errorText = t('sdk.status.error'),
   showRetry = false,
   onRetry,
-  retryButtonText = 'Retry',
+  retryButtonText = t('common.tryAgain'),
   onPress,
   animated = true,
   pulseWhenConnected = false,
@@ -181,7 +182,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
     );
 
     const containerStyle = [styles.standaloneContainer, compact && styles.compactContainer];
-    const a11yLabel = accessibilityLabel || `Connection status: ${status ?? 'unknown'}`;
+    const a11yLabel = accessibilityLabel || t('sdk.status.label', { status: currentText || status || '' });
 
     if (onPress) {
       return (
@@ -233,7 +234,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           position === 'bottom-left' && styles.dotBottomLeft,
         ]}
         accessible={true}
-        accessibilityLabel={accessibilityLabel || `Connection status: ${isConnected ? onlineLabel : offlineLabel}`}
+        accessibilityLabel={accessibilityLabel || t('sdk.status.label', { status: isConnected ? onlineLabel : offlineLabel })}
         accessibilityRole="text"
         testID={testID}
       />
@@ -246,7 +247,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
       <View
         style={[styles.badge, isConnected ? styles.badgeOnline : styles.badgeOffline]}
         accessible={true}
-        accessibilityLabel={accessibilityLabel || `Connection status: ${isConnected ? onlineLabel : offlineLabel}`}
+        accessibilityLabel={accessibilityLabel || t('sdk.status.label', { status: isConnected ? onlineLabel : offlineLabel })}
         accessibilityRole="text"
         testID={testID}
       >
@@ -263,7 +264,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
     <Text
       style={[styles.text, isConnected ? styles.textOnline : styles.textOffline]}
       accessible={true}
-      accessibilityLabel={accessibilityLabel || `Connection status: ${isConnected ? onlineLabel : offlineLabel}`}
+      accessibilityLabel={accessibilityLabel || t('sdk.status.label', { status: isConnected ? onlineLabel : offlineLabel })}
       accessibilityRole="text"
       testID={testID}
     >
