@@ -618,7 +618,25 @@ export interface ConferBotContextActions {
   openChat: () => void;
   closeChat: () => void;
   sendMessage: (text: string, attachments?: MessageAttachment[]) => Promise<void>;
+  /** @deprecated Use setPushToken(token, type). */
   registerPushToken: (token: string) => Promise<void>;
+  /**
+   * Push notifications, opt-in (embed-server docs/mobile-push.md): the
+   * device's FCM registration token or APNs device token (hex), registered
+   * with the current conversation and again for each new one. `type` is
+   * "fcm" or "apns" (an iOS app using Firebase Messaging passes "fcm");
+   * without it a 64-character hex token is APNs. null unregisters.
+   */
+  setPushToken: (token: string | null, type?: 'fcm' | 'apns') => Promise<void>;
+  /** Stop this device's pushes (the visitor turned notifications off). The token is kept for the next conversation. */
+  unregisterPush: () => Promise<void>;
+  /**
+   * A notification the app received or the visitor tapped (its data map,
+   * or the push library's message object): true when it is this bot's
+   * Conferbot message, and its conversation is opened (`{ open: false }`:
+   * only counted as unread).
+   */
+  handlePushNotification: (data: unknown, options?: { open?: boolean }) => boolean;
   on: (event: SocketEvents, callback: (...args: any[]) => void) => () => void;
   off: (event: SocketEvents, callback: (...args: any[]) => void) => void;
   // Reaction actions
