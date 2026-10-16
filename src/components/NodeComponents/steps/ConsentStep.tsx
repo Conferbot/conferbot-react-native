@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Linking } from 'react-native';
 import { consentContinueLabel, safeLink } from '../../../core/flow/rich';
+import { t } from '../../../core/i18n';
 import { StepButton, StepCard, StepStatus, StepViewProps, useStepLook } from './stepKit';
 
 /** A piece of the consent text: plain, bold, or a link. */
@@ -67,7 +68,7 @@ export const ConsentStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
           onPress={() => setAgreed((a) => !a)}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: agreed }}
-          accessibilityLabel={pieces.map((p) => p.text).join('') || 'I agree'}
+          accessibilityLabel={pieces.map((p) => p.text).join('') || t('sdk.consent.agree')}
           testID={`${testID}-box`}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={{
@@ -104,7 +105,7 @@ export const ConsentStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
               )
             )
           ) : (
-            'I agree'
+            t('sdk.consent.agree')
           )}
         </Text>
       </View>
