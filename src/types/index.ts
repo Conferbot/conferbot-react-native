@@ -1,10 +1,21 @@
 // ********** Core Types ********** //
 // Conferbot SDK configuration
 export interface ConferBotConfig {
+  /**
+   * @deprecated Has no effect (a development warning says so): push is
+   * switched on by `setPushToken(token)` and off by `unregisterPush()`.
+   */
   enableNotifications?: boolean;
+  /**
+   * Queue a message sent while offline and send it on reconnect, as the web
+   * widget does (default true). `false`: such a message is not sent.
+   */
   enableOfflineMode?: boolean;
+  /** Connect the socket on mount (default true). */
   autoConnect?: boolean;
+  /** How many times the socket tries to reconnect (a number >= 0; default 5). */
   reconnectionAttempts?: number;
+  /** The first wait before a reconnect, in ms (>= 1; default 1000, doubling up to 5000). */
   reconnectionDelay?: number;
   /** Enable session persistence (default: true when asyncStorage is provided) */
   enablePersistence?: boolean;
@@ -16,7 +27,12 @@ export interface ConferBotConfig {
   enableReadReceipts?: boolean;
   /** Read receipts configuration */
   readReceiptConfig?: ReadReceiptConfig;
-  /** Offline queue configuration */
+  /**
+   * The offline queue (with `enableOfflineMode`): `maxQueueSize` (50),
+   * `maxRetries` (5), `initialRetryDelay`, `maxRetryDelay`,
+   * `backoffMultiplier`, `persistQueue` (kept on the device when
+   * AsyncStorage is there; default true), `keyPrefix`, `autoProcess`.
+   */
   offlineQueueConfig?: OfflineQueueConfig;
   /**
    * The language the SDK draws its own words in: "en", "nl", "fr", "de",
@@ -607,9 +623,12 @@ export interface ConferBotContextState {
   // Read receipt state
   messageStatuses: Map<string | number, import('./messageStatus').MessageStatusEntry>;
   readReceiptsEnabled: boolean;
-  // Offline queue state
+  // Offline queue state (#80)
+  /** The socket is connected and, with @react-native-community/netinfo installed, the device is online. */
   isOnline: boolean;
+  /** Sends made while offline, waiting to go on reconnect. */
   pendingMessageCount: number;
+  /** Sends that gave up after `offlineQueueConfig.maxRetries` tries. */
   failedMessageCount: number;
 }
 
@@ -652,7 +671,8 @@ export interface ConferBotContextActions {
   ) => import('./messageStatus').MessageStatus | undefined;
   markMessageAsRead: (messageId: string | number) => void;
   markVisibleMessagesAsRead: (messageIds: (string | number)[]) => void;
-  // Offline queue actions
+  // Offline queue actions (#80)
+  /** Try a failed send again, by the visitor's message id (or the queue's id). */
   retryFailedMessage: (messageId: string) => Promise<boolean>;
   retryAllFailedMessages: () => Promise<number>;
   clearFailedMessages: () => Promise<number>;
