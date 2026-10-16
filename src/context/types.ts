@@ -118,6 +118,8 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   // Live chat extras (core/liveChat.ts)
   botId: string;
   queue: import('../core/liveChat').QueueStatus | null;
+  /** When the waiting handover's max wait runs out (ms since the epoch), for the wait card's countdown; null when no flow handover waits. */
+  waitEndsAt?: number | null;
   handoverWaiting: import('../core/liveChat').HandoverWaiting | null;
   noAgentsAvailable: boolean;
   lockedBy: string | null;
