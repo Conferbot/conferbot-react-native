@@ -14,6 +14,7 @@ import {
   Animated,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t, widgetLanguage, widgetLocale } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import type { KBArticle } from './types';
 
@@ -109,8 +110,8 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
         onPressOut={handlePressOut}
         activeOpacity={0.9}
         accessible={true}
-        accessibilityLabel={`Article: ${article.title}`}
-        accessibilityHint="Double tap to read article"
+        accessibilityLabel={t('sdk.kb.article', { title: article.title })}
+        accessibilityHint={t('sdk.kb.readHint')}
         accessibilityRole="button"
         testID={testID}
       >
@@ -123,7 +124,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
                 style={styles.coverImage}
                 resizeMode="cover"
                 accessible={true}
-                accessibilityLabel={`Cover image for ${article.title}`}
+                accessibilityLabel={t('sdk.kb.cover', { title: article.title })}
               />
             ) : (
               <View style={styles.imagePlaceholder}>
@@ -160,7 +161,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
                     source={{ uri: article.author.avatar }}
                     style={styles.avatar}
                     accessible={true}
-                    accessibilityLabel={`Author: ${article.author.name}`}
+                    accessibilityLabel={t('sdk.kb.author', { name: article.author.name })}
                   />
                 ) : (
                   <View style={styles.avatarPlaceholder}>
@@ -269,17 +270,17 @@ const ChevronRightIcon: React.FC<{ color: string }> = ({ color }) => (
 
 // Helper functions
 function calculateReadingTime(content: string): string {
-  if (!content) return '1 min read';
+  if (!content) return t('kb.minRead', { n: 1 });
   const text = content.replace(/<[^>]*>/g, '');
   const wordCount = text.split(/\s+/).filter((word) => word.length > 0).length;
   const minutes = Math.ceil(wordCount / 200);
-  return minutes <= 1 ? '1 min read' : `${minutes} min read`;
+  return t('kb.minRead', { n: Math.max(1, minutes) });
 }
 
 function formatDate(date?: string | Date): string {
   if (!date) return '';
   const d = new Date(date);
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(widgetLanguage() === 'en' ? 'en-US' : widgetLocale(), {
     month: 'short',
     day: 'numeric',
     year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
