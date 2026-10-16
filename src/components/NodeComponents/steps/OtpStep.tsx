@@ -13,6 +13,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { digitsFromPaste, maskEmail, OTP_LENGTH, resendLabel } from '../../../core/flow/rich';
+import { t } from '../../../core/i18n';
 import { StepButton, StepCard, StepField, StepLink, StepRow, StepStatus, StepViewProps, useStepLook } from './stepKit';
 
 /** Seconds until Resend opens: the step's wait from when the code was sent. */
@@ -47,7 +48,7 @@ export const OtpStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 
   }, [ticking]);
 
   const skip = ui.allowSkip ? (
-    <StepButton look={look} title={ui.skipLabel || 'Skip'} disabled={busy} onPress={() => onSubmit({ action: 'skip' })} testID={`${testID}-skip`} />
+    <StepButton look={look} title={ui.skipLabel || t('common.skip')} disabled={busy} onPress={() => onSubmit({ action: 'skip' })} testID={`${testID}-skip`} />
   ) : null;
 
   if (!codeStage || changing) {
@@ -56,10 +57,10 @@ export const OtpStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 
       <StepCard look={look} testID={testID}>
         <StepField
           look={look}
-          label="Email address"
+          label={t('otp.emailLabel')}
           value={email}
           onChangeText={setEmail}
-          placeholder="name@example.com"
+          placeholder={t('otp.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -70,10 +71,10 @@ export const OtpStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 
           editable={!busy}
           testID={`${testID}-email`}
         />
-        <StepStatus look={look} error={changing ? undefined : ui.errorMessage} hint={`We'll email you a ${OTP_LENGTH}-digit code.`} testID={`${testID}-status`} />
+        <StepStatus look={look} error={changing ? undefined : ui.errorMessage} hint={t('otp.willEmail', { n: OTP_LENGTH })} testID={`${testID}-status`} />
         <StepRow end>
           {skip}
-          <StepButton look={look} primary title="Send code" disabled={busy} onPress={send} testID={`${testID}-send`} />
+          <StepButton look={look} primary title={t('otp.send')} disabled={busy} onPress={send} testID={`${testID}-send`} />
         </StepRow>
       </StepCard>
     );
@@ -84,7 +85,7 @@ export const OtpStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 
   return (
     <StepCard look={look} testID={testID}>
       <Text style={{ color: look.text, fontSize: look.fontSize }}>
-        {`We sent a ${OTP_LENGTH}-digit code to ${maskEmail(ui.sentTo)}`}
+        {t('otp.sentTo', { n: OTP_LENGTH, email: maskEmail(ui.sentTo) })}
       </Text>
       {/* Six boxes over one field: typing, pasting and the keyboard's suggested code all land here. */}
       <TouchableOpacity activeOpacity={1} onPress={() => codeRef.current?.focus()} accessible={false}>
@@ -118,7 +119,7 @@ export const OtpStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 
           editable={!busy}
           onSubmitEditing={verify}
           caretHidden
-          accessibilityLabel={`${OTP_LENGTH}-digit code`}
+          accessibilityLabel={t('sdk.otp.code', { n: OTP_LENGTH })}
           testID={`${testID}-code`}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.02, color: 'transparent' }}
         />
@@ -129,7 +130,7 @@ export const OtpStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 
         <Text style={{ color: look.muted }}>·</Text>
         <StepLink
           look={look}
-          title="Change email"
+          title={t('otp.changeEmail')}
           disabled={busy}
           onPress={() => {
             setEmail(String(ui.sentTo || ''));
@@ -140,7 +141,7 @@ export const OtpStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 
       </StepRow>
       <StepRow end>
         {skip}
-        <StepButton look={look} primary title="Verify" disabled={busy} onPress={verify} testID={`${testID}-verify`} />
+        <StepButton look={look} primary title={t('otp.verify')} disabled={busy} onPress={verify} testID={`${testID}-verify`} />
       </StepRow>
     </StepCard>
   );
