@@ -112,7 +112,7 @@ Every web widget feature works the same in the 4 mobile SDKs: customization, lau
 | Celebrations / reactions: tapback, confetti, rating sparks (#73) | done | todo | todo | todo |
 | Change an answer, the waiting nudge, auto-open, typing preview, booked slots (#55) | done | todo | todo | todo |
 | Post-chat redirect: the app's hook, the 10 s line with Cancel, the system browser, once per conversation (#74) | done | todo | done (#92) | done (#85) |
-| Post-chat rating at the flow's end, 1.5 s on, once per conversation, the redirect waits for it (#76) | done | done (#91) | done (#95) | todo |
+| Post-chat rating at the flow's end, 1.5 s on, once per conversation, the redirect waits for it (#76) | done | done (#91) | done (#95) | done (#88) |
 | The owner's font and the theme's font (#53) | done | todo | todo | todo |
 | Reply-time wording: header `headerLine` (#32), home card `homePeople` (#68), wait card `typicalWait` (#42) | done | todo | todo | todo |
 | The wait card's max-wait countdown, from the server's time left after a restart (#42) | done | todo | todo | todo |
