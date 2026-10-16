@@ -403,7 +403,11 @@ describe('the home screen (web firstImpression.ts enhanceHome)', () => {
     expect(HIDDEN_WHILE_ASKING).toEqual(['resume', 'requests', 'talk', 'help']);
   });
 
-  it('the mascot has its place, empty for now', () => {
-    expect(homeModel({ c: HOME })!.mascot).toBeNull();
+  it('carries the owner\'s mascot for an app\'s own spot (the web\'s home draws none)', () => {
+    expect(homeModel({ c: HOME })!.mascot.look).toEqual({ shape: 'blob', eyes: 'round', accessory: 'none', color: '', name: '' });
+    expect(homeModel({ c: { ...HOME, mascotShape: 'owl', mascotName: 'Hoot', widgetIconBgColor: '#123456' } })!.mascot).toEqual({
+      look: { shape: 'owl', eyes: 'round', accessory: 'none', color: '', name: 'Hoot' },
+      accent: '#123456',
+    });
   });
 });
