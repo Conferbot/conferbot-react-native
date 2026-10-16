@@ -50,6 +50,8 @@ export interface ChatHeaderProps {
    */
   statusText?: string;
   showConnectionStatus?: boolean;
+  /** Back to the home screen, when the bot has one (web templates/shared.ts #chat_head_back-btn). */
+  onBack?: () => void;
   onClose?: () => void;
   onAvatarPress?: () => void;
   onTitlePress?: () => void;
@@ -86,6 +88,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   showOnline = false,
   statusText = 'Online',
   showConnectionStatus = true,
+  onBack,
   onClose,
   onAvatarPress,
   onTitlePress,
@@ -112,6 +115,20 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       }
       testID={testID}
     >
+      {onBack && (
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
+          accessible={true}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          testID={`${testID}-back`}
+        >
+          <Text style={styles.backIcon}>‹</Text>
+        </TouchableOpacity>
+      )}
+
       {/* The agent's photo, else the bot's logo (none when the owner hid it). */}
       {(agent || !hideLogo) && (
       <TouchableOpacity
@@ -215,6 +232,16 @@ const createStyles = (theme: ConferBotTheme) =>
       height: theme.layout.headerHeight,
       gap: 10,
       ...theme.shadows.md,
+    },
+    backButton: {
+      marginRight: -4,
+      paddingRight: 2,
+    },
+    backIcon: {
+      fontSize: 30,
+      lineHeight: 32,
+      marginTop: -3,
+      color: theme.colors.headerText,
     },
     titleContainer: {
       flex: 1,
