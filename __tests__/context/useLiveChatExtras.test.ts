@@ -94,6 +94,33 @@ describe('useLiveChatExtras', () => {
     jest.useRealTimers();
   });
 
+  it('asks for the queue position again on a reconnect while waiting (#83)', async () => {
+    const socket = fakeSocket();
+    const off = jest.fn();
+    socket.on.mockImplementation((event: string, fn: any) => {
+      socket.handlers[event] = fn;
+      return off;
+    });
+    socket.emitWithAck.mockResolvedValue({ status: 'waiting', position: 3 });
+    const hook = renderHook(() =>
+      useLiveChatExtras({
+        socketClient: { current: socket as any },
+        chatStateRef: { current: fakeState() as any },
+        record: [],
+        setRecord: jest.fn(),
+        isOpen: true,
+        waitingForPerson: true,
+      })
+    );
+    await act(async () => {});
+    expect(socket.emitWithAck).toHaveBeenCalledTimes(1);
+    await act(async () => socket.fire('connect'));
+    expect(socket.emitWithAck).toHaveBeenCalledTimes(2);
+    expect(socket.emitWithAck).toHaveBeenLastCalledWith('queue-status', { chatSessionId: 's1' }, 10000);
+    hook.unmount();
+    expect(off).toHaveBeenCalled();
+  });
+
   it('tracks locks, the composer switch, a dropped agent and a file request', () => {
     const { hook, socket, state } = setup();
     act(() => socket.fire('conversation-locked', { lockedByName: 'Ana' }));
