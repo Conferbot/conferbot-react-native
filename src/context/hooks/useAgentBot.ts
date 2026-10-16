@@ -316,12 +316,13 @@ export function useAgentBot({
     socket.on('chat-ended', (data: any) => {
       if (own(data)) setAwaitingReply(false);
     });
-    // Closed for inactivity; a later message from the visitor reopens it.
+    // Paused for inactivity; a later message from the visitor reopens it.
+    // The line and its record entry are the handover's
+    // (useHandoverLifecycle, core/liveEvents.ts inactiveCloseEntry).
     socket.on('ai-agent-inactive-close', (data: any) => {
       if (!own(data)) return;
       setAwaitingReply(false);
       setSuggestions([]);
-      chatStateRef.current?.addRecord({ id: `ai-close-${Date.now()}`, type: 'ai-agent-inactive-close', time: new Date().toISOString() } as any);
     });
     socket.on('ai-agent-resumed', (data: any) => {
       if (!own(data)) return;
