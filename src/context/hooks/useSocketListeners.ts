@@ -460,9 +460,18 @@ export function useSocketListeners({
       setIsLiveChatMode(false);
       setAgentTyping(false);
 
-      flowEngine.current?.reset();
-      setCurrentUIState(null);
-      setIsNodeProcessing(false);
+      // A flow at its handover step carries on from it, as the web does
+      // (agentListeners.ts onChatEnded): the step's post-chat survey
+      // questions when it has them, else its next edge. Only a chat with no
+      // flow waiting on a handover step is over.
+      const engine = flowEngine.current;
+      if (engine?.isAtHandover() && engine.getState().isWaitingForInput) {
+        engine.submitResponse({ action: 'chatEnded' }).catch(() => {});
+      } else {
+        engine?.reset();
+        setCurrentUIState(null);
+        setIsNodeProcessing(false);
+      }
 
       persistSession({ isActive: false });
 
