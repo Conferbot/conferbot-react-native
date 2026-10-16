@@ -21,6 +21,7 @@ import {
   FileDownload,
   HTMLView,
 } from './MessageComponents';
+import { t } from '../../core/i18n';
 import { TextInputComponent } from './InputComponents';
 import {
   ButtonGroup,
@@ -103,7 +104,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
       <LoadingIndicator
         nodeId={uiState.nodeId}
         type="loading"
-        message="Processing..."
+        message={t('sdk.loading.processing')}
       />
     );
   }
