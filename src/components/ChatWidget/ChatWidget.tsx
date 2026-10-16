@@ -63,6 +63,7 @@ import { homeOn } from '../../core/home';
 import { HomeScreen } from '../Home/HomeScreen';
 import { ViewSwitch } from '../Home/ViewSwitch';
 import { KnowledgeBaseScreen } from '../KnowledgeBase/KnowledgeBaseScreen';
+import { StallHint } from '../Delight/Delight';
 
 // Maximum file size for attachments (5MB)
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
@@ -275,6 +276,15 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     knowledgeBase,
     // Actions
     resetConversation,
+    // Sounds, the human touches, the typing preview
+    soundOn,
+    hasSounds,
+    toggleSound,
+    playSendSound,
+    stallHint,
+    noteChatActivity,
+    updateVisitorDraft,
+    clearVisitorDraft,
   } = useConferBot();
   // The owner's home screen: the chat opens on it and its header's back returns there.
   const hasHome = homeOn(serverCustomizations);
@@ -449,6 +459,10 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     ...(requests && requests.length
       ? [{ id: 'requests', label: REQUESTS_TEXT.menu(requestsUnread || 0), icon: '☰', onPress: () => openRequests?.() }]
       : []),
+    // The visitor's Sound on / off, when the bot has a sound (web chat menu option-sound-toggle).
+    ...(hasSounds
+      ? [{ id: 'sound', label: soundOn ? t('chat.menu.soundOn') : t('chat.menu.soundOff'), icon: soundOn ? '🔊' : '🔇', onPress: () => toggleSound?.() }]
+      : []),
   ];
 
   // Blocked, or the live chat ended with nothing going on: the closed
@@ -472,6 +486,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   };
 
   const handleSendMessage = async (text: string) => {
+    // A sound pack's send sound; the agent's typing preview goes (web messageSound.ts mountSoundPack, typingPreview.ts).
+    playSendSound?.();
+    clearVisitorDraft?.();
     // Waiting for a person: "play" or "games" opens the games menu instead
     // of being sent (core/waitingGames.ts, web games/wire.ts).
     if (interceptPlay?.(text)) return;
@@ -1001,6 +1018,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.container, serverThemeOverride?.colors?.surface ? { backgroundColor: serverThemeOverride.colors.surface } : null]}
+        // Any touch in the chat: the visitor is busy here (the waiting nudge waits).
+        onTouchStart={() => noteChatActivity?.()}
       >
         {/* Home, conversation or help centre, moving as the owner chose (core/viewTransition.ts). */}
         <ViewSwitch view={view} kind={serverCustomizations?.viewTransition} sweep={serverCustomizations?.viewTransitionDirection} testID={`${testID}-views`}>
@@ -1048,6 +1067,16 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
               isNodeLoading={isNodeProcessing}
               footerExtras={
                 <>
+                  {/* "No rush - ..." under a question that has waited (core/delight.ts). */}
+                  {stallHint && !visitorBlocked && shouldShowNodeRenderer() && currentUIState ? (
+                    <StallHint
+                      text={stallHint}
+                      accent={customizations.accent || theme.colors.primary}
+                      muted={theme.colors.textSecondary}
+                      indent={theme.spacing.chatContentPadding}
+                      testID={`${testID}-stall`}
+                    />
+                  ) : null}
                   <QueueCard />
                   <HandoverWaitingCard />
                   <LeaveMessageCard />
@@ -1068,6 +1097,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
                 emailTranscriptOpen,
                 emailTranscriptSentTo || '',
                 closed?.kind || '',
+                stallHint || '',
               ].join(':')}
             />
             </View>
@@ -1084,6 +1114,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
               <ChatBottomBar
                 onSend={handleSendMessage}
                 onTyping={handleTyping}
+                onDraft={(text) => updateVisitorDraft?.(text)}
                 placeholder={closed?.inputOff ? closed.text : lockedBy || !visitorInputEnabled ? t('sdk.chat.repliesOff') : placeholder}
                 disabled={!isConnected || !!lockedBy || !visitorInputEnabled || !!closed?.inputOff}
                 onAttach={
