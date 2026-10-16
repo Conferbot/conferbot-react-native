@@ -1,0 +1,2060 @@
+{
+  "sdk.agent.avatar": {
+    "en": "Agent avatar",
+    "nl": "Avatar van de medewerker",
+    "fr": "Avatar de l'agent",
+    "de": "Avatar der Ansprechperson",
+    "es": "Avatar del agente"
+  },
+  "sdk.agent.avatarOf": {
+    "en": "{name}'s avatar",
+    "nl": "Avatar van {name}",
+    "fr": "Avatar de {name}",
+    "de": "Avatar von {name}",
+    "es": "Avatar de {name}"
+  },
+  "sdk.ai.regenerate": {
+    "en": "Regenerate",
+    "nl": "Opnieuw genereren",
+    "fr": "Régénérer",
+    "de": "Neu generieren",
+    "es": "Regenerar"
+  },
+  "sdk.ai.responseLabel": {
+    "en": "AI response: {text}",
+    "nl": "Antwoord van de AI: {text}",
+    "fr": "Réponse de l'IA : {text}",
+    "de": "Antwort der KI: {text}",
+    "es": "Respuesta de la IA: {text}"
+  },
+  "sdk.ai.stop": {
+    "en": "Stop",
+    "nl": "Stoppen",
+    "fr": "Arrêter",
+    "de": "Stopp",
+    "es": "Detener"
+  },
+  "sdk.ai.stopped": {
+    "en": "Generation stopped",
+    "nl": "Genereren gestopt",
+    "fr": "Génération arrêtée",
+    "de": "Generierung gestoppt",
+    "es": "Generación detenida"
+  },
+  "sdk.ai.thinking": {
+    "en": "AI is thinking...",
+    "nl": "AI denkt na...",
+    "fr": "L'IA réfléchit...",
+    "de": "Die KI denkt nach...",
+    "es": "La IA está pensando..."
+  },
+  "sdk.attachment.preview": {
+    "en": "Attachment Preview",
+    "nl": "Voorbeeld van bijlage",
+    "fr": "Aperçu de la pièce jointe",
+    "de": "Anhangsvorschau",
+    "es": "Vista previa del adjunto"
+  },
+  "sdk.avatar.of": {
+    "en": "Avatar for {name}",
+    "nl": "Avatar van {name}",
+    "fr": "Avatar de {name}",
+    "de": "Avatar von {name}",
+    "es": "Avatar de {name}"
+  },
+  "sdk.avatar.user": {
+    "en": "Avatar for user",
+    "nl": "Avatar van gebruiker",
+    "fr": "Avatar de l'utilisateur",
+    "de": "Avatar des Nutzers",
+    "es": "Avatar del usuario"
+  },
+  "sdk.bubble.label": {
+    "en": "Message: {text}",
+    "nl": "Bericht: {text}",
+    "fr": "Message : {text}",
+    "de": "Nachricht: {text}",
+    "es": "Mensaje: {text}"
+  },
+  "sdk.bubble.message": {
+    "en": "Message",
+    "nl": "Bericht",
+    "fr": "Message",
+    "de": "Nachricht",
+    "es": "Mensaje"
+  },
+  "sdk.bubble.messageReact": {
+    "en": "Message, long press to react",
+    "nl": "Bericht, lang indrukken om te reageren",
+    "fr": "Message, appui long pour réagir",
+    "de": "Nachricht, lange drücken, um zu reagieren",
+    "es": "Mensaje, mantén pulsado para reaccionar"
+  },
+  "sdk.bubble.opensLink": {
+    "en": "Opens {url} in the browser",
+    "nl": "Opent {url} in de browser",
+    "fr": "Ouvre {url} dans le navigateur",
+    "de": "Öffnet {url} im Browser",
+    "es": "Abre {url} en el navegador"
+  },
+  "sdk.bubble.reactHint": {
+    "en": "Long press to add a reaction",
+    "nl": "Lang indrukken om een reactie toe te voegen",
+    "fr": "Appui long pour ajouter une réaction",
+    "de": "Lange drücken, um eine Reaktion hinzuzufügen",
+    "es": "Mantén pulsado para añadir una reacción"
+  },
+  "sdk.chat.modal": {
+    "en": "Chat modal",
+    "nl": "Chatvenster",
+    "fr": "Fenêtre de chat",
+    "de": "Chatfenster",
+    "es": "Ventana de chat"
+  },
+  "sdk.chat.reconnecting": {
+    "en": "Reconnecting...",
+    "nl": "Opnieuw verbinden...",
+    "fr": "Reconnexion...",
+    "de": "Verbindung wird wiederhergestellt...",
+    "es": "Reconectando..."
+  },
+  "sdk.chat.repliesOff": {
+    "en": "Replies are turned off for now",
+    "nl": "Reageren is nu even uitgeschakeld",
+    "fr": "Les réponses sont désactivées pour le moment",
+    "de": "Antworten ist gerade deaktiviert",
+    "es": "Las respuestas están desactivadas por ahora"
+  },
+  "sdk.common.error": {
+    "en": "Error",
+    "nl": "Fout",
+    "fr": "Erreur",
+    "de": "Fehler",
+    "es": "Error"
+  },
+  "sdk.common.no": {
+    "en": "No",
+    "nl": "Nee",
+    "fr": "Non",
+    "de": "Nein",
+    "es": "No"
+  },
+  "sdk.common.ok": {
+    "en": "OK",
+    "nl": "OK",
+    "fr": "OK",
+    "de": "OK",
+    "es": "Aceptar"
+  },
+  "sdk.common.yes": {
+    "en": "Yes",
+    "nl": "Ja",
+    "fr": "Oui",
+    "de": "Ja",
+    "es": "Sí"
+  },
+  "sdk.composer.attachFile": {
+    "en": "Attach file",
+    "nl": "Bestand bijvoegen",
+    "fr": "Joindre un fichier",
+    "de": "Datei anhängen",
+    "es": "Adjuntar archivo"
+  },
+  "sdk.composer.hint": {
+    "en": "Type your message here",
+    "nl": "Typ hier je bericht",
+    "fr": "Saisissez votre message ici",
+    "de": "Schreib hier deine Nachricht",
+    "es": "Escribe aquí tu mensaje"
+  },
+  "sdk.composer.sendMessage": {
+    "en": "Send message",
+    "nl": "Bericht versturen",
+    "fr": "Envoyer le message",
+    "de": "Nachricht senden",
+    "es": "Enviar mensaje"
+  },
+  "sdk.consent.agree": {
+    "en": "I agree",
+    "nl": "Ik ga akkoord",
+    "fr": "J'accepte",
+    "de": "Ich stimme zu",
+    "es": "Acepto"
+  },
+  "sdk.csat.no": {
+    "en": "No",
+    "nl": "Nee",
+    "fr": "Non",
+    "de": "Nein",
+    "es": "No"
+  },
+  "sdk.csat.yes": {
+    "en": "Yes",
+    "nl": "Ja",
+    "fr": "Oui",
+    "de": "Ja",
+    "es": "Sí"
+  },
+  "sdk.date.placeholder": {
+    "en": "Select a date...",
+    "nl": "Kies een datum...",
+    "fr": "Choisissez une date...",
+    "de": "Wähle ein Datum...",
+    "es": "Elige una fecha..."
+  },
+  "sdk.datetime.hours": {
+    "en": "Hours",
+    "nl": "Uren",
+    "fr": "Heures",
+    "de": "Stunden",
+    "es": "Horas"
+  },
+  "sdk.datetime.minutes": {
+    "en": "Minutes",
+    "nl": "Minuten",
+    "fr": "Minutes",
+    "de": "Minuten",
+    "es": "Minutos"
+  },
+  "sdk.emoji.cat.activities": {
+    "en": "Activities",
+    "nl": "Activiteiten",
+    "fr": "Activités",
+    "de": "Aktivitäten",
+    "es": "Actividades"
+  },
+  "sdk.emoji.cat.animals": {
+    "en": "Animals & Nature",
+    "nl": "Dieren en natuur",
+    "fr": "Animaux et nature",
+    "de": "Tiere und Natur",
+    "es": "Animales y naturaleza"
+  },
+  "sdk.emoji.cat.food": {
+    "en": "Food & Drink",
+    "nl": "Eten en drinken",
+    "fr": "Nourriture et boissons",
+    "de": "Essen und Trinken",
+    "es": "Comida y bebida"
+  },
+  "sdk.emoji.cat.objects": {
+    "en": "Objects",
+    "nl": "Voorwerpen",
+    "fr": "Objets",
+    "de": "Objekte",
+    "es": "Objetos"
+  },
+  "sdk.emoji.cat.people": {
+    "en": "People & Body",
+    "nl": "Mensen en lichaam",
+    "fr": "Corps et métiers",
+    "de": "Menschen und Körper",
+    "es": "Personas y partes del cuerpo"
+  },
+  "sdk.emoji.cat.recent": {
+    "en": "Recently Used",
+    "nl": "Recent gebruikt",
+    "fr": "Utilisés récemment",
+    "de": "Zuletzt verwendet",
+    "es": "Usados recientemente"
+  },
+  "sdk.emoji.cat.smileys": {
+    "en": "Smileys & Emotion",
+    "nl": "Smileys en emoticons",
+    "fr": "Émoticônes",
+    "de": "Smileys und Emoticons",
+    "es": "Emojis y emoticones"
+  },
+  "sdk.emoji.cat.symbols": {
+    "en": "Symbols",
+    "nl": "Symbolen",
+    "fr": "Symboles",
+    "de": "Symbole",
+    "es": "Símbolos"
+  },
+  "sdk.emoji.cat.travel": {
+    "en": "Travel & Places",
+    "nl": "Reizen en plaatsen",
+    "fr": "Voyages et lieux",
+    "de": "Reisen und Orte",
+    "es": "Viajes y lugares"
+  },
+  "sdk.emoji.close": {
+    "en": "Close emoji picker",
+    "nl": "Emoji-kiezer sluiten",
+    "fr": "Fermer le choix d'emoji",
+    "de": "Emoji-Auswahl schließen",
+    "es": "Cerrar el selector de emojis"
+  },
+  "sdk.emoji.none": {
+    "en": "No emojis found",
+    "nl": "Geen emoji gevonden",
+    "fr": "Aucun emoji trouvé",
+    "de": "Keine Emojis gefunden",
+    "es": "No se han encontrado emojis"
+  },
+  "sdk.emoji.open": {
+    "en": "Open emoji picker",
+    "nl": "Emoji-kiezer openen",
+    "fr": "Ouvrir le choix d'emoji",
+    "de": "Emoji-Auswahl öffnen",
+    "es": "Abrir el selector de emojis"
+  },
+  "sdk.emoji.placeholder": {
+    "en": "Search emojis...",
+    "nl": "Emoji zoeken...",
+    "fr": "Rechercher des emojis...",
+    "de": "Emojis suchen...",
+    "es": "Buscar emojis..."
+  },
+  "sdk.emoji.resultsFor": {
+    "en": "Search results for \"{query}\"",
+    "nl": "Zoekresultaten voor \"{query}\"",
+    "fr": "Résultats pour « {query} »",
+    "de": "Suchergebnisse für „{query}“",
+    "es": "Resultados de búsqueda de \"{query}\""
+  },
+  "sdk.emoji.search": {
+    "en": "Search emojis",
+    "nl": "Emoji zoeken",
+    "fr": "Rechercher des emojis",
+    "de": "Emojis suchen",
+    "es": "Buscar emojis"
+  },
+  "sdk.emoji.searchHint": {
+    "en": "Type to search for emojis",
+    "nl": "Typ om emoji te zoeken",
+    "fr": "Saisissez du texte pour rechercher des emojis",
+    "de": "Tippe, um Emojis zu suchen",
+    "es": "Escribe para buscar emojis"
+  },
+  "sdk.emoji.tone": {
+    "en": "{name} skin tone",
+    "nl": "Huidskleur {name}",
+    "fr": "Couleur de peau {name}",
+    "de": "Hautton {name}",
+    "es": "Tono de piel {name}"
+  },
+  "sdk.emoji.tone.dark": {
+    "en": "Dark",
+    "nl": "Donker",
+    "fr": "Sombre",
+    "de": "Dunkel",
+    "es": "Oscuro"
+  },
+  "sdk.emoji.tone.default": {
+    "en": "Default",
+    "nl": "Standaard",
+    "fr": "Par défaut",
+    "de": "Standard",
+    "es": "Predeterminado"
+  },
+  "sdk.emoji.tone.light": {
+    "en": "Light",
+    "nl": "Licht",
+    "fr": "Clair",
+    "de": "Hell",
+    "es": "Claro"
+  },
+  "sdk.emoji.tone.medium": {
+    "en": "Medium",
+    "nl": "Medium",
+    "fr": "Moyen",
+    "de": "Mittel",
+    "es": "Medio"
+  },
+  "sdk.emoji.tone.mediumDark": {
+    "en": "Medium-Dark",
+    "nl": "Middeldonker",
+    "fr": "Moyennement sombre",
+    "de": "Mittel-dunkel",
+    "es": "Oscuro medio"
+  },
+  "sdk.emoji.tone.mediumLight": {
+    "en": "Medium-Light",
+    "nl": "Medium-Licht",
+    "fr": "Moyennement clair",
+    "de": "Mittel-hell",
+    "es": "Claro medio"
+  },
+  "sdk.emoji.toneClose": {
+    "en": "Close skin tone selector",
+    "nl": "Huidskleurkiezer sluiten",
+    "fr": "Fermer le choix de couleur de peau",
+    "de": "Hautton-Auswahl schließen",
+    "es": "Cerrar el selector de tono de piel"
+  },
+  "sdk.emoji.toneHint": {
+    "en": "Long press for skin tone options",
+    "nl": "Houd ingedrukt voor huidskleuren",
+    "fr": "Appui long pour les couleurs de peau",
+    "de": "Lange drücken für Hauttöne",
+    "es": "Mantén pulsado para ver los tonos de piel"
+  },
+  "sdk.empty.message": {
+    "en": "Start a conversation by sending a message",
+    "nl": "Begin een gesprek door een bericht te sturen",
+    "fr": "Commencez une conversation en envoyant un message",
+    "de": "Starte ein Gespräch, indem du eine Nachricht schickst",
+    "es": "Empieza una conversación enviando un mensaje"
+  },
+  "sdk.empty.messageBelow": {
+    "en": "Start a conversation by sending a message below",
+    "nl": "Begin een gesprek door hieronder een bericht te sturen",
+    "fr": "Commencez une conversation en envoyant un message ci-dessous",
+    "de": "Starte ein Gespräch, indem du unten eine Nachricht schickst",
+    "es": "Empieza una conversación enviando un mensaje abajo"
+  },
+  "sdk.empty.title": {
+    "en": "No messages yet",
+    "nl": "Nog geen berichten",
+    "fr": "Aucun message pour l'instant",
+    "de": "Noch keine Nachrichten",
+    "es": "Aún no hay mensajes"
+  },
+  "sdk.file.choose": {
+    "en": "Choose a file",
+    "nl": "Kies een bestand",
+    "fr": "Choisir un fichier",
+    "de": "Datei auswählen",
+    "es": "Elegir un archivo"
+  },
+  "sdk.file.chooseMany": {
+    "en": "Choose Files",
+    "nl": "Bestanden kiezen",
+    "fr": "Choisir des fichiers",
+    "de": "Dateien wählen",
+    "es": "Elegir archivos"
+  },
+  "sdk.file.chooseOne": {
+    "en": "Choose File",
+    "nl": "Bestand kiezen",
+    "fr": "Choisir un fichier",
+    "de": "Datei wählen",
+    "es": "Elegir archivo"
+  },
+  "sdk.file.document": {
+    "en": "Choose Document",
+    "nl": "Document kiezen",
+    "fr": "Choisir un document",
+    "de": "Dokument wählen",
+    "es": "Elegir un documento"
+  },
+  "sdk.file.gallery": {
+    "en": "Choose from Gallery",
+    "nl": "Kiezen uit galerij",
+    "fr": "Choisir dans la galerie",
+    "de": "Aus der Galerie wählen",
+    "es": "Elegir de la galería"
+  },
+  "sdk.file.pickerMissing": {
+    "en": "Sending files isn't available here",
+    "nl": "Bestanden sturen kan hier niet",
+    "fr": "L'envoi de fichiers n'est pas disponible ici",
+    "de": "Dateien senden ist hier nicht möglich",
+    "es": "Aquí no se pueden enviar archivos"
+  },
+  "sdk.file.remove": {
+    "en": "Remove {name}",
+    "nl": "{name} verwijderen",
+    "fr": "Retirer {name}",
+    "de": "{name} entfernen",
+    "es": "Quitar {name}"
+  },
+  "sdk.file.selectMessage": {
+    "en": "Choose how you want to add a file",
+    "nl": "Kies hoe je een bestand wilt toevoegen",
+    "fr": "Choisissez comment ajouter un fichier",
+    "de": "Wähle, wie du eine Datei hinzufügen möchtest",
+    "es": "Elige cómo quieres añadir un archivo"
+  },
+  "sdk.file.selectTitle": {
+    "en": "Select File",
+    "nl": "Bestand kiezen",
+    "fr": "Choisir un fichier",
+    "de": "Datei auswählen",
+    "es": "Elegir archivo"
+  },
+  "sdk.file.takePhoto": {
+    "en": "Take Photo",
+    "nl": "Foto maken",
+    "fr": "Prendre une photo",
+    "de": "Foto aufnehmen",
+    "es": "Hacer una foto"
+  },
+  "sdk.file.tooLargeTitle": {
+    "en": "File Too Large",
+    "nl": "Bestand te groot",
+    "fr": "Fichier trop volumineux",
+    "de": "Datei zu groß",
+    "es": "Archivo demasiado grande"
+  },
+  "sdk.file.upload": {
+    "en": "Upload",
+    "nl": "Uploaden",
+    "fr": "Envoyer",
+    "de": "Hochladen",
+    "es": "Subir"
+  },
+  "sdk.file.uploadMany": {
+    "en": "Upload files",
+    "nl": "Bestanden uploaden",
+    "fr": "Envoyer les fichiers",
+    "de": "Dateien hochladen",
+    "es": "Subir archivos"
+  },
+  "sdk.file.uploaded": {
+    "en": "Uploaded",
+    "nl": "Geüpload",
+    "fr": "Envoyé",
+    "de": "Hochgeladen",
+    "es": "Subido"
+  },
+  "sdk.file.uploading": {
+    "en": "Uploading...",
+    "nl": "Uploaden...",
+    "fr": "Envoi en cours...",
+    "de": "Wird hochgeladen...",
+    "es": "Subiendo..."
+  },
+  "sdk.flow.aiExtractPrompt": {
+    "en": "How can we help?",
+    "nl": "Waarmee kunnen we helpen?",
+    "fr": "Comment pouvons-nous vous aider ?",
+    "de": "Wie können wir helfen?",
+    "es": "¿En qué podemos ayudarte?"
+  },
+  "sdk.flow.connected": {
+    "en": "You are now connected.",
+    "nl": "Je bent nu verbonden.",
+    "fr": "Vous êtes maintenant connecté.",
+    "de": "Du bist jetzt verbunden.",
+    "es": "Ya estás conectado."
+  },
+  "sdk.flow.handoverWait": {
+    "en": "Please wait while we connect you with an agent...",
+    "nl": "Even geduld, we verbinden je met een medewerker...",
+    "fr": "Veuillez patienter, nous vous mettons en relation avec un agent...",
+    "de": "Einen Moment, wir verbinden dich mit einem Mitarbeiter...",
+    "es": "Espera un momento, te estamos conectando con un agente..."
+  },
+  "sdk.flow.noAgents": {
+    "en": "No agents available.",
+    "nl": "Er zijn geen medewerkers beschikbaar.",
+    "fr": "Aucun agent n'est disponible.",
+    "de": "Gerade ist kein Mitarbeiter verfügbar.",
+    "es": "No hay agentes disponibles."
+  },
+  "sdk.flow.rateConversation": {
+    "en": "Please rate your conversation",
+    "nl": "Beoordeel je gesprek",
+    "fr": "Veuillez évaluer votre conversation",
+    "de": "Bitte bewerte dein Gespräch",
+    "es": "Valora tu conversación"
+  },
+  "sdk.flow.signatureDraw": {
+    "en": "Draw your signature in the box.",
+    "nl": "Zet je handtekening in het vak.",
+    "fr": "Dessinez votre signature dans le cadre.",
+    "de": "Unterschreibe im Feld.",
+    "es": "Dibuja tu firma en el recuadro."
+  },
+  "sdk.flow.signatureDrawOrType": {
+    "en": "Draw your signature in the box - or type your name instead.",
+    "nl": "Zet je handtekening in het vak - of typ je naam.",
+    "fr": "Dessinez votre signature dans le cadre - ou saisissez plutôt votre nom.",
+    "de": "Unterschreibe im Feld - oder gib stattdessen deinen Namen ein.",
+    "es": "Dibuja tu firma en el recuadro - o escribe tu nombre."
+  },
+  "sdk.flow.signatureName": {
+    "en": "Enter your full name.",
+    "nl": "Vul je volledige naam in.",
+    "fr": "Saisissez votre nom complet.",
+    "de": "Gib deinen vollständigen Namen ein.",
+    "es": "Escribe tu nombre completo."
+  },
+  "sdk.flow.signatureType": {
+    "en": "Type your full name to sign.",
+    "nl": "Typ je volledige naam om te ondertekenen.",
+    "fr": "Saisissez votre nom complet pour signer.",
+    "de": "Gib zum Unterschreiben deinen vollständigen Namen ein.",
+    "es": "Escribe tu nombre completo para firmar."
+  },
+  "sdk.flow.streetRequired": {
+    "en": "Enter the street address.",
+    "nl": "Vul het adres in.",
+    "fr": "Saisissez l'adresse.",
+    "de": "Gib die Straße und Hausnummer ein.",
+    "es": "Escribe la dirección."
+  },
+  "sdk.flow.timedOut": {
+    "en": "Connection timed out.",
+    "nl": "De verbinding is verlopen.",
+    "fr": "La connexion a expiré.",
+    "de": "Die Verbindung ist abgelaufen.",
+    "es": "Se agotó el tiempo de conexión."
+  },
+  "sdk.form.invalidEmail": {
+    "en": "Please enter a valid email.",
+    "nl": "Vul een geldig e-mailadres in.",
+    "fr": "Veuillez saisir une adresse e-mail valide.",
+    "de": "Bitte gib eine gültige E-Mail-Adresse ein.",
+    "es": "Introduce un correo electrónico válido."
+  },
+  "sdk.form.notThrough": {
+    "en": "That did not go through. Please try again.",
+    "nl": "Dat is niet gelukt. Probeer het opnieuw.",
+    "fr": "Cela n'a pas fonctionné. Veuillez réessayer.",
+    "de": "Das hat nicht geklappt. Bitte versuch es noch einmal.",
+    "es": "No se ha podido enviar. Inténtalo de nuevo."
+  },
+  "sdk.games.reactionAvg": {
+    "en": "{ms} ms average",
+    "nl": "gemiddeld {ms} ms",
+    "fr": "{ms} ms en moyenne",
+    "de": "{ms} ms im Schnitt",
+    "es": "{ms} ms de media"
+  },
+  "sdk.games.scrambleIntro": {
+    "en": "Tap the letters in order",
+    "nl": "Tik de letters in volgorde aan",
+    "fr": "Touchez les lettres dans l'ordre",
+    "de": "Tippe die Buchstaben der Reihe nach an",
+    "es": "Toca las letras en orden"
+  },
+  "sdk.greeting.now": {
+    "en": "now",
+    "nl": "nu",
+    "fr": "maintenant",
+    "de": "jetzt",
+    "es": "ahora"
+  },
+  "sdk.handover.cancelGoBack": {
+    "en": "Cancel and go back",
+    "nl": "Annuleren en teruggaan",
+    "fr": "Annuler et revenir",
+    "de": "Abbrechen und zurück",
+    "es": "Cancelar y volver"
+  },
+  "sdk.handover.connectedAgent": {
+    "en": "You are now connected with an agent",
+    "nl": "Je bent nu verbonden met een medewerker",
+    "fr": "Vous êtes maintenant en contact avec un agent",
+    "de": "Du bist jetzt mit einer Ansprechperson verbunden",
+    "es": "Ya estás en contacto con un agente"
+  },
+  "sdk.handover.connectedMessage": {
+    "en": "You are now connected with an agent.",
+    "nl": "Je bent nu verbonden met een medewerker.",
+    "fr": "Vous êtes maintenant en contact avec un agent.",
+    "de": "Du bist jetzt mit einer Ansprechperson verbunden.",
+    "es": "Ya estás en contacto con un agente."
+  },
+  "sdk.handover.connectedTo": {
+    "en": "Connected to {name}",
+    "nl": "Verbonden met {name}",
+    "fr": "En contact avec {name}",
+    "de": "Verbunden mit {name}",
+    "es": "Conectado con {name}"
+  },
+  "sdk.handover.connectedWith": {
+    "en": "You are now connected with",
+    "nl": "Je bent nu verbonden met",
+    "fr": "Vous êtes maintenant en relation avec",
+    "de": "Du bist jetzt verbunden mit",
+    "es": "Ahora estás conectado con"
+  },
+  "sdk.handover.connectedWithName": {
+    "en": "You are now connected with {name}",
+    "nl": "Je bent nu verbonden met {name}",
+    "fr": "Vous êtes maintenant en contact avec {name}",
+    "de": "Du bist jetzt mit {name} verbunden",
+    "es": "Ya estás en contacto con {name}"
+  },
+  "sdk.handover.continueBot": {
+    "en": "Continue with Bot",
+    "nl": "Doorgaan met de bot",
+    "fr": "Continuer avec le bot",
+    "de": "Mit dem Bot weitermachen",
+    "es": "Seguir con el bot"
+  },
+  "sdk.handover.endChat": {
+    "en": "End Chat",
+    "nl": "Chat beëindigen",
+    "fr": "Terminer le chat",
+    "de": "Chat beenden",
+    "es": "Terminar el chat"
+  },
+  "sdk.handover.ended": {
+    "en": "The conversation has ended. Thank you for chatting with us!",
+    "nl": "Het gesprek is beëindigd. Bedankt voor je bericht!",
+    "fr": "La conversation est terminée. Merci d'avoir échangé avec nous !",
+    "de": "Das Gespräch ist beendet. Danke, dass du mit uns gechattet hast!",
+    "es": "La conversación ha terminado. ¡Gracias por chatear con nosotros!"
+  },
+  "sdk.handover.endedMessage": {
+    "en": "The conversation has ended. Thank you for chatting with us!",
+    "nl": "Het gesprek is beëindigd. Bedankt voor het chatten!",
+    "fr": "La conversation est terminée. Merci d'avoir échangé avec nous !",
+    "de": "Das Gespräch ist beendet. Danke, dass du mit uns gechattet hast!",
+    "es": "La conversación ha terminado. ¡Gracias por chatear con nosotros!"
+  },
+  "sdk.handover.errorMessage": {
+    "en": "Something went wrong while connecting you to an agent. Please try again.",
+    "nl": "Er ging iets mis bij het verbinden met een medewerker. Probeer het opnieuw.",
+    "fr": "Un problème est survenu lors de la mise en contact avec un agent. Veuillez réessayer.",
+    "de": "Beim Verbinden mit einer Ansprechperson ist etwas schiefgelaufen. Bitte versuch es noch einmal.",
+    "es": "Algo ha fallado al ponerte en contacto con un agente. Inténtalo de nuevo."
+  },
+  "sdk.handover.goBack": {
+    "en": "Go Back",
+    "nl": "Terug",
+    "fr": "Retour",
+    "de": "Zurück",
+    "es": "Volver"
+  },
+  "sdk.handover.label": {
+    "en": "Talking to a person",
+    "nl": "In gesprek met een medewerker",
+    "fr": "En relation avec un conseiller",
+    "de": "Gespräch mit einem Menschen",
+    "es": "Hablando con una persona"
+  },
+  "sdk.handover.noAgents": {
+    "en": "Sorry, no agents are available at the moment. Please try again later.",
+    "nl": "Sorry, er zijn op dit moment geen medewerkers beschikbaar. Probeer het later opnieuw.",
+    "fr": "Désolé, aucun conseiller n'est disponible pour le moment. Veuillez réessayer plus tard.",
+    "de": "Leider ist gerade kein Mitarbeiter verfügbar. Bitte versuche es später noch einmal.",
+    "es": "Lo sentimos, ahora mismo no hay agentes disponibles. Inténtalo de nuevo más tarde."
+  },
+  "sdk.handover.noAgentsMessage": {
+    "en": "Sorry, no agents are available at the moment. Please try again later or leave a message.",
+    "nl": "Sorry, er is op dit moment niemand beschikbaar. Probeer het later opnieuw of laat een bericht achter.",
+    "fr": "Désolé, aucun agent n'est disponible pour le moment. Veuillez réessayer plus tard ou laisser un message.",
+    "de": "Sorry, gerade ist niemand erreichbar. Bitte versuch es später noch einmal oder hinterlasse eine Nachricht.",
+    "es": "Lo sentimos, ahora mismo no hay agentes disponibles. Inténtalo más tarde o deja un mensaje."
+  },
+  "sdk.handover.noAgentsShort": {
+    "en": "Sorry, no agents are available at the moment.",
+    "nl": "Sorry, er is op dit moment niemand beschikbaar.",
+    "fr": "Désolé, aucun agent n'est disponible pour le moment.",
+    "de": "Sorry, gerade ist niemand erreichbar.",
+    "es": "Lo sentimos, ahora mismo no hay agentes disponibles."
+  },
+  "sdk.handover.noAgentsTitle": {
+    "en": "No Agents Available",
+    "nl": "Niemand beschikbaar",
+    "fr": "Aucun agent disponible",
+    "de": "Niemand erreichbar",
+    "es": "No hay agentes disponibles"
+  },
+  "sdk.handover.timedOut": {
+    "en": "Connection timed out. Please try again later.",
+    "nl": "De verbinding duurde te lang. Probeer het later opnieuw.",
+    "fr": "La connexion a expiré. Veuillez réessayer plus tard.",
+    "de": "Die Verbindung hat zu lange gedauert. Bitte versuch es später noch einmal.",
+    "es": "La conexión ha tardado demasiado. Inténtalo más tarde."
+  },
+  "sdk.handover.timeout": {
+    "en": "We apologize, but we were unable to connect you with an agent. Please try again later.",
+    "nl": "Sorry, het is niet gelukt je met een medewerker te verbinden. Probeer het later opnieuw.",
+    "fr": "Désolé, nous n'avons pas pu vous mettre en relation avec un conseiller. Veuillez réessayer plus tard.",
+    "de": "Leider konnten wir dich nicht mit einem Mitarbeiter verbinden. Bitte versuche es später noch einmal.",
+    "es": "Lo sentimos, no hemos podido conectarte con un agente. Inténtalo de nuevo más tarde."
+  },
+  "sdk.handover.timeoutMessage": {
+    "en": "We apologize, but we were unable to connect you with an agent. The wait time has exceeded our limit.",
+    "nl": "Sorry, we konden je niet met een medewerker verbinden. De wachttijd is langer dan ons maximum.",
+    "fr": "Nous sommes désolés, nous n'avons pas pu vous mettre en contact avec un agent. Le temps d'attente a dépassé notre limite.",
+    "de": "Sorry, wir konnten dich nicht mit einer Ansprechperson verbinden. Die Wartezeit hat unser Limit überschritten.",
+    "es": "Lo sentimos, no hemos podido ponerte en contacto con un agente. El tiempo de espera ha superado nuestro límite."
+  },
+  "sdk.handover.timeoutTitle": {
+    "en": "Connection Timeout",
+    "nl": "Verbinding verlopen",
+    "fr": "Délai de connexion dépassé",
+    "de": "Zeitüberschreitung",
+    "es": "Tiempo de conexión agotado"
+  },
+  "sdk.handover.tryAgain": {
+    "en": "Try Again",
+    "nl": "Opnieuw proberen",
+    "fr": "Réessayer",
+    "de": "Erneut versuchen",
+    "es": "Reintentar"
+  },
+  "sdk.handover.wait": {
+    "en": "Please wait while we connect you with an agent...",
+    "nl": "Even geduld, we verbinden je met een medewerker...",
+    "fr": "Veuillez patienter, nous vous mettons en relation avec un conseiller...",
+    "de": "Bitte warte kurz, wir verbinden dich mit einem Mitarbeiter...",
+    "es": "Espera un momento, te estamos conectando con un agente..."
+  },
+  "sdk.header.chat": {
+    "en": "Chat",
+    "nl": "Chat",
+    "fr": "Chat",
+    "de": "Chat",
+    "es": "Chat"
+  },
+  "sdk.header.label": {
+    "en": "Chat header. {title}",
+    "nl": "Chatkop. {title}",
+    "fr": "En-tête du chat. {title}",
+    "de": "Chat-Kopfzeile. {title}",
+    "es": "Cabecera del chat. {title}"
+  },
+  "sdk.input.address": {
+    "en": "Enter address...",
+    "nl": "Vul je adres in...",
+    "fr": "Saisissez votre adresse...",
+    "de": "Adresse eingeben...",
+    "es": "Escribe tu dirección..."
+  },
+  "sdk.input.date": {
+    "en": "Enter date...",
+    "nl": "Vul een datum in...",
+    "fr": "Saisissez une date...",
+    "de": "Datum eingeben...",
+    "es": "Escribe una fecha..."
+  },
+  "sdk.input.email": {
+    "en": "Enter email...",
+    "nl": "Vul je e-mailadres in...",
+    "fr": "Saisissez votre e-mail...",
+    "de": "E-Mail eingeben...",
+    "es": "Escribe tu correo electrónico..."
+  },
+  "sdk.input.number": {
+    "en": "Enter number...",
+    "nl": "Vul een getal in...",
+    "fr": "Saisissez un nombre...",
+    "de": "Zahl eingeben...",
+    "es": "Escribe un número..."
+  },
+  "sdk.input.phone": {
+    "en": "Enter phone...",
+    "nl": "Vul je telefoonnummer in...",
+    "fr": "Saisissez votre téléphone...",
+    "de": "Telefonnummer eingeben...",
+    "es": "Escribe tu teléfono..."
+  },
+  "sdk.input.questionLabel": {
+    "en": "Question: {question}",
+    "nl": "Vraag: {question}",
+    "fr": "Question : {question}",
+    "de": "Frage: {question}",
+    "es": "Pregunta: {question}"
+  },
+  "sdk.input.text": {
+    "en": "Enter text...",
+    "nl": "Typ je tekst...",
+    "fr": "Saisissez votre texte...",
+    "de": "Text eingeben...",
+    "es": "Escribe tu texto..."
+  },
+  "sdk.input.url": {
+    "en": "Enter url...",
+    "nl": "Vul een link in...",
+    "fr": "Saisissez un lien...",
+    "de": "Link eingeben...",
+    "es": "Escribe un enlace..."
+  },
+  "sdk.kb.all": {
+    "en": "All",
+    "nl": "Alle",
+    "fr": "Toutes",
+    "de": "Alle",
+    "es": "Todas"
+  },
+  "sdk.kb.article": {
+    "en": "Article: {title}",
+    "nl": "Artikel: {title}",
+    "fr": "Article : {title}",
+    "de": "Artikel: {title}",
+    "es": "Artículo: {title}"
+  },
+  "sdk.kb.articleList": {
+    "en": "Article list",
+    "nl": "Artikellijst",
+    "fr": "Liste des articles",
+    "de": "Artikelliste",
+    "es": "Lista de artículos"
+  },
+  "sdk.kb.articlesIn": {
+    "en": "Articles in {name} category",
+    "nl": "Artikelen in de categorie {name}",
+    "fr": "Articles de la catégorie {name}",
+    "de": "Artikel in der Kategorie {name}",
+    "es": "Artículos de la categoría {name}"
+  },
+  "sdk.kb.author": {
+    "en": "Author: {name}",
+    "nl": "Auteur: {name}",
+    "fr": "Auteur : {name}",
+    "de": "Autor: {name}",
+    "es": "Autor: {name}"
+  },
+  "sdk.kb.cover": {
+    "en": "Cover image for {title}",
+    "nl": "Omslagafbeelding van {title}",
+    "fr": "Image de couverture de {title}",
+    "de": "Titelbild für {title}",
+    "es": "Imagen de portada de {title}"
+  },
+  "sdk.kb.emptyCategory": {
+    "en": "There are no articles in this category yet.",
+    "nl": "Er staan nog geen artikelen in deze categorie.",
+    "fr": "Il n'y a pas encore d'article dans cette catégorie.",
+    "de": "In dieser Kategorie gibt es noch keine Artikel.",
+    "es": "Todavía no hay artículos en esta categoría."
+  },
+  "sdk.kb.loadFailed": {
+    "en": "Failed to load knowledge base",
+    "nl": "Het helpcentrum kon niet worden geladen",
+    "fr": "Impossible de charger le centre d'aide",
+    "de": "Das Hilfecenter konnte nicht geladen werden",
+    "es": "No se pudo cargar el centro de ayuda"
+  },
+  "sdk.kb.open": {
+    "en": "Open {label}",
+    "nl": "{label} openen",
+    "fr": "Ouvrir {label}",
+    "de": "{label} öffnen",
+    "es": "Abrir {label}"
+  },
+  "sdk.kb.readHint": {
+    "en": "Double tap to read article",
+    "nl": "Dubbeltik om het artikel te lezen",
+    "fr": "Touchez deux fois pour lire l'article",
+    "de": "Doppeltippen, um den Artikel zu lesen",
+    "es": "Toca dos veces para leer el artículo"
+  },
+  "sdk.kb.searchHint": {
+    "en": "Type to search knowledge base articles",
+    "nl": "Typ om in de helpartikelen te zoeken",
+    "fr": "Saisissez du texte pour rechercher dans les articles d'aide",
+    "de": "Tippe, um die Hilfeartikel zu durchsuchen",
+    "es": "Escribe para buscar en los artículos de ayuda"
+  },
+  "sdk.kb.searchInput": {
+    "en": "Search input",
+    "nl": "Zoekveld",
+    "fr": "Champ de recherche",
+    "de": "Suchfeld",
+    "es": "Campo de búsqueda"
+  },
+  "sdk.kb.unknownAuthor": {
+    "en": "Unknown Author",
+    "nl": "Onbekende auteur",
+    "fr": "Auteur inconnu",
+    "de": "Unbekannter Autor",
+    "es": "Autor desconocido"
+  },
+  "sdk.kb.wasArticleHelpful": {
+    "en": "Was this article helpful?",
+    "nl": "Was dit artikel nuttig?",
+    "fr": "Cet article vous a-t-il aidé ?",
+    "de": "War dieser Artikel hilfreich?",
+    "es": "¿Te ha sido útil este artículo?"
+  },
+  "sdk.link.imageFrom": {
+    "en": "Image from {domain}",
+    "nl": "Afbeelding van {domain}",
+    "fr": "Image de {domain}",
+    "de": "Bild von {domain}",
+    "es": "Imagen de {domain}"
+  },
+  "sdk.link.openDomain": {
+    "en": "Open link: {domain}",
+    "nl": "Link openen: {domain}",
+    "fr": "Ouvrir le lien : {domain}",
+    "de": "Link öffnen: {domain}",
+    "es": "Abrir enlace: {domain}"
+  },
+  "sdk.link.opensBrowser": {
+    "en": "(opens in the browser)",
+    "nl": "(opent in de browser)",
+    "fr": "(s'ouvre dans le navigateur)",
+    "de": "(öffnet im Browser)",
+    "es": "(se abre en el navegador)"
+  },
+  "sdk.link.preview": {
+    "en": "Link preview: {title}",
+    "nl": "Linkvoorbeeld: {title}",
+    "fr": "Aperçu du lien : {title}",
+    "de": "Linkvorschau: {title}",
+    "es": "Vista previa del enlace: {title}"
+  },
+  "sdk.live.newChat": {
+    "en": "Start a new chat",
+    "nl": "Nieuwe chat starten",
+    "fr": "Démarrer une nouvelle conversation",
+    "de": "Neuen Chat starten",
+    "es": "Empezar un chat nuevo"
+  },
+  "sdk.loading.processing": {
+    "en": "Processing...",
+    "nl": "Bezig...",
+    "fr": "Traitement en cours...",
+    "de": "Wird verarbeitet...",
+    "es": "Procesando..."
+  },
+  "sdk.location.orManual": {
+    "en": "or enter manually",
+    "nl": "of vul het zelf in",
+    "fr": "ou saisissez-la manuellement",
+    "de": "oder gib sie selbst ein",
+    "es": "o escríbela tú mismo"
+  },
+  "sdk.location.submit": {
+    "en": "Submit location",
+    "nl": "Locatie versturen",
+    "fr": "Envoyer la position",
+    "de": "Standort senden",
+    "es": "Enviar ubicación"
+  },
+  "sdk.matrix.pickAny": {
+    "en": "Pick any that apply in each row",
+    "nl": "Kies per rij alles wat van toepassing is",
+    "fr": "Choisissez tout ce qui s'applique pour chaque ligne",
+    "de": "Wähle in jeder Zeile alles, was zutrifft",
+    "es": "Elige en cada fila todo lo que corresponda"
+  },
+  "sdk.media.audioPaused": {
+    "en": "Audio player. Paused",
+    "nl": "Audiospeler. Gepauzeerd",
+    "fr": "Lecteur audio. En pause",
+    "de": "Audioplayer. Pausiert",
+    "es": "Reproductor de audio. En pausa"
+  },
+  "sdk.media.audioPlaying": {
+    "en": "Audio player. Playing",
+    "nl": "Audiospeler. Speelt af",
+    "fr": "Lecteur audio. Lecture en cours",
+    "de": "Audioplayer. Wird abgespielt",
+    "es": "Reproductor de audio. Reproduciendo"
+  },
+  "sdk.media.downloadFile": {
+    "en": "Download file: {name}",
+    "nl": "Bestand downloaden: {name}",
+    "fr": "Télécharger le fichier : {name}",
+    "de": "Datei herunterladen: {name}",
+    "es": "Descargar archivo: {name}"
+  },
+  "sdk.media.html": {
+    "en": "HTML content",
+    "nl": "HTML-inhoud",
+    "fr": "Contenu HTML",
+    "de": "HTML-Inhalt",
+    "es": "Contenido HTML"
+  },
+  "sdk.media.image": {
+    "en": "Image",
+    "nl": "Afbeelding",
+    "fr": "Image",
+    "de": "Bild",
+    "es": "Imagen"
+  },
+  "sdk.media.imageFailed": {
+    "en": "Failed to load image",
+    "nl": "Afbeelding kon niet worden geladen",
+    "fr": "Impossible de charger l'image",
+    "de": "Bild konnte nicht geladen werden",
+    "es": "No se pudo cargar la imagen"
+  },
+  "sdk.media.pauseAudio": {
+    "en": "Pause audio",
+    "nl": "Audio pauzeren",
+    "fr": "Mettre l'audio en pause",
+    "de": "Audio pausieren",
+    "es": "Pausar audio"
+  },
+  "sdk.media.playAudio": {
+    "en": "Play audio",
+    "nl": "Audio afspelen",
+    "fr": "Lire l'audio",
+    "de": "Audio abspielen",
+    "es": "Reproducir audio"
+  },
+  "sdk.media.playVideo": {
+    "en": "Play video",
+    "nl": "Video afspelen",
+    "fr": "Lire la vidéo",
+    "de": "Video abspielen",
+    "es": "Reproducir vídeo"
+  },
+  "sdk.media.videoPlayer": {
+    "en": "Video player. Tap to play",
+    "nl": "Videospeler. Tik om af te spelen",
+    "fr": "Lecteur vidéo. Touchez pour lire",
+    "de": "Videoplayer. Tippe zum Abspielen",
+    "es": "Reproductor de vídeo. Toca para reproducir"
+  },
+  "sdk.message.bot": {
+    "en": "Bot message: {text}",
+    "nl": "Bericht van de bot: {text}",
+    "fr": "Message du bot : {text}",
+    "de": "Nachricht vom Bot: {text}",
+    "es": "Mensaje del bot: {text}"
+  },
+  "sdk.message.botAvatar": {
+    "en": "Bot avatar",
+    "nl": "Avatar van de bot",
+    "fr": "Avatar du bot",
+    "de": "Avatar des Bots",
+    "es": "Avatar del bot"
+  },
+  "sdk.message.botName": {
+    "en": "Bot",
+    "nl": "Bot",
+    "fr": "Bot",
+    "de": "Bot",
+    "es": "Bot"
+  },
+  "sdk.message.failedRetry": {
+    "en": "Message failed. Tap to retry",
+    "nl": "Bericht niet verstuurd. Tik om het opnieuw te proberen",
+    "fr": "Échec de l'envoi. Touchez pour réessayer",
+    "de": "Nachricht nicht gesendet. Tippe, um es noch einmal zu versuchen",
+    "es": "No se ha enviado el mensaje. Toca para reintentar"
+  },
+  "sdk.message.list": {
+    "en": "Message list",
+    "nl": "Berichtenlijst",
+    "fr": "Liste des messages",
+    "de": "Nachrichtenliste",
+    "es": "Lista de mensajes"
+  },
+  "sdk.message.retryHint": {
+    "en": "Double tap to retry sending this message",
+    "nl": "Dubbeltik om dit bericht opnieuw te versturen",
+    "fr": "Touchez deux fois pour renvoyer ce message",
+    "de": "Doppeltippen, um diese Nachricht noch einmal zu senden",
+    "es": "Toca dos veces para volver a enviar este mensaje"
+  },
+  "sdk.message.status": {
+    "en": "Message status: {status}",
+    "nl": "Berichtstatus: {status}",
+    "fr": "État du message : {status}",
+    "de": "Nachrichtenstatus: {status}",
+    "es": "Estado del mensaje: {status}"
+  },
+  "sdk.message.yours": {
+    "en": "Your message: {text}",
+    "nl": "Jouw bericht: {text}",
+    "fr": "Votre message : {text}",
+    "de": "Deine Nachricht: {text}",
+    "es": "Tu mensaje: {text}"
+  },
+  "sdk.offline.hint": {
+    "en": "Tap to view pending messages",
+    "nl": "Tik om de berichten in de wachtrij te zien",
+    "fr": "Touchez pour voir les messages en attente",
+    "de": "Tippe, um die wartenden Nachrichten zu sehen",
+    "es": "Toca para ver los mensajes pendientes"
+  },
+  "sdk.offline.pending.one": {
+    "en": "{n} message pending",
+    "nl": "{n} bericht in de wachtrij",
+    "fr": "{n} message en attente",
+    "de": "{n} Nachricht wartet",
+    "es": "{n} mensaje pendiente"
+  },
+  "sdk.offline.pending.other": {
+    "en": "{n} messages pending",
+    "nl": "{n} berichten in de wachtrij",
+    "fr": "{n} messages en attente",
+    "de": "{n} Nachrichten warten",
+    "es": "{n} mensajes pendientes"
+  },
+  "sdk.offline.title": {
+    "en": "You are offline",
+    "nl": "Je bent offline",
+    "fr": "Vous êtes hors ligne",
+    "de": "Du bist offline",
+    "es": "No tienes conexión"
+  },
+  "sdk.otp.code": {
+    "en": "{n}-digit code",
+    "nl": "Code van {n} cijfers",
+    "fr": "Code à {n} chiffres",
+    "de": "{n}-stelliger Code",
+    "es": "Código de {n} dígitos"
+  },
+  "sdk.pay.timeLeft": {
+    "en": "{time} left",
+    "nl": "Nog {time}",
+    "fr": "Encore {time}",
+    "de": "Noch {time}",
+    "es": "Quedan {time}"
+  },
+  "sdk.permission.cameraDenied": {
+    "en": "Camera permission is required to take photos. Please enable it in Settings.",
+    "nl": "Je hebt toegang tot de camera nodig om foto's te maken. Zet dit aan in Instellingen.",
+    "fr": "L'accès à l'appareil photo est nécessaire pour prendre des photos. Veuillez l'activer dans les Réglages.",
+    "de": "Zum Fotografieren wird der Kamerazugriff benötigt. Bitte aktiviere ihn in den Einstellungen.",
+    "es": "Se necesita permiso de cámara para hacer fotos. Actívalo en Ajustes."
+  },
+  "sdk.permission.cameraMessage": {
+    "en": "This app needs access to your camera to take photos.",
+    "nl": "Deze app heeft toegang tot je camera nodig om foto's te maken.",
+    "fr": "Cette application a besoin d'accéder à votre appareil photo pour prendre des photos.",
+    "de": "Diese App braucht Zugriff auf deine Kamera, um Fotos aufzunehmen.",
+    "es": "Esta app necesita acceder a tu cámara para hacer fotos."
+  },
+  "sdk.permission.cameraTitle": {
+    "en": "Camera Permission",
+    "nl": "Toegang tot camera",
+    "fr": "Accès à l'appareil photo",
+    "de": "Kamerazugriff",
+    "es": "Permiso de cámara"
+  },
+  "sdk.permission.later": {
+    "en": "Ask Me Later",
+    "nl": "Later vragen",
+    "fr": "Me demander plus tard",
+    "de": "Später fragen",
+    "es": "Preguntarme más tarde"
+  },
+  "sdk.permission.micDenied": {
+    "en": "Microphone permission is required to record voice messages. Please enable it in Settings.",
+    "nl": "Je hebt toegang tot de microfoon nodig om spraakberichten op te nemen. Zet dit aan in Instellingen.",
+    "fr": "L'accès au micro est nécessaire pour enregistrer des messages vocaux. Veuillez l'activer dans les Réglages.",
+    "de": "Für Sprachnachrichten wird der Mikrofonzugriff benötigt. Bitte aktiviere ihn in den Einstellungen.",
+    "es": "Se necesita permiso de micrófono para grabar mensajes de voz. Actívalo en Ajustes."
+  },
+  "sdk.permission.micMessage": {
+    "en": "This app needs access to your microphone to record voice messages.",
+    "nl": "Deze app heeft toegang tot je microfoon nodig om spraakberichten op te nemen.",
+    "fr": "Cette application a besoin d'accéder à votre micro pour enregistrer des messages vocaux.",
+    "de": "Diese App braucht Zugriff auf dein Mikrofon, um Sprachnachrichten aufzunehmen.",
+    "es": "Esta app necesita acceder a tu micrófono para grabar mensajes de voz."
+  },
+  "sdk.permission.micTitle": {
+    "en": "Microphone Permission",
+    "nl": "Toegang tot microfoon",
+    "fr": "Accès au micro",
+    "de": "Mikrofonzugriff",
+    "es": "Permiso de micrófono"
+  },
+  "sdk.permission.openSettings": {
+    "en": "Open Settings",
+    "nl": "Instellingen openen",
+    "fr": "Ouvrir les Réglages",
+    "de": "Einstellungen öffnen",
+    "es": "Abrir Ajustes"
+  },
+  "sdk.permission.requiredTitle": {
+    "en": "Permission Required",
+    "nl": "Toestemming nodig",
+    "fr": "Autorisation requise",
+    "de": "Berechtigung erforderlich",
+    "es": "Permiso necesario"
+  },
+  "sdk.permission.storageDenied": {
+    "en": "Storage permission is required to select files. Please enable it in Settings.",
+    "nl": "Je hebt toegang tot je bestanden nodig om bestanden te kiezen. Zet dit aan in Instellingen.",
+    "fr": "L'accès aux fichiers est nécessaire pour choisir des fichiers. Veuillez l'activer dans les Réglages.",
+    "de": "Zum Auswählen von Dateien wird der Speicherzugriff benötigt. Bitte aktiviere ihn in den Einstellungen.",
+    "es": "Se necesita permiso de almacenamiento para elegir archivos. Actívalo en Ajustes."
+  },
+  "sdk.permission.storageMessage": {
+    "en": "This app needs access to your files to select documents.",
+    "nl": "Deze app heeft toegang tot je bestanden nodig om documenten te kiezen.",
+    "fr": "Cette application a besoin d'accéder à vos fichiers pour choisir des documents.",
+    "de": "Diese App braucht Zugriff auf deine Dateien, um Dokumente auszuwählen.",
+    "es": "Esta app necesita acceder a tus archivos para elegir documentos."
+  },
+  "sdk.permission.storageTitle": {
+    "en": "Storage Permission",
+    "nl": "Toegang tot bestanden",
+    "fr": "Accès aux fichiers",
+    "de": "Speicherzugriff",
+    "es": "Permiso de almacenamiento"
+  },
+  "sdk.prechat.email": {
+    "en": "Email",
+    "nl": "E-mail",
+    "fr": "E-mail",
+    "de": "E-Mail",
+    "es": "Correo electrónico"
+  },
+  "sdk.prechat.emailPlaceholder": {
+    "en": "Enter your email",
+    "nl": "Vul je e-mailadres in",
+    "fr": "Saisissez votre adresse e-mail",
+    "de": "Gib deine E-Mail-Adresse ein",
+    "es": "Escribe tu correo electrónico"
+  },
+  "sdk.prechat.enterYour": {
+    "en": "Enter your {field}",
+    "nl": "Vul in: {field}",
+    "fr": "Saisissez : {field}",
+    "de": "Bitte eingeben: {field}",
+    "es": "Escribe: {field}"
+  },
+  "sdk.prechat.invalidFormat": {
+    "en": "Invalid format",
+    "nl": "Ongeldig formaat",
+    "fr": "Format non valide",
+    "de": "Ungültiges Format",
+    "es": "Formato no válido"
+  },
+  "sdk.prechat.name": {
+    "en": "Name",
+    "nl": "Naam",
+    "fr": "Nom",
+    "de": "Name",
+    "es": "Nombre"
+  },
+  "sdk.prechat.namePlaceholder": {
+    "en": "Enter your name",
+    "nl": "Vul je naam in",
+    "fr": "Saisissez votre nom",
+    "de": "Gib deinen Namen ein",
+    "es": "Escribe tu nombre"
+  },
+  "sdk.prechat.requiredField": {
+    "en": "Required field",
+    "nl": "Verplicht veld",
+    "fr": "Champ obligatoire",
+    "de": "Pflichtfeld",
+    "es": "Campo obligatorio"
+  },
+  "sdk.prechat.start": {
+    "en": "Start Chat",
+    "nl": "Chat starten",
+    "fr": "Démarrer le chat",
+    "de": "Chat starten",
+    "es": "Iniciar chat"
+  },
+  "sdk.prechat.subtitle": {
+    "en": "Please provide the following information",
+    "nl": "Vul de volgende gegevens in",
+    "fr": "Veuillez fournir les informations suivantes",
+    "de": "Bitte gib die folgenden Informationen an",
+    "es": "Indícanos la siguiente información"
+  },
+  "sdk.prechat.title": {
+    "en": "Before we connect you",
+    "nl": "Voordat we je verbinden",
+    "fr": "Avant de vous mettre en relation",
+    "de": "Bevor wir dich verbinden",
+    "es": "Antes de conectarte"
+  },
+  "sdk.prechat.tooLong": {
+    "en": "Input is too long",
+    "nl": "Dat is te lang",
+    "fr": "La saisie est trop longue",
+    "de": "Die Eingabe ist zu lang",
+    "es": "El texto es demasiado largo"
+  },
+  "sdk.prechat.tooShort": {
+    "en": "Input is too short",
+    "nl": "Dat is te kort",
+    "fr": "La saisie est trop courte",
+    "de": "Die Eingabe ist zu kurz",
+    "es": "El texto es demasiado corto"
+  },
+  "sdk.quiz.submit": {
+    "en": "Submit Answer",
+    "nl": "Antwoord versturen",
+    "fr": "Envoyer la réponse",
+    "de": "Antwort senden",
+    "es": "Enviar respuesta"
+  },
+  "sdk.quiz.title": {
+    "en": "Quiz Question",
+    "nl": "Quizvraag",
+    "fr": "Question du quiz",
+    "de": "Quizfrage",
+    "es": "Pregunta del quiz"
+  },
+  "sdk.ranking.drag": {
+    "en": "Drag {item}",
+    "nl": "Sleep {item}",
+    "fr": "Faire glisser {item}",
+    "de": "{item} ziehen",
+    "es": "Arrastra {item}"
+  },
+  "sdk.rating.rate": {
+    "en": "Rate {n} out of {max}",
+    "nl": "Geef {n} van de {max}",
+    "fr": "Noter {n} sur {max}",
+    "de": "Mit {n} von {max} bewerten",
+    "es": "Valorar con {n} de {max}"
+  },
+  "sdk.rating.submit": {
+    "en": "Submit rating",
+    "nl": "Beoordeling versturen",
+    "fr": "Envoyer la note",
+    "de": "Bewertung senden",
+    "es": "Enviar valoración"
+  },
+  "sdk.reaction.badge.one": {
+    "en": "{emoji} reaction, {n} person",
+    "nl": "{emoji}-reactie, {n} persoon",
+    "fr": "Réaction {emoji}, {n} personne",
+    "de": "{emoji}-Reaktion, {n} Person",
+    "es": "Reacción {emoji}, {n} persona"
+  },
+  "sdk.reaction.badge.other": {
+    "en": "{emoji} reaction, {n} people",
+    "nl": "{emoji}-reactie, {n} personen",
+    "fr": "Réaction {emoji}, {n} personnes",
+    "de": "{emoji}-Reaktion, {n} Personen",
+    "es": "Reacción {emoji}, {n} personas"
+  },
+  "sdk.reaction.close": {
+    "en": "Close reaction picker",
+    "nl": "Reactiekiezer sluiten",
+    "fr": "Fermer le choix de réaction",
+    "de": "Reaktionsauswahl schließen",
+    "es": "Cerrar el selector de reacciones"
+  },
+  "sdk.reaction.count.one": {
+    "en": "{n} Reaction",
+    "nl": "{n} reactie",
+    "fr": "{n} réaction",
+    "de": "{n} Reaktion",
+    "es": "{n} reacción"
+  },
+  "sdk.reaction.count.other": {
+    "en": "{n} Reactions",
+    "nl": "{n} reacties",
+    "fr": "{n} réactions",
+    "de": "{n} Reaktionen",
+    "es": "{n} reacciones"
+  },
+  "sdk.reaction.hint": {
+    "en": "Tap to toggle reaction, long press to see who reacted",
+    "nl": "Tik om je reactie aan of uit te zetten, houd ingedrukt om te zien wie reageerde",
+    "fr": "Touchez pour ajouter ou retirer la réaction, appui long pour voir qui a réagi",
+    "de": "Tippe zum Umschalten, lange drücken, um zu sehen, wer reagiert hat",
+    "es": "Toca para activar o quitar la reacción, mantén pulsado para ver quién reaccionó"
+  },
+  "sdk.reaction.user": {
+    "en": "User",
+    "nl": "Gebruiker",
+    "fr": "Utilisateur",
+    "de": "Nutzer",
+    "es": "Usuario"
+  },
+  "sdk.reaction.with": {
+    "en": "React with {emoji}",
+    "nl": "Reageer met {emoji}",
+    "fr": "Réagir avec {emoji}",
+    "de": "Mit {emoji} reagieren",
+    "es": "Reaccionar con {emoji}"
+  },
+  "sdk.reaction.youReacted": {
+    "en": "you reacted",
+    "nl": "jij hebt gereageerd",
+    "fr": "vous avez réagi",
+    "de": "du hast reagiert",
+    "es": "has reaccionado"
+  },
+  "sdk.restart.message": {
+    "en": "This will clear the current conversation and start fresh. Continue?",
+    "nl": "Hiermee wis je het huidige gesprek en begin je opnieuw. Doorgaan?",
+    "fr": "La conversation actuelle sera effacée et un nouveau chat commencera. Continuer ?",
+    "de": "Damit wird das aktuelle Gespräch gelöscht und neu begonnen. Fortfahren?",
+    "es": "Se borrará la conversación actual y empezarás de nuevo. ¿Continuar?"
+  },
+  "sdk.restart.title": {
+    "en": "Restart Chat",
+    "nl": "Chat opnieuw starten",
+    "fr": "Recommencer le chat",
+    "de": "Chat neu starten",
+    "es": "Reiniciar chat"
+  },
+  "sdk.select.carousel": {
+    "en": "Card carousel",
+    "nl": "Kaartcarrousel",
+    "fr": "Carrousel de cartes",
+    "de": "Kartenkarussell",
+    "es": "Carrusel de tarjetas"
+  },
+  "sdk.select.done": {
+    "en": "Done ({n})",
+    "nl": "Klaar ({n})",
+    "fr": "Terminé ({n})",
+    "de": "Fertig ({n})",
+    "es": "Listo ({n})"
+  },
+  "sdk.select.imageOption": {
+    "en": "Image option",
+    "nl": "Afbeeldingsoptie",
+    "fr": "Option illustrée",
+    "de": "Bildoption",
+    "es": "Opción con imagen"
+  },
+  "sdk.select.placeholder": {
+    "en": "Select an option...",
+    "nl": "Kies een optie...",
+    "fr": "Choisissez une option...",
+    "de": "Wähle eine Option...",
+    "es": "Elige una opción..."
+  },
+  "sdk.select.search": {
+    "en": "Search...",
+    "nl": "Zoeken...",
+    "fr": "Rechercher...",
+    "de": "Suchen...",
+    "es": "Buscar..."
+  },
+  "sdk.select.submit": {
+    "en": "Submit ({n})",
+    "nl": "Versturen ({n})",
+    "fr": "Envoyer ({n})",
+    "de": "Senden ({n})",
+    "es": "Enviar ({n})"
+  },
+  "sdk.select.submitCount": {
+    "en": "Submit {n} selected items",
+    "nl": "{n} gekozen items versturen",
+    "fr": "Envoyer {n} éléments sélectionnés",
+    "de": "{n} ausgewählte Einträge senden",
+    "es": "Enviar {n} elementos seleccionados"
+  },
+  "sdk.send.failedTitle": {
+    "en": "Send Failed",
+    "nl": "Versturen mislukt",
+    "fr": "Échec de l'envoi",
+    "de": "Senden fehlgeschlagen",
+    "es": "Error al enviar"
+  },
+  "sdk.signature.pad": {
+    "en": "Signature pad: draw your signature with a finger",
+    "nl": "Handtekeningveld: teken je handtekening met je vinger",
+    "fr": "Zone de signature : dessinez votre signature avec le doigt",
+    "de": "Unterschriftsfeld: Zeichne deine Unterschrift mit dem Finger",
+    "es": "Panel de firma: dibuja tu firma con el dedo"
+  },
+  "sdk.status.connected": {
+    "en": "Connected",
+    "nl": "Verbonden",
+    "fr": "Connecté",
+    "de": "Verbunden",
+    "es": "Conectado"
+  },
+  "sdk.status.disconnected": {
+    "en": "Disconnected",
+    "nl": "Verbinding verbroken",
+    "fr": "Déconnecté",
+    "de": "Getrennt",
+    "es": "Desconectado"
+  },
+  "sdk.status.error": {
+    "en": "Connection error",
+    "nl": "Verbindingsfout",
+    "fr": "Erreur de connexion",
+    "de": "Verbindungsfehler",
+    "es": "Error de conexión"
+  },
+  "sdk.status.label": {
+    "en": "Connection status: {status}",
+    "nl": "Verbindingsstatus: {status}",
+    "fr": "État de la connexion : {status}",
+    "de": "Verbindungsstatus: {status}",
+    "es": "Estado de la conexión: {status}"
+  },
+  "sdk.status.offline": {
+    "en": "Offline",
+    "nl": "Offline",
+    "fr": "Hors ligne",
+    "de": "Offline",
+    "es": "Sin conexión"
+  },
+  "sdk.status.reconnecting": {
+    "en": "Reconnecting...",
+    "nl": "Opnieuw verbinden...",
+    "fr": "Reconnexion...",
+    "de": "Verbindung wird wiederhergestellt...",
+    "es": "Reconectando..."
+  },
+  "sdk.stepper.down": {
+    "en": "{label} down",
+    "nl": "{label} omlaag",
+    "fr": "{label} moins",
+    "de": "{label} runter",
+    "es": "{label} menos"
+  },
+  "sdk.stepper.up": {
+    "en": "{label} up",
+    "nl": "{label} omhoog",
+    "fr": "{label} plus",
+    "de": "{label} hoch",
+    "es": "{label} más"
+  },
+  "sdk.survey.feedbackLabel": {
+    "en": "Feedback text input",
+    "nl": "Feedback invullen",
+    "fr": "Saisie de votre feedback",
+    "de": "Feedback eingeben",
+    "es": "Escribir comentarios"
+  },
+  "sdk.survey.feedbackPlaceholder": {
+    "en": "Tell us more about your experience...",
+    "nl": "Vertel ons meer over je ervaring...",
+    "fr": "Dites-nous en plus sur votre expérience...",
+    "de": "Erzähl uns mehr über deine Erfahrung...",
+    "es": "Cuéntanos más sobre tu experiencia..."
+  },
+  "sdk.survey.feedbackQuestion": {
+    "en": "Any additional feedback? (optional)",
+    "nl": "Nog andere feedback? (optioneel)",
+    "fr": "Autre chose à nous dire ? (facultatif)",
+    "de": "Noch weiteres Feedback? (optional)",
+    "es": "¿Algún comentario más? (opcional)"
+  },
+  "sdk.survey.rate": {
+    "en": "Please rate your conversation",
+    "nl": "Beoordeel je gesprek",
+    "fr": "Veuillez noter votre conversation",
+    "de": "Bitte bewerte dein Gespräch",
+    "es": "Valora tu conversación"
+  },
+  "sdk.survey.ratingQuestion": {
+    "en": "Please rate your conversation",
+    "nl": "Beoordeel je gesprek",
+    "fr": "Veuillez évaluer votre conversation",
+    "de": "Bitte bewerte dein Gespräch",
+    "es": "Valora tu conversación"
+  },
+  "sdk.survey.skipLabel": {
+    "en": "Skip survey",
+    "nl": "Enquête overslaan",
+    "fr": "Passer le questionnaire",
+    "de": "Umfrage überspringen",
+    "es": "Omitir encuesta"
+  },
+  "sdk.survey.stars.one": {
+    "en": "{n} star",
+    "nl": "{n} ster",
+    "fr": "{n} étoile",
+    "de": "{n} Stern",
+    "es": "{n} estrella"
+  },
+  "sdk.survey.stars.other": {
+    "en": "{n} stars",
+    "nl": "{n} sterren",
+    "fr": "{n} étoiles",
+    "de": "{n} Sterne",
+    "es": "{n} estrellas"
+  },
+  "sdk.survey.submitLabel": {
+    "en": "Submit survey",
+    "nl": "Enquête versturen",
+    "fr": "Envoyer le questionnaire",
+    "de": "Umfrage absenden",
+    "es": "Enviar encuesta"
+  },
+  "sdk.transcript.empty": {
+    "en": "There are no messages to share.",
+    "nl": "Er zijn geen berichten om te delen.",
+    "fr": "Il n'y a aucun message à partager.",
+    "de": "Es gibt keine Nachrichten zum Teilen.",
+    "es": "No hay mensajes para compartir."
+  },
+  "sdk.transcript.emptyTitle": {
+    "en": "No Messages",
+    "nl": "Geen berichten",
+    "fr": "Aucun message",
+    "de": "Keine Nachrichten",
+    "es": "No hay mensajes"
+  },
+  "sdk.transcript.share": {
+    "en": "Share Transcript",
+    "nl": "Transcript delen",
+    "fr": "Partager la transcription",
+    "de": "Verlauf teilen",
+    "es": "Compartir transcripción"
+  },
+  "sdk.upload.failedTitle": {
+    "en": "Upload Failed",
+    "nl": "Uploaden mislukt",
+    "fr": "Échec de l'envoi",
+    "de": "Hochladen fehlgeschlagen",
+    "es": "Error al subir"
+  },
+  "sdk.validation.date": {
+    "en": "Please enter a valid date (YYYY-MM-DD)",
+    "nl": "Vul een geldige datum in (JJJJ-MM-DD)",
+    "fr": "Veuillez saisir une date valide (AAAA-MM-JJ)",
+    "de": "Bitte gib ein gültiges Datum ein (JJJJ-MM-TT)",
+    "es": "Introduce una fecha válida (AAAA-MM-DD)"
+  },
+  "sdk.validation.format": {
+    "en": "Invalid format",
+    "nl": "Ongeldige notatie",
+    "fr": "Format non valide",
+    "de": "Ungültiges Format",
+    "es": "Formato no válido"
+  },
+  "sdk.validation.max": {
+    "en": "Maximum value is {max}",
+    "nl": "De maximumwaarde is {max}",
+    "fr": "La valeur maximale est {max}",
+    "de": "Der Höchstwert ist {max}",
+    "es": "El valor máximo es {max}"
+  },
+  "sdk.validation.maxLength": {
+    "en": "Maximum {n} characters allowed",
+    "nl": "Maximaal {n} tekens toegestaan",
+    "fr": "{n} caractères maximum autorisés",
+    "de": "Höchstens {n} Zeichen erlaubt",
+    "es": "Se permiten como máximo {n} caracteres"
+  },
+  "sdk.validation.min": {
+    "en": "Minimum value is {min}",
+    "nl": "De minimumwaarde is {min}",
+    "fr": "La valeur minimale est {min}",
+    "de": "Der Mindestwert ist {min}",
+    "es": "El valor mínimo es {min}"
+  },
+  "sdk.validation.minLength": {
+    "en": "Minimum {n} characters required",
+    "nl": "Minimaal {n} tekens nodig",
+    "fr": "{n} caractères minimum requis",
+    "de": "Mindestens {n} Zeichen erforderlich",
+    "es": "Se necesitan al menos {n} caracteres"
+  },
+  "sdk.validation.required": {
+    "en": "This field is required",
+    "nl": "Dit veld is verplicht",
+    "fr": "Ce champ est obligatoire",
+    "de": "Dieses Feld ist erforderlich",
+    "es": "Este campo es obligatorio"
+  },
+  "sdk.voice.cancel": {
+    "en": "Cancel recording",
+    "nl": "Opname annuleren",
+    "fr": "Annuler l'enregistrement",
+    "de": "Aufnahme abbrechen",
+    "es": "Cancelar grabación"
+  },
+  "sdk.voice.download": {
+    "en": "Download voice message",
+    "nl": "Spraakbericht downloaden",
+    "fr": "Télécharger le message vocal",
+    "de": "Sprachnachricht herunterladen",
+    "es": "Descargar mensaje de voz"
+  },
+  "sdk.voice.downloadFailed": {
+    "en": "Failed to download audio file.",
+    "nl": "Het audiobestand kon niet worden gedownload.",
+    "fr": "Impossible de télécharger le fichier audio.",
+    "de": "Die Audiodatei konnte nicht heruntergeladen werden.",
+    "es": "No se pudo descargar el archivo de audio."
+  },
+  "sdk.voice.errorTitle": {
+    "en": "Recording Error",
+    "nl": "Opnamefout",
+    "fr": "Erreur d'enregistrement",
+    "de": "Aufnahmefehler",
+    "es": "Error de grabación"
+  },
+  "sdk.voice.label": {
+    "en": "Voice message, {duration}",
+    "nl": "Spraakbericht, {duration}",
+    "fr": "Message vocal, {duration}",
+    "de": "Sprachnachricht, {duration}",
+    "es": "Mensaje de voz, {duration}"
+  },
+  "sdk.voice.loading": {
+    "en": "Loading voice message...",
+    "nl": "Spraakbericht laden...",
+    "fr": "Chargement du message vocal...",
+    "de": "Sprachnachricht wird geladen...",
+    "es": "Cargando mensaje de voz..."
+  },
+  "sdk.voice.playFailed": {
+    "en": "Failed to play recording.",
+    "nl": "De opname kon niet worden afgespeeld.",
+    "fr": "Impossible de lire l'enregistrement.",
+    "de": "Die Aufnahme konnte nicht abgespielt werden.",
+    "es": "No se pudo reproducir la grabación."
+  },
+  "sdk.voice.playPreview": {
+    "en": "Play preview",
+    "nl": "Voorbeeld afspelen",
+    "fr": "Écouter l'aperçu",
+    "de": "Vorschau abspielen",
+    "es": "Reproducir vista previa"
+  },
+  "sdk.voice.playbackErrorTitle": {
+    "en": "Playback Error",
+    "nl": "Afspeelfout",
+    "fr": "Erreur de lecture",
+    "de": "Wiedergabefehler",
+    "es": "Error de reproducción"
+  },
+  "sdk.voice.recordAtLeast": {
+    "en": "Please record for at least {duration}.",
+    "nl": "Neem minstens {duration} op.",
+    "fr": "Veuillez enregistrer pendant au moins {duration}.",
+    "de": "Bitte nimm mindestens {duration} auf.",
+    "es": "Graba al menos {duration}."
+  },
+  "sdk.voice.recording": {
+    "en": "Recording...",
+    "nl": "Opnemen...",
+    "fr": "Enregistrement...",
+    "de": "Aufnahme läuft...",
+    "es": "Grabando..."
+  },
+  "sdk.voice.retry": {
+    "en": "Tap to retry",
+    "nl": "Tik om het opnieuw te proberen",
+    "fr": "Touchez pour réessayer",
+    "de": "Tippe, um es erneut zu versuchen",
+    "es": "Toca para reintentar"
+  },
+  "sdk.voice.send": {
+    "en": "Send voice message",
+    "nl": "Spraakbericht versturen",
+    "fr": "Envoyer le message vocal",
+    "de": "Sprachnachricht senden",
+    "es": "Enviar mensaje de voz"
+  },
+  "sdk.voice.start": {
+    "en": "Start recording",
+    "nl": "Opname starten",
+    "fr": "Démarrer l'enregistrement",
+    "de": "Aufnahme starten",
+    "es": "Empezar a grabar"
+  },
+  "sdk.voice.startFailed": {
+    "en": "Failed to start recording. Please try again.",
+    "nl": "De opname kon niet starten. Probeer het opnieuw.",
+    "fr": "Impossible de démarrer l'enregistrement. Veuillez réessayer.",
+    "de": "Die Aufnahme konnte nicht gestartet werden. Bitte versuche es noch einmal.",
+    "es": "No se pudo empezar a grabar. Inténtalo de nuevo."
+  },
+  "sdk.voice.stop": {
+    "en": "Stop recording",
+    "nl": "Opname stoppen",
+    "fr": "Arrêter l'enregistrement",
+    "de": "Aufnahme stoppen",
+    "es": "Detener grabación"
+  },
+  "sdk.voice.stopFailed": {
+    "en": "Failed to stop recording. Please try again.",
+    "nl": "De opname kon niet stoppen. Probeer het opnieuw.",
+    "fr": "Impossible d'arrêter l'enregistrement. Veuillez réessayer.",
+    "de": "Die Aufnahme konnte nicht beendet werden. Bitte versuche es noch einmal.",
+    "es": "No se pudo detener la grabación. Inténtalo de nuevo."
+  },
+  "sdk.voice.tapToRecord": {
+    "en": "Tap microphone to record",
+    "nl": "Tik op de microfoon om op te nemen",
+    "fr": "Touchez le micro pour enregistrer",
+    "de": "Tippe auf das Mikrofon, um aufzunehmen",
+    "es": "Toca el micrófono para grabar"
+  },
+  "sdk.voice.tooShort": {
+    "en": "Recording too short. Minimum duration is {duration}.",
+    "nl": "Opname te kort. De minimale duur is {duration}.",
+    "fr": "Enregistrement trop court. La durée minimale est de {duration}.",
+    "de": "Aufnahme zu kurz. Die Mindestdauer beträgt {duration}.",
+    "es": "Grabación demasiado corta. La duración mínima es {duration}."
+  },
+  "sdk.voice.tooShortTitle": {
+    "en": "Recording Too Short",
+    "nl": "Opname te kort",
+    "fr": "Enregistrement trop court",
+    "de": "Aufnahme zu kurz",
+    "es": "Grabación demasiado corta"
+  },
+  "sdk.voice.unavailable": {
+    "en": "Voice recording isn't available on this device.",
+    "nl": "Spraakopname is niet beschikbaar op dit apparaat.",
+    "fr": "L'enregistrement vocal n'est pas disponible sur cet appareil.",
+    "de": "Sprachaufnahme ist auf diesem Gerät nicht verfügbar.",
+    "es": "La grabación de voz no está disponible en este dispositivo."
+  },
+  "sdk.wait.aboutHours.one": {
+    "en": "About {n} hour",
+    "nl": "Ongeveer {n} uur",
+    "fr": "Environ {n} heure",
+    "de": "Etwa {n} Stunde",
+    "es": "Alrededor de {n} hora"
+  },
+  "sdk.wait.aboutHours.other": {
+    "en": "About {n} hours",
+    "nl": "Ongeveer {n} uur",
+    "fr": "Environ {n} heures",
+    "de": "Etwa {n} Stunden",
+    "es": "Alrededor de {n} horas"
+  },
+  "sdk.wait.aboutHoursMinutes": {
+    "en": "About {hours} {minutes}",
+    "nl": "Ongeveer {hours} en {minutes}",
+    "fr": "Environ {hours} {minutes}",
+    "de": "Etwa {hours} {minutes}",
+    "es": "Alrededor de {hours} y {minutes}"
+  },
+  "sdk.wait.aboutMinutes.one": {
+    "en": "About {n} minute",
+    "nl": "Ongeveer {n} minuut",
+    "fr": "Environ {n} minute",
+    "de": "Etwa {n} Minute",
+    "es": "Unos {n} minuto"
+  },
+  "sdk.wait.aboutMinutes.other": {
+    "en": "About {n} minutes",
+    "nl": "Ongeveer {n} minuten",
+    "fr": "Environ {n} minutes",
+    "de": "Etwa {n} Minuten",
+    "es": "Unos {n} minutos"
+  },
+  "sdk.wait.cancelLabel": {
+    "en": "Cancel and return to bot",
+    "nl": "Annuleren en terug naar de bot",
+    "fr": "Annuler et revenir au bot",
+    "de": "Abbrechen und zurück zum Bot",
+    "es": "Cancelar y volver al bot"
+  },
+  "sdk.wait.connecting": {
+    "en": "Connecting you to an agent...",
+    "nl": "We verbinden je met een medewerker...",
+    "fr": "Mise en contact avec un agent...",
+    "de": "Wir verbinden dich mit einer Ansprechperson...",
+    "es": "Te estamos conectando con un agente..."
+  },
+  "sdk.wait.department": {
+    "en": "Department: {name}",
+    "nl": "Afdeling: {name}",
+    "fr": "Service : {name}",
+    "de": "Abteilung: {name}",
+    "es": "Departamento: {name}"
+  },
+  "sdk.wait.estimated": {
+    "en": "Estimated wait time:",
+    "nl": "Geschatte wachttijd:",
+    "fr": "Temps d'attente estimé :",
+    "de": "Geschätzte Wartezeit:",
+    "es": "Tiempo de espera estimado:"
+  },
+  "sdk.wait.found": {
+    "en": "Agent Found",
+    "nl": "Medewerker gevonden",
+    "fr": "Agent trouvé",
+    "de": "Ansprechperson gefunden",
+    "es": "Agente encontrado"
+  },
+  "sdk.wait.hours.one": {
+    "en": "{n} hour",
+    "nl": "{n} uur",
+    "fr": "{n} heure",
+    "de": "{n} Stunde",
+    "es": "{n} hora"
+  },
+  "sdk.wait.hours.other": {
+    "en": "{n} hours",
+    "nl": "{n} uur",
+    "fr": "{n} heures",
+    "de": "{n} Stunden",
+    "es": "{n} horas"
+  },
+  "sdk.wait.inQueue.one": {
+    "en": "{n} person in queue",
+    "nl": "{n} persoon in de wachtrij",
+    "fr": "{n} personne dans la file",
+    "de": "{n} Person in der Warteschlange",
+    "es": "{n} persona en la cola"
+  },
+  "sdk.wait.inQueue.other": {
+    "en": "{n} people in queue",
+    "nl": "{n} mensen in de wachtrij",
+    "fr": "{n} personnes dans la file",
+    "de": "{n} Personen in der Warteschlange",
+    "es": "{n} personas en la cola"
+  },
+  "sdk.wait.label": {
+    "en": "Waiting for agent",
+    "nl": "Wachten op een medewerker",
+    "fr": "En attente d'un agent",
+    "de": "Warten auf eine Ansprechperson",
+    "es": "Esperando a un agente"
+  },
+  "sdk.wait.message": {
+    "en": "Please wait while we connect you with an agent...",
+    "nl": "Even geduld, we verbinden je met een medewerker...",
+    "fr": "Veuillez patienter, nous vous mettons en contact avec un agent...",
+    "de": "Einen Moment, wir verbinden dich mit einer Ansprechperson...",
+    "es": "Espera un momento, te estamos poniendo en contacto con un agente..."
+  },
+  "sdk.wait.minutes.one": {
+    "en": "{n} minute",
+    "nl": "{n} minuut",
+    "fr": "{n} minute",
+    "de": "{n} Minute",
+    "es": "{n} minuto"
+  },
+  "sdk.wait.minutes.other": {
+    "en": "{n} minutes",
+    "nl": "{n} minuten",
+    "fr": "{n} minutes",
+    "de": "{n} Minuten",
+    "es": "{n} minutos"
+  },
+  "sdk.wait.position": {
+    "en": "Your position in queue:",
+    "nl": "Je plek in de wachtrij:",
+    "fr": "Votre position dans la file :",
+    "de": "Dein Platz in der Warteschlange:",
+    "es": "Tu posición en la cola:"
+  },
+  "sdk.wait.title": {
+    "en": "Connecting to Agent",
+    "nl": "Verbinden met een medewerker",
+    "fr": "Mise en contact avec un agent",
+    "de": "Verbindung mit einer Ansprechperson",
+    "es": "Conectando con un agente"
+  },
+  "sdk.wait.underMinute": {
+    "en": "Less than a minute",
+    "nl": "Minder dan een minuut",
+    "fr": "Moins d'une minute",
+    "de": "Weniger als eine Minute",
+    "es": "Menos de un minuto"
+  },
+  "sdk.waiting.busy": {
+    "en": "Everyone's busy right now.",
+    "nl": "Iedereen is nu bezig.",
+    "fr": "Tout le monde est occupé pour le moment.",
+    "de": "Gerade sind alle beschäftigt.",
+    "es": "Ahora mismo todos están ocupados."
+  },
+  "sdk.waiting.leaveEmail": {
+    "en": "Leave your email and they will reply.",
+    "nl": "Laat je e-mailadres achter, dan antwoorden ze.",
+    "fr": "Laissez votre adresse e-mail et ils vous répondront.",
+    "de": "Hinterlasse deine E-Mail-Adresse, dann antworten sie dir.",
+    "es": "Deja tu correo y te responderán."
+  },
+  "sdk.waiting.offline": {
+    "en": "The team is offline right now.",
+    "nl": "Het team is nu offline.",
+    "fr": "L'équipe est hors ligne pour le moment.",
+    "de": "Das Team ist gerade offline.",
+    "es": "El equipo no está conectado ahora mismo."
+  },
+  "sdk.waiting.offlineBack": {
+    "en": "The team is offline right now, back around {when}.",
+    "nl": "Het team is nu offline, terug rond {when}.",
+    "fr": "L'équipe est hors ligne pour le moment, de retour vers {when}.",
+    "de": "Das Team ist gerade offline, wieder da gegen {when}.",
+    "es": "El equipo no está conectado ahora mismo, vuelve hacia {when}."
+  },
+  "sdk.waiting.replyTo": {
+    "en": "They'll reply to {email}.",
+    "nl": "Ze antwoorden naar {email}.",
+    "fr": "Ils vous répondront à {email}.",
+    "de": "Sie antworten an {email}.",
+    "es": "Te responderán a {email}."
+  }
+}
