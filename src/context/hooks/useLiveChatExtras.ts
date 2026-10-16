@@ -24,6 +24,8 @@ import {
   type ReceiptMarks,
 } from '../../core/liveChat';
 import { deduplicateMessages, trimMessages } from '../types';
+import { blockedText, endedSinceLastLive } from '../../core/liveEvents';
+import type { TranscriptEmailResult } from '../../core/emailTranscript';
 import { buildHandoverTimeoutPayload, waitMinutesOf } from '../../core/handoverPayload';
 
 export const QUEUE_POLL_MS = 20000;
@@ -40,9 +42,11 @@ interface Params {
   continueFlow?: () => void;
   /** The waiting handover step's data and the bot's workspace, for its max wait. */
   handoverWait?: () => { data: Record<string, any> | undefined; workspaceId: string };
+  /** "Email me this chat": the server's transcript email (services/api.ts). */
+  postTranscriptEmail?: (chatSessionId: string, email: string) => Promise<TranscriptEmailResult>;
 }
 
-export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow, handoverWait }: Params) {
+export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow, handoverWait, postTranscriptEmail }: Params) {
   const [queue, setQueue] = useState<QueueStatus | null>(null);
   const [waiting, setWaiting] = useState<HandoverWaiting | null>(null);
   const [noAgents, setNoAgents] = useState(false);
@@ -59,6 +63,11 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
   const [leftMessageTo, setLeftMessageTo] = useState<string | null>(null);
   const [leadEmail, setLeadEmail] = useState<string | null>(null);
   const [csatSent, setCsatSent] = useState(false);
+  // The workspace blocked this visitor: the closed line (core/liveEvents.ts).
+  const [blocked, setBlocked] = useState<string | null>(null);
+  // "Email me this chat": the card is up, and where it went once sent.
+  const [mailOpen, setMailOpen] = useState(false);
+  const [mailSentTo, setMailSentTo] = useState<string | null>(null);
   const reported = useRef({ delivered: '', seen: '' });
 
   const sid = () => socketClient.current?.chatSessionId || chatStateRef.current?.sessionId || '';
@@ -128,11 +137,28 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     socket.on('agent-read-status', (data: any) => {
       if (own(data)) setReceiptMarks(receiptMarksOf(data));
     });
-    socket.on('chat-ended', () => {
+    socket.on('chat-ended', (data: any) => {
+      if (!own(data)) return;
+      // The same end again: one survey, not two (core/liveEvents.ts).
+      if (endedSinceLastLive(chatStateRef.current?.getRecord?.() || [])) return;
       setQueue(null);
       setLockedBy(null);
       setFileRequestedBy(null);
       setCsatOpen(true);
+    });
+    // Blocked by the workspace, mid-chat or at the handshake (web
+    // _applyVisitorBlock): the chat closes with a neutral line, whatever
+    // was waiting goes, and nothing more is taken.
+    socket.on('visitor-blocked', (data: any) => {
+      if (!own(data)) return;
+      setBlocked(blockedText(data));
+      setQueue(null);
+      setWaiting(null);
+      setNoAgents(false);
+      setLeadCardOpen(false);
+      setFileRequestedBy(null);
+      setCsatOpen(false);
+      setMailOpen(false);
     });
     socket.on('agent-message', (data: any) => {
       // Buying intent and no email yet: the one-field follow-up card.
@@ -248,6 +274,36 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     setCsatSent(true);
   }, [csatConfig]);
 
+  /** "Email me this chat" from the menu: the card, once at a time (web mountEmailTranscript). */
+  const openEmailTranscript = useCallback(() => {
+    setMailSentTo(null);
+    setMailOpen(true);
+  }, []);
+  const closeEmailTranscript = useCallback(() => setMailOpen(false), []);
+
+  /**
+   * Send the transcript to this address. Sent: the address is kept as the
+   * visitor's (user metadata, the email answer) and the record goes, as the
+   * web's rememberEmail does.
+   */
+  const emailTranscript = useCallback(
+    async (email: string): Promise<TranscriptEmailResult> => {
+      const id = sid();
+      if (!id || !postTranscriptEmail) return { ok: false };
+      const r = await postTranscriptEmail(id, email.trim());
+      if (!r?.ok) return r || { ok: false };
+      const state = chatStateRef.current;
+      if (state) {
+        state.setUserMetadata?.({ email: email.trim() });
+        state.setAnswer?.('email-transcript', 'email', email.trim());
+        sendRecord();
+      }
+      setMailSentTo(email.trim());
+      return r;
+    },
+    [postTranscriptEmail, sendRecord]
+  );
+
   const dismissCsat = useCallback(() => setCsatOpen(false), []);
   const dismissFileRequest = useCallback(() => setFileRequestedBy(null), []);
 
@@ -265,6 +321,9 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     setLeftMessageTo(null);
     setLeadEmail(null);
     setCsatSent(false);
+    setBlocked(null);
+    setMailOpen(false);
+    setMailSentTo(null);
     reported.current = { delivered: '', seen: '' };
   }, []);
 
@@ -283,6 +342,12 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     leftMessageTo,
     leadEmail,
     csatSent,
+    blocked,
+    mailOpen,
+    mailSentTo,
+    openEmailTranscript,
+    closeEmailTranscript,
+    emailTranscript,
     setChatbotData,
     setupLiveChatListeners,
     leaveMessage,
