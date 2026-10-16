@@ -5,20 +5,33 @@
  * action's result card, an action to confirm, and "Helpful?". Each piece is
  * drawn only when the reply carries it (core/agentBot.ts cleans them).
  */
-import React, { useContext, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
+import React, { useContext, useEffect, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
-import { answerFeedbackOn, conversionEventOf, sourceHost } from '../../core/agentBot';
+import { answerFeedbackOn, conversionEventOf, isAIAgentDetails, sourceHost } from '../../core/agentBot';
+import { talkToPersonAllowed } from '../../core/handoverState';
+import {
+  FEEDBACK_REASONS,
+  HELPFUL_TEXT,
+  THANKS_MS,
+  helpfulStart,
+  helpfulStep,
+  ratedLabel,
+  type HelpfulTap,
+} from '../../core/answerFeedback';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
-const REASONS = [
-  ['wrong', 'Wrong'],
-  ['outdated', 'Outdated'],
-  ['unanswered', "Didn't answer"],
-  ['other', 'Other'],
-] as const;
+/** The newest AI answer that can be rated: only it asks (web: an older unrated one steps aside). */
+const newestRateableId = (record: any[]): string | null => {
+  for (let i = (record || []).length - 1; i >= 0; i--) {
+    const r = record[i];
+    const id = String(r?._id || r?.id || '');
+    if (r?.type === 'agent-message' && isAIAgentDetails(r?.agentDetails) && !r?.isFallback && OBJECT_ID.test(id)) return id;
+  }
+  return null;
+};
 
 export interface AgentReplyExtrasProps {
   message: any;
@@ -33,11 +46,14 @@ export const AgentReplyExtras: React.FC<AgentReplyExtrasProps> = ({ message, tes
 
   const sources = Array.isArray(message.sources) ? message.sources : [];
   const actions = Array.isArray(message.actions) ? message.actions : [];
+  const answerId = String(message._id || message.id || '');
   const showHelpful =
     !message.isFallback &&
-    OBJECT_ID.test(String(message._id || message.id || '')) &&
+    OBJECT_ID.test(answerId) &&
     answerFeedbackOn(ctx?.serverCustomizations) &&
-    !!ctx?.sendAnswerFeedback;
+    !!ctx?.sendAnswerFeedback &&
+    // Rated answers keep their line; only the newest unrated one asks.
+    (!!message.feedback || newestRateableId(ctx?.record || []) === answerId);
 
   if (!sources.length && !actions.length && !message.card && !message.resultCard && !message.actionRequest && !showHelpful) return null;
 
@@ -83,7 +99,15 @@ export const AgentReplyExtras: React.FC<AgentReplyExtrasProps> = ({ message, tes
         </View>
       )}
 
-      {showHelpful && <Helpful message={message} styles={styles} send={ctx.sendAnswerFeedback} />}
+      {showHelpful && (
+        <Helpful
+          message={message}
+          styles={styles}
+          send={ctx.sendAnswerFeedback}
+          // "Talk to a person" only while nobody is coming or here (web offerHuman).
+          askAsVisitor={talkToPersonAllowed(ctx?.record || []) && ctx?.sendMessage ? (text) => ctx.sendMessage(text) : undefined}
+        />
+      )}
     </View>
   );
 };
@@ -167,34 +191,120 @@ const ActionCard = ({ request, styles, theme, decide }) => {
   );
 };
 
-const Helpful = ({ message, styles, send }) => {
-  const given = message.feedback;
-  const [askWhy, setAskWhy] = useState(false);
+/**
+ * "Helpful?" (core/answerFeedback.ts, web answerFeedback.ts): a vote goes
+ * the moment it is given - a No too, before any reason - then the reasons,
+ * an optional comment, "Talk to a person" and "Ask another way". The rated
+ * line's thumbs change the vote.
+ */
+const Helpful = ({ message, styles, send, askAsVisitor }) => {
   const id = String(message._id || message.id);
-  if (given) {
-    return <Text style={styles.thanks}>{given.helpful ? 'Thanks, glad it helped' : 'Thanks for telling us'}</Text>;
-  }
-  if (askWhy) {
+  const [state, setState] = useState(() => helpfulStart(message.feedback));
+  const [comment, setComment] = useState('');
+  const tap = (t: HelpfulTap) => {
+    const r = helpfulStep(state, t);
+    if (r.send) send(id, r.send);
+    if (r.ask) askAsVisitor?.(r.ask);
+    setState(r.state);
+  };
+  // "Thanks for letting us know!", then the quiet rated line.
+  useEffect(() => {
+    if (state.view !== 'thanks') return;
+    const t = setTimeout(() => setState((s) => helpfulStep(s, { kind: 'settle' }).state), THANKS_MS);
+    return () => clearTimeout(t);
+  }, [state.view]);
+
+  const thumb = (helpful: boolean, pressed = false) => (
+    <TouchableOpacity
+      key={helpful ? 'up' : 'down'}
+      style={[styles.thumb, pressed && styles.thumbPressed]}
+      onPress={() => tap({ kind: 'vote', helpful })}
+      accessibilityRole="button"
+      accessibilityState={{ selected: pressed }}
+      accessibilityLabel={state.view === 'rated' ? (helpful ? HELPFUL_TEXT.ratedUp : HELPFUL_TEXT.ratedDown) : helpful ? HELPFUL_TEXT.yes : HELPFUL_TEXT.no}
+      testID={`cb-helpful-${helpful ? 'up' : 'down'}`}
+    >
+      <Text style={[styles.thumbGlyph, !pressed && state.view === 'rated' && styles.thumbIdle]}>{helpful ? '\u{1F44D}' : '\u{1F44E}'}</Text>
+    </TouchableOpacity>
+  );
+
+  if (state.view === 'thanks') return <Text style={styles.thanks}>{HELPFUL_TEXT.thanks}</Text>;
+
+  if (state.view === 'rated') {
     return (
-      <View style={styles.reasons}>
-        <Text style={styles.helpfulLabel}>What was wrong?</Text>
-        {REASONS.map(([key, label]) => (
-          <TouchableOpacity key={key} style={styles.reason} onPress={() => send(id, { helpful: false, reason: key })} accessibilityRole="button">
-            <Text style={styles.reasonText}>{label}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.helpful} accessibilityLabel={HELPFUL_TEXT.groupLabel} testID="cb-helpful-rated">
+        {thumb(true, state.current?.helpful === true)}
+        {thumb(false, state.current?.helpful === false)}
+        <Text style={styles.helpfulLabel}>{ratedLabel(state.current)}</Text>
       </View>
     );
   }
+
+  if (state.view === 'down') {
+    const reason = state.current?.reason;
+    return (
+      <View style={styles.downWrap} accessibilityLabel={HELPFUL_TEXT.groupLabel} testID="cb-helpful-down">
+        <Text style={styles.helpfulLabel}>{HELPFUL_TEXT.sorry}</Text>
+        <View style={styles.reasons} accessibilityRole="radiogroup" accessibilityLabel={HELPFUL_TEXT.whatWentWrong}>
+          {FEEDBACK_REASONS.map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.reason, reason === key && styles.reasonOn]}
+              onPress={() => tap({ kind: 'reason', reason: key })}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: reason === key }}
+              testID={`cb-helpful-reason-${key}`}
+            >
+              <Text style={[styles.reasonText, reason === key && styles.reasonTextOn]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {state.commented ? (
+          <Text style={styles.thanks}>{HELPFUL_TEXT.thanksComment}</Text>
+        ) : reason ? (
+          <View style={styles.noteRow}>
+            <TextInput
+              value={comment}
+              onChangeText={setComment}
+              placeholder={HELPFUL_TEXT.comment}
+              accessibilityLabel={HELPFUL_TEXT.comment}
+              maxLength={500}
+              autoFocus
+              returnKeyType="send"
+              onSubmitEditing={() => tap({ kind: 'comment', text: comment })}
+              style={styles.noteInput}
+              testID="cb-helpful-comment"
+            />
+            <TouchableOpacity
+              style={styles.noteSend}
+              onPress={() => tap({ kind: 'comment', text: comment })}
+              accessibilityRole="button"
+              accessibilityLabel={HELPFUL_TEXT.sendFeedback}
+              testID="cb-helpful-send"
+            >
+              <Text style={styles.noteSendText}>{'\u2192'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        <View style={styles.reasons}>
+          {askAsVisitor ? (
+            <TouchableOpacity style={styles.reason} onPress={() => tap({ kind: 'human' })} accessibilityRole="button" testID="cb-helpful-human">
+              <Text style={styles.reasonText}>{HELPFUL_TEXT.talkToPerson}</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={styles.reason} onPress={() => tap({ kind: 'retry' })} accessibilityRole="button" testID="cb-helpful-retry">
+            <Text style={styles.reasonText}>{HELPFUL_TEXT.retry}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.helpful}>
-      <Text style={styles.helpfulLabel}>Helpful?</Text>
-      <TouchableOpacity style={styles.reason} onPress={() => send(id, { helpful: true })} accessibilityRole="button" accessibilityLabel="Helpful">
-        <Text style={styles.reasonText}>Yes</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.reason} onPress={() => setAskWhy(true)} accessibilityRole="button" accessibilityLabel="Not helpful">
-        <Text style={styles.reasonText}>No</Text>
-      </TouchableOpacity>
+    <View style={styles.helpful} accessibilityLabel={HELPFUL_TEXT.groupLabel} testID="cb-helpful-ask">
+      <Text style={styles.helpfulLabel}>{HELPFUL_TEXT.ask}</Text>
+      {thumb(true)}
+      {thumb(false)}
     </View>
   );
 };
@@ -279,5 +389,26 @@ const createStyles = (theme) =>
       borderColor: theme.colors.border,
     },
     reasonText: { fontSize: theme.typography.fontSize.xs, color: theme.colors.text },
+    reasonOn: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+    reasonTextOn: { color: theme.colors.textInverse },
+    downWrap: { gap: 6 },
+    thumb: { paddingVertical: 3, paddingHorizontal: 6, borderRadius: theme.borderRadius.full },
+    thumbPressed: { backgroundColor: theme.colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
+    thumbGlyph: { fontSize: theme.typography.fontSize.sm },
+    thumbIdle: { opacity: 0.45 },
+    noteRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    noteInput: {
+      flex: 1,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
+    },
+    noteSend: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.primary },
+    noteSendText: { color: theme.colors.textInverse, fontWeight: '700', fontSize: theme.typography.fontSize.sm },
     thanks: { fontSize: theme.typography.fontSize.xs, color: theme.colors.textSecondary },
   });
