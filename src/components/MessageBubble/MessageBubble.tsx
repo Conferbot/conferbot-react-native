@@ -27,6 +27,7 @@ import { HANDED_OVER_NOTE, handoverLineText, isHandoverOutcome } from '../../cor
 import { MessageStatus } from '../../types/messageStatus';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Agent, Reaction, ReactionEmoji } from '../../types';
+import { t, widgetLanguage } from '../../core/i18n';
 
 /**
  * MessageBubble Props
@@ -264,9 +265,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     const d = typeof date === 'string' ? new Date(date) : date;
     const hours = d.getHours();
     const minutes = d.getMinutes();
+    const minuteStr = minutes < 10 ? `0${minutes}` : minutes;
+    // English keeps "10:30 AM"; nl, fr, de and es write the 24-hour clock.
+    if (widgetLanguage() !== 'en') return `${hours < 10 ? `0${hours}` : hours}:${minuteStr}`;
     const ampm = hours >= 12 ? 'PM' : 'AM';
     const hour12 = hours % 12 || 12;
-    const minuteStr = minutes < 10 ? `0${minutes}` : minutes;
     return `${hour12}:${minuteStr} ${ampm}`;
   };
 
@@ -292,7 +295,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const messageText = isHandoverLine
     ? handoverLineText((message as any).settled)
     : isDeleted
-    ? 'This message was deleted'
+    ? t('message.removed')
     : translation && showOriginal
       ? translation.original
       : 'text' in message
@@ -374,7 +377,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         <Text
           style={[styles.messageText, { color: textColor }]}
           accessible={true}
-          accessibilityLabel={`Message: ${messageText}`}
+          accessibilityLabel={t('sdk.bubble.label', { text: messageText })}
           accessibilityRole="text"
         >
           {segments.map((segment, index) => {
@@ -385,7 +388,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   style={[styles.linkText, { color: isUser ? '#FFFFFF' : theme.colors.link }]}
                   onPress={() => handleLinkPress(segment.url!)}
                   accessibilityRole="link"
-                  accessibilityHint={`Opens ${segment.content} in browser`}
+                  accessibilityHint={t('sdk.bubble.opensLink', { url: segment.content })}
                 >
                   {segment.content}
                 </Text>
@@ -440,7 +443,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         <View style={styles.avatarContainer}>
           <Avatar
             source={agentDetails && !agentDetails.isAIAgent ? agentDetails.avatar : agentDetails?.avatar || look?.avatar || botAvatarUrl || undefined}
-            name={agentDetails?.name || botName || 'Bot'}
+            name={agentDetails?.name || botName || t('transcript.bot')}
             size={look ? look.avatarSize : theme.layout.avatarSize}
             shape={look?.avatarShape}
           />
@@ -477,7 +480,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Text
                 style={[styles.messageText, { color: textColor }, isDeleted && { fontStyle: 'italic', opacity: 0.7 }]}
                 accessible={true}
-                accessibilityLabel={`Message: ${messageText}`}
+                accessibilityLabel={t('sdk.bubble.label', { text: messageText })}
                 accessibilityRole="text"
               >
                 {messageText}
@@ -496,7 +499,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {systemNote ? (
             <Text style={[styles.timestamp, { color: textColor, opacity: 0.7, marginTop: 2, textAlign: 'center' }]}>{systemNote}</Text>
           ) : null}
-          {isEdited ? <Text style={[styles.timestamp, { color: textColor, opacity: 0.6, marginTop: 2 }]}>Edited</Text> : null}
+          {isEdited ? <Text style={[styles.timestamp, { color: textColor, opacity: 0.6, marginTop: 2 }]}>{t('message.edited')}</Text> : null}
           {translation ? (
             <TouchableOpacity onPress={() => setShowOriginal((v) => !v)} accessibilityRole="button" hitSlop={{ top: 6, bottom: 6 }}>
               <Text style={[styles.timestamp, { color: textColor, opacity: 0.7, marginTop: 4, textDecorationLine: 'underline' }]}>
@@ -569,8 +572,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           testID={testID}
           delayLongPress={300}
           accessible={true}
-          accessibilityLabel={`Message${canReact ? ', long press to react' : ''}`}
-          accessibilityHint={canReact ? 'Long press to add a reaction' : undefined}
+          accessibilityLabel={canReact ? t('sdk.bubble.messageReact') : t('sdk.bubble.message')}
+          accessibilityHint={canReact ? t('sdk.bubble.reactHint') : undefined}
         >
           {bubbleContent}
         </TouchableOpacity>
