@@ -71,6 +71,24 @@ export interface RichEntry {
 }
 
 export const DEFAULT_AGENT_NAME = 'AI Assistant';
+/**
+ * How long the "writing a reply" dots may wait for the AI (web
+ * agentListeners.ts AWAITING_REPLY_MAX_MS): the AI path stays silent when
+ * the provider fails twice, so without a ceiling they would run forever.
+ */
+export const AWAIT_REPLY_MS = 45000;
+
+/** Said when that ceiling is hit, so the dots do not just vanish (web chat.replyTimeout). */
+export const REPLY_TIMEOUT_TEXT = 'That took too long. Try again, or ask for a human.';
+
+/** The notice as an on-screen line (not part of the conversation's record, as on the web). */
+export const replyTimeoutNotice = (now: number = Date.now()) => ({
+  _id: `reply-timeout-${now}`,
+  type: 'system-message' as const,
+  text: REPLY_TIMEOUT_TEXT,
+  time: new Date(now).toISOString(),
+});
+
 export const DEFAULT_AGENT_GREETING = 'Hi! How can I help you today?';
 export const MAX_AGENT_SOURCES = 3;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
