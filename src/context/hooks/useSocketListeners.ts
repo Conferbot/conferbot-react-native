@@ -9,6 +9,7 @@ import { stripHtml, deduplicateMessages, trimMessages } from '../types';
 import { parseAgentBot, type AgentBot } from '../../core/agentBot';
 import { htmlToMarkdown } from '../../utils/chatMarkdown';
 import { agentTranslationOf } from '../../core/liveChat';
+import { endedSinceLastLive, liveEventId } from '../../core/liveEvents';
 import type { HandoverLifecycle } from './useHandoverLifecycle';
 
 interface UseSocketListenersParams {
@@ -430,8 +431,14 @@ export function useSocketListeners({
 
     // *** CHAT ENDED *** //
     socketClient.current.on(SocketEvents.CHAT_ENDED, (data: any) => {
+      const ownSessionId = socketClient.current?.chatSessionId || sessionRef.current;
+      if (data?.chatSessionId && ownSessionId && data.chatSessionId !== ownSessionId) return;
+      // The same end again (an agent's double click, an AI close racing a
+      // person's): one "Chat ended" line, not two (web endedSinceLastLive).
+      if (endedSinceLastLive(chatStateRef.current?.getRecord() || handover.recordRef.current)) return;
+      const endedId = liveEventId('agent-chat-ended');
       const endedRecord: RecordItem = {
-        _id: `chat-ended-${Date.now()}`,
+        _id: endedId,
         type: 'agent-chat-ended',
         text: 'Chat has ended',
         time: new Date().toISOString(),
@@ -440,8 +447,10 @@ export function useSocketListeners({
       setRecord((prev) => deduplicateMessages(trimMessages([...prev, endedRecord])));
 
       if (chatStateRef.current) {
+        // Its own id: under the session id a second live chat's end merged
+        // into the first one's entry (web agentListeners.ts).
         chatStateRef.current.addRecord({
-          id: data?.chatSessionId || `chat-ended-${Date.now()}`,
+          id: endedId,
           type: 'agent-chat-ended',
           time: new Date().toISOString(),
         });
