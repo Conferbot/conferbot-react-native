@@ -18,6 +18,7 @@ import {
   Platform,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t, tPlural } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import type { KBArticle, KBCategoryWithArticles, KBScreenType } from './types';
 import { KBProvider, useKB } from './KBContext';
@@ -80,14 +81,15 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
   loading = false,
   error = null,
   onRetry,
-  retryButtonText = 'Retry',
+  retryButtonText: retryButtonTextProp,
   noResultsMessage,
   accessibilityLabel,
   testID,
 }) => {
+  const retryButtonText = retryButtonTextProp ?? t('common.tryAgain');
   const theme = useTheme();
   const styles = createStyles(theme);
-  const screenTitle = title ?? headerTitle ?? 'Help Center';
+  const screenTitle = title ?? headerTitle ?? t('home.helpCentre');
   const childID = (suffix: string): string | undefined =>
     testID ? `${testID}-${suffix}` : undefined;
 
@@ -286,7 +288,7 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
             onPress={handleBack}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessible={true}
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.back')}
             accessibilityRole="button"
             testID={childID('back')}
           >
@@ -304,7 +306,7 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
             onPress={onClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessible={true}
-            accessibilityLabel="Close knowledge base"
+            accessibilityLabel={t('common.close')}
             accessibilityRole="button"
             testID={childID('close')}
           >
@@ -333,7 +335,7 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
             value={searchQuery}
             onSearch={handleSearch}
             onClear={handleClearSearch}
-            placeholder="Search articles..."
+            placeholder={t('kb.searchPlaceholder')}
             testID={childID('search')}
           />
         </View>
@@ -353,8 +355,8 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
       {isSearchActive && (
         <Text style={styles.searchResultsTitle}>
           {searchResults.length > 0
-            ? `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''} found`
-            : noResultsMessage || 'No results found'}
+            ? tPlural('kb.results', searchResults.length)
+            : noResultsMessage || t('kb.noResults')}
         </Text>
       )}
 
@@ -370,11 +372,11 @@ const KnowledgeBaseScreenContent: React.FC<KnowledgeBaseScreenProps> = ({
         category={!isSearchActive ? selectedCategory : null}
         showCategoryHeader={Boolean(selectedCategory) && !isSearchActive}
         onArticlePress={handleArticlePress}
-        emptyTitle="No articles found"
+        emptyTitle={isSearchActive ? t('kb.noResults') : t('kb.noArticles')}
         emptyMessage={
           isSearchActive
-            ? noResultsMessage || 'Try different keywords or browse categories below.'
-            : 'Knowledge base articles will appear here.'
+            ? noResultsMessage || t('kb.noResultsSub')
+            : t('kb.noArticlesSub')
         }
         testID={childID('articles')}
       />
@@ -581,7 +583,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
         onPress={onPress}
         activeOpacity={0.7}
         accessible={true}
-        accessibilityLabel={`${category.name} category, ${category.articles?.length || 0} articles`}
+        accessibilityLabel={`${category.name}, ${tPlural('kb.articles', category.articles?.length || 0)}`}
         accessibilityRole="button"
         testID={testID}
       >
