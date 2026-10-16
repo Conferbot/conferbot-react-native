@@ -24,6 +24,7 @@ import {
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 
 
 
@@ -157,7 +158,7 @@ export const ButtonGroup: React.FC<ButtonGroupProps> = ({
           onPress={handleMultiSubmit}
           disabled={selectedIds.size === 0 || isSubmitting}
           accessibilityRole="button"
-          accessibilityLabel={`Submit ${selectedIds.size} selected items`}
+          accessibilityLabel={t('sdk.select.submitCount', { n: selectedIds.size })}
         >
           <Text
             style={[
@@ -171,7 +172,7 @@ export const ButtonGroup: React.FC<ButtonGroupProps> = ({
               },
             ]}
           >
-            {isSubmitting ? 'Sending...' : `Submit (${selectedIds.size})`}
+            {isSubmitting ? t('common.sending') : t('sdk.select.submit', { n: selectedIds.size })}
           </Text>
         </TouchableOpacity>
       )}
@@ -496,7 +497,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
         decelerationRate="fast"
         contentContainerStyle={styles.carouselContent}
         accessibilityRole="list"
-        accessibilityLabel="Card carousel"
+        accessibilityLabel={t('sdk.select.carousel')}
       />
     </View>
   );
@@ -624,7 +625,7 @@ export const PictureChoiceGrid: React.FC<PictureChoiceGridProps> = ({
                 checked: isSelected,
                 disabled: isSubmitting,
               }}
-              accessibilityLabel={choice.label || 'Image option'}
+              accessibilityLabel={choice.label || t('sdk.select.imageOption')}
             >
               <Image
                 source={{ uri: choice.imageUrl }}
@@ -691,7 +692,7 @@ export const PictureChoiceGrid: React.FC<PictureChoiceGridProps> = ({
           onPress={handleMultiSubmit}
           disabled={selectedIds.size === 0 || isSubmitting}
           accessibilityRole="button"
-          accessibilityLabel={`Submit ${selectedIds.size} selected items`}
+          accessibilityLabel={t('sdk.select.submitCount', { n: selectedIds.size })}
         >
           <Text
             style={[
@@ -705,7 +706,7 @@ export const PictureChoiceGrid: React.FC<PictureChoiceGridProps> = ({
               },
             ]}
           >
-            {isSubmitting ? 'Sending...' : `Submit (${selectedIds.size})`}
+            {isSubmitting ? t('common.sending') : t('sdk.select.submit', { n: selectedIds.size })}
           </Text>
         </TouchableOpacity>
       )}
@@ -733,13 +734,14 @@ export const DropdownPicker: React.FC<DropdownPickerProps> = ({
   question,
   options,
   variableName,
-  placeholder = 'Select an option...',
+  placeholder: placeholderProp,
   searchable = false,
   multiSelect = false,
   onSubmit,
   testID,
 }) => {
   const theme = useTheme();
+  const placeholder = placeholderProp ?? t('sdk.select.placeholder');
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -925,7 +927,7 @@ export const DropdownPicker: React.FC<DropdownPickerProps> = ({
                       fontSize: theme.typography.fontSize.md,
                     },
                   ]}
-                  placeholder="Search..."
+                  placeholder={t('sdk.select.search')}
                   placeholderTextColor={theme.colors.textDisabled}
                   value={searchText}
                   onChangeText={setSearchText}
@@ -996,7 +998,7 @@ export const DropdownPicker: React.FC<DropdownPickerProps> = ({
                   onPress={handleMultiSubmit}
                   disabled={selectedIds.size === 0}
                   accessibilityRole="button"
-                  accessibilityLabel={`Submit ${selectedIds.size} selected items`}
+                  accessibilityLabel={t('sdk.select.submitCount', { n: selectedIds.size })}
                 >
                   <Text
                     style={[
@@ -1010,7 +1012,7 @@ export const DropdownPicker: React.FC<DropdownPickerProps> = ({
                       },
                     ]}
                   >
-                    Done ({selectedIds.size})
+                    {t('sdk.select.done', { n: selectedIds.size })}
                   </Text>
                 </TouchableOpacity>
               </View>
