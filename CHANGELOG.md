@@ -112,6 +112,7 @@ These only matter if you registered or subclassed handlers yourself. `registerAl
 - `isOnline`, `pendingMessageCount` and the retry actions are filled in; `isConnected` follows disconnects and reconnects (#80).
 - `config.reconnectionAttempts` and `config.reconnectionDelay` reach the socket; `enableOfflineMode` and `offlineQueueConfig` drive the offline queue (#81).
 - `import { SocketEvents }` works as a value (#82).
+- After a reconnect the visitor is back in the chat's room, so agent messages sent after a network blip arrive; a waiting visitor's queue position is asked again at once (#83).
 
 ### Security
 
