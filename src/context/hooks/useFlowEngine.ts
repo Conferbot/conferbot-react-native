@@ -51,6 +51,8 @@ interface UseFlowEngineParams {
   setRecord: React.Dispatch<React.SetStateAction<RecordItem[]>>;
   persistAnswerVariables: () => Promise<void>;
   persistFlowState: () => Promise<void>;
+  /** The flow reached its end: the conversation is over (the post-chat redirect). */
+  onConversationEnd?: () => void;
 }
 
 export function useFlowEngine({
@@ -63,6 +65,7 @@ export function useFlowEngine({
   setRecord,
   persistAnswerVariables,
   persistFlowState,
+  onConversationEnd,
 }: UseFlowEngineParams) {
   const [currentUIState, setCurrentUIState] = useState<NodeUIState | null>(null);
   const [isNodeProcessing, setIsNodeProcessing] = useState(false);
@@ -212,6 +215,7 @@ export function useFlowEngine({
             setCurrentUIState(null);
             setIsNodeProcessing(false);
             persistFlowState();
+            onConversationEnd?.();
           },
           onError: (error, nodeId) => {
             console.error('[ConferBot] Flow engine error:', error.message, { nodeId });
