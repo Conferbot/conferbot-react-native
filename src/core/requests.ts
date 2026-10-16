@@ -18,8 +18,10 @@
  * from any device. Only conversations a person on the team handles are
  * requests; a chat the AI answered alone is not one.
  *
- * English only for now (the web's i18n `requests.*`, `when.*` keys).
+ * The words are the web's i18n `requests.*`, `when.*` keys (ts/home/requests/words.ts).
  */
+
+import { t, localized, I18nKey, weekdayNames, monthNames, widgetLanguage, widgetLocale } from './i18n';
 
 // ------------------------------------------------------------ types
 
@@ -52,36 +54,53 @@ export type RequestState = 'replied' | 'waiting' | 'solved';
 
 // ------------------------------------------------------------ the words
 
-/** The web's English strings (i18n en `requests.*`, `common.*`, `transcript.you`). */
-export const REQUESTS_TEXT = {
-  title: 'Your requests',
-  one: 'Your request',
-  back: 'Back',
-  loading: 'Loading...',
-  loadFailed: "We couldn't load this just now.",
-  tryAgain: 'Try again',
-  empty: 'Nothing here yet. When you ask us something, you can follow it here.',
-  you: 'You',
-  supportTeam: 'Support team',
-  replyPlaceholder: 'Write your reply...',
-  reopenPlaceholder: 'Write here to open it again...',
-  yourReply: 'Your reply',
-  send: 'Send',
-  sending: 'Sending...',
-  notSent: 'Not sent.',
-  locked: 'This conversation is closed for replies.',
-  newReply: 'New reply',
-  newReplyFrom: (name: string) => `New reply from ${name}`,
-  seeAll: (n: number) => `See all (${n})`,
-  /** The chat menu's item (RN; the web has the home card instead). */
-  menu: (unread: number) => (unread > 0 ? `Your requests · ${REQUESTS_TEXT.newReply}` : REQUESTS_TEXT.title),
-} as const;
+/** The web's strings (i18n `requests.*`, `common.*`, `transcript.you`), in the active language. */
+export const REQUESTS_TEXT = Object.assign(
+  localized({
+    title: 'requests.title',
+    one: 'requests.one',
+    back: 'common.back',
+    loading: 'common.loading',
+    loadFailed: 'requests.loadFailed',
+    tryAgain: 'common.tryAgain',
+    empty: 'requests.empty',
+    you: 'transcript.you',
+    supportTeam: 'requests.supportTeam',
+    replyPlaceholder: 'requests.replyPlaceholder',
+    reopenPlaceholder: 'requests.reopenPlaceholder',
+    yourReply: 'requests.yourReply',
+    send: 'common.send',
+    sending: 'common.sending',
+    notSent: 'requests.notSent',
+    locked: 'requests.locked',
+    newReply: 'requests.newReply',
+  }),
+  {
+    newReplyFrom: (name: string): string => t('requests.newReplyFrom', { name }),
+    seeAll: (n: number): string => t('requests.seeAll', { n }),
+    /** The chat menu's item (RN; the web has the home card instead). */
+    menu: (unread: number): string =>
+      unread > 0 ? `${t('requests.title')} · ${t('requests.newReply')}` : t('requests.title'),
+  }
+);
 
-/** Each state in a few plain words, never a ticket status (web words.ts STATE_WORDS). */
+/** The short words on a row and the banner of an open request (web words.ts stateWords). */
+const stateWords = (s: RequestState) => ({
+  label: t(`requests.${s}.label` as I18nKey),
+  detail: t(`requests.${s}.detail` as I18nKey),
+});
+
+/** Each state in a few plain words, never a ticket status; read when drawn (web words.ts STATE_WORDS). */
 export const STATE_WORDS: Record<RequestState, { label: string; detail: string }> = {
-  replied: { label: 'We replied', detail: 'Read it below. If you need anything else, just write back.' },
-  waiting: { label: "We're on it", detail: "We'll reply right here. You can close this - your message is safe with us." },
-  solved: { label: 'Solved', detail: "Still need help with this? Write below and we'll pick it up again." },
+  get replied() {
+    return stateWords('replied');
+  },
+  get waiting() {
+    return stateWords('waiting');
+  },
+  get solved() {
+    return stateWords('solved');
+  },
 };
 
 const ms = (v?: string | number | null): number => {
@@ -100,22 +119,31 @@ export const stateOf = (r: RequestSummary): RequestState =>
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-/** "Just now", "5 min ago", "3 hours ago", "Yesterday", "Monday", "3 Oct" (web whenWords, English). */
+/** "Just now", "5 min ago", "3 hours ago", "Yesterday", "Monday", "3 Oct", in the active language (web words.ts whenWords). */
 export const whenWords = (v?: string | number | null, now = Date.now()): string => {
-  const t = ms(v);
-  if (!t) return '';
-  const diff = Math.max(0, now - t);
-  if (diff < 60 * 1000) return 'Just now';
-  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / 60000)} min ago`;
-  const d = new Date(t);
+  const at = ms(v);
+  if (!at) return '';
+  const diff = Math.max(0, now - at);
+  if (diff < 60 * 1000) return t('when.justNow');
+  if (diff < 60 * 60 * 1000) return t('when.minutesAgo', { n: Math.floor(diff / 60000) });
+  const d = new Date(at);
   const today = new Date(now);
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  if (t >= startOfToday) {
+  if (at >= startOfToday) {
     const h = Math.floor(diff / 3600000);
-    return h <= 1 ? '1 hour ago' : `${h} hours ago`;
+    return h <= 1 ? t('when.hourAgo') : t('when.hoursAgo', { n: h });
   }
-  if (t >= startOfToday - 86400000) return 'Yesterday';
-  if (t >= startOfToday - 6 * 86400000) return DAYS[d.getDay()];
+  if (at >= startOfToday - 86400000) return t('when.yesterday');
+  if (at >= startOfToday - 6 * 86400000) return weekdayNames('long', DAYS)[d.getDay()];
+  if (widgetLanguage() !== 'en') {
+    const year = d.getFullYear() !== today.getFullYear() ? ` ${d.getFullYear()}` : '';
+    try {
+      const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) };
+      return d.toLocaleDateString(widgetLocale(), opts);
+    } catch {
+      return `${d.getDate()} ${monthNames('short', MONTHS)[d.getMonth()]}${year}`;
+    }
+  }
   return `${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() !== today.getFullYear() ? ` ${d.getFullYear()}` : ''}`;
 };
 
