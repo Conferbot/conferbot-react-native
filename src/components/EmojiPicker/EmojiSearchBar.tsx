@@ -8,6 +8,7 @@ import {
   Text,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 
 export interface EmojiSearchBarProps {
@@ -20,9 +21,10 @@ export interface EmojiSearchBarProps {
 export const EmojiSearchBar: React.FC<EmojiSearchBarProps> = ({
   value,
   onChangeText,
-  placeholder = 'Search emojis...',
+  placeholder: placeholderProp,
   testID,
 }) => {
+  const placeholder = placeholderProp ?? t('sdk.emoji.placeholder');
   const theme = useTheme();
   const styles = createStyles(theme);
   const inputRef = useRef<TextInput>(null);
@@ -48,8 +50,8 @@ export const EmojiSearchBar: React.FC<EmojiSearchBarProps> = ({
         autoCorrect={false}
         returnKeyType="search"
         accessible={true}
-        accessibilityLabel="Search emojis"
-        accessibilityHint="Type to search for emojis"
+        accessibilityLabel={t('sdk.emoji.search')}
+        accessibilityHint={t('sdk.emoji.searchHint')}
         testID={`${testID}-input`}
       />
       {value.length > 0 && (
@@ -57,7 +59,7 @@ export const EmojiSearchBar: React.FC<EmojiSearchBarProps> = ({
           style={styles.clearButton}
           onPress={handleClear}
           accessible={true}
-          accessibilityLabel="Clear search"
+          accessibilityLabel={t('kb.clearSearch')}
           accessibilityRole="button"
           testID={`${testID}-clear`}
         >
