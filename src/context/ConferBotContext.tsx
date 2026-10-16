@@ -34,6 +34,11 @@ import { useHomeScreen } from './hooks/useHomeScreen';
 import { personalizeCustomizations, visitorVars } from '../core/personalize';
 import { asyncStorageFor } from '../utils/deviceStorage';
 import { useWaitingExtras, isScreenOnlyEntry, type WaitingExtras } from './hooks/useWaitingExtras';
+import { useChatSounds } from './hooks/useChatSounds';
+import { useDelight } from './hooks/useDelight';
+import { useChatFontLoader } from '../hooks/useChatFont';
+import { createDraftSender, draftPreviewOn, isSensitiveField } from '../core/typingPreview';
+import { handoverPhase } from '../core/handoverState';
 
 // ********** Context Creation ********** //
 const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
@@ -297,6 +302,55 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       requestsRef.current?.refreshRequests();
     },
   });
+
+  // ********** The chat's font ********** //
+  // The owner's font, else the theme's, fetched and registered at run time
+  // with expo-font when the app has it (core/ownerFont.ts).
+  const chatFont = useChatFontLoader(themedCustomizations, widgetTheme);
+
+  // ********** Sounds ********** //
+  // A message arriving, the chat opening and closing, the visitor sending
+  // (core/messageSound.ts; web ts/chat/messageSound.ts).
+  const sounds = useChatSounds({
+    customizations: themedCustomizations,
+    record,
+    isOpen,
+    isRestoring,
+    storage: config?.enablePersistence === false ? null : asyncStorageFor(config),
+  });
+
+  // ********** Human touches ********** //
+  // The bot's tapback, the celebration, the waiting nudge and "Edit" on
+  // the latest answer (core/delight.ts; web ts/chat/delight/).
+  const delight = useDelight({
+    customizations: themedCustomizations,
+    record,
+    setRecord,
+    flowEngine: flowEngineRef,
+    currentUIState,
+    isNodeProcessing,
+    chatVisible: isOpen && home.view === 'chat',
+    locked: isLiveChatMode || handoverPhase(chatStateRef.current?.getRecord?.() || []) !== 'none',
+  });
+
+  // ********** Typing preview ********** //
+  // While a person chats with the visitor, the agent sees the draft
+  // (core/typingPreview.ts; web index.ts updateVisitorDraft).
+  const draftSender = useRef(
+    createDraftSender((draft) => {
+      const sid = socketClient.current?.chatSessionId || chatStateRef.current?.sessionId;
+      if (sid && socketClient.current?.isConnected()) socketClient.current.emitToServer('visitor-draft', { chatSessionId: sid, draft });
+    })
+  ).current;
+  const chattingWithPerson = isLiveChatMode && !!currentAgent && currentAgent.isAIAgent !== true;
+  const updateVisitorDraft = useCallback(
+    (text: string, field?: { secureTextEntry?: boolean; textContentType?: string; autoComplete?: string }) => {
+      delight.setComposerValue(text);
+      if (draftPreviewOn(themedCustomizations, chattingWithPerson) && !isSensitiveField(field)) draftSender.update(text);
+      else draftSender.clear();
+    },
+    [themedCustomizations, chattingWithPerson]
+  );
 
   // ********** Read Receipts Hook ********** //
   const readReceiptConfig: ReadReceiptConfig = {
@@ -813,6 +867,23 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     homeMemory: home.memory,
     knowledgeBase: home.knowledgeBase,
     searchArticleText: home.searchArticleText,
+    // The chat's font (core/ownerFont.ts)
+    chatFont,
+    // Sounds (core/messageSound.ts)
+    soundOn: sounds.soundOn,
+    hasSounds: sounds.hasSounds,
+    toggleSound: sounds.toggleSound,
+    playSendSound: sounds.playSendSound,
+    // Human touches (core/delight.ts)
+    answerTouches: delight.touches,
+    changeAnswerRowId: delight.changeRowId,
+    changeAnswer: delight.changeAnswer,
+    stallHint: delight.stallHint,
+    noteChatActivity: delight.noteActivity,
+    clearAnswerTouch: delight.clearTouch,
+    // Typing preview (core/typingPreview.ts)
+    updateVisitorDraft,
+    clearVisitorDraft: () => draftSender.clear(),
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
