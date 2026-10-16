@@ -11,13 +11,16 @@
 //   box's centre in the stage, on a motion path)
 //   v holds only the channels away from rest (tx 0, sx 1, o 1...), to 4 decimals;
 //   tracks are as the web wrote them; iterations -1 = Infinity.
+//   A case with `css` is played as a CSS animation of the web's own
+//   @keyframes text (paused, its delay moved to each sample time); one with
+//   `matrix` reads its transform back as the matrix (ma, mb, mc, md, me, mf).
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
 const { GEOMETRY, LEFT, SEED, cases } = require('./cases');
 
 const all = cases();
-const REST = { tx: 0, ty: 0, txp: 0, typ: 0, sx: 1, sy: 1, r: 0, rx: 0, ry: 0, o: 1, od: 0, dash: 0, clip: 0, left: 0 };
+const REST = { tx: 0, ty: 0, txp: 0, typ: 0, sx: 1, sy: 1, r: 0, rx: 0, ry: 0, o: 1, od: 0, dash: 0, clip: 0, left: 0, ma: 1, mb: 0, mc: 0, md: 1, me: 0, mf: 0 };
 const json = (x) => JSON.parse(JSON.stringify(x, (k, v) => (v === Infinity ? -1 : v)));
 
 (async () => {
@@ -46,7 +49,7 @@ const json = (x) => JSON.parse(JSON.stringify(x, (k, v) => (v === Infinity ? -1 
         const n = parseFloat(s);
         return s.endsWith('%') ? [0, n] : [n, 0];
       };
-      const read = (el, parentW) => {
+      const read = (el, parentW, matrix) => {
         const cs = getComputedStyle(el);
         const v = { tx: 0, ty: 0, txp: 0, typ: 0, sx: 1, sy: 1, r: 0, rx: 0, ry: 0, o: parseFloat(cs.opacity), od: 0, dash: 0, clip: 0, left: 0 };
         if (cs.translate && cs.translate !== 'none') {
@@ -74,7 +77,11 @@ const json = (x) => JSON.parse(JSON.stringify(x, (k, v) => (v === Infinity ? -1 
             else v.r = a * Math.sign(z || 1);
           }
         }
-        if (cs.transform && cs.transform !== 'none') {
+        if (matrix) {
+          const m = /matrix\(([^)]*)\)/.exec(cs.transform || '');
+          const n = m ? m[1].split(',').map(parseFloat) : [1, 0, 0, 1, 0, 0];
+          [v.ma, v.mb, v.mc, v.md, v.me, v.mf] = n;
+        } else if (cs.transform && cs.transform !== 'none') {
           const m = /matrix\(([^)]*)\)/.exec(cs.transform);
           if (m) v.sy = parseFloat(m[1].split(',')[3]);
         }
@@ -114,11 +121,23 @@ const json = (x) => JSON.parse(JSON.stringify(x, (k, v) => (v === Infinity ? -1 
         }
         holder.appendChild(el);
         document.body.appendChild(holder);
+        if (c.css) {
+          const k = c.css;
+          const style = document.createElement('style');
+          style.textContent = `@keyframes ${k.name} {${k.body}}`;
+          holder.appendChild(style);
+          const samples = c.times.map((t) => {
+            el.style.animation = `${k.name} ${k.duration}ms ${k.timing} ${k.delay - t}ms ${k.iterations} normal ${k.fill} paused`;
+            return { t, v: read(el, c.box.parentW || c.box.w, c.matrix) };
+          });
+          holder.remove();
+          return samples;
+        }
         const anims = c.tracks.map((t) => el.animate(t.keyframes, inf(t.options)));
         anims.forEach((a) => a.pause());
         const samples = c.times.map((t) => {
           anims.forEach((a) => (a.currentTime = t));
-          return { t, v: read(el, c.box.parentW || c.box.w) };
+          return { t, v: read(el, c.box.parentW || c.box.w, c.matrix) };
         });
         anims.forEach((a) => a.cancel());
         holder.remove();
@@ -133,7 +152,7 @@ const json = (x) => JSON.parse(JSON.stringify(x, (k, v) => (v === Infinity ? -1 
         for (const [ch, x] of Object.entries(v)) if (Math.abs(x - (REST[ch] ?? 0)) > 1e-6) o[ch] = +x.toFixed(4);
         return { t, v: o };
       });
-      out.push({ src: c.src, box: c.box, base: c.base, tracks: c.tracks, ...(c.transformScale ? { transformScale: true } : {}), ...(c.path ? { path: c.path } : {}), samples: small });
+      out.push({ src: c.src, box: c.box, base: c.base, tracks: c.tracks, ...(c.transformScale ? { transformScale: true } : {}), ...(c.matrix ? { matrix: true } : {}), ...(c.css ? { css: c.css } : {}), ...(c.path ? { path: c.path } : {}), samples: small });
     });
   }
   await b.close();
