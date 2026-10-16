@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 
 export interface AvatarProps {
@@ -84,7 +85,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     <View
       style={[styles.container, containerStyle]}
       accessible={true}
-      accessibilityLabel={accessibilityLabel || `Avatar for ${name || 'user'}`}
+      accessibilityLabel={accessibilityLabel || (name ? t('sdk.avatar.of', { name }) : t('sdk.avatar.user'))}
       accessibilityRole="image"
       testID={testID}
     >
