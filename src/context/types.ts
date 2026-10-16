@@ -1,6 +1,7 @@
 // @ts-nocheck
 import type { ResolvedCustomizations } from '../core/customizations';
 import type { ResolvedWidgetTheme } from '../core/widgetTheme';
+import type { WidgetLanguage } from '../core/i18n';
 import type { WidgetSignalDetail, WidgetSignalName } from '../core/handoverWaiting';
 import type {
   ConferBotConfig,
@@ -76,6 +77,8 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   customizations: ResolvedCustomizations;
   /** The widget theme in force: tokens, shape, scheme (core/widgetTheme). */
   widgetTheme: ResolvedWidgetTheme;
+  /** The language the SDK's own words are drawn in (core/i18n): the owner's `widgetLanguage`, or the phone's. */
+  widgetLanguage: WidgetLanguage;
   botName: string | null;
   botAvatarUrl: string | null;
   // Persistence methods
