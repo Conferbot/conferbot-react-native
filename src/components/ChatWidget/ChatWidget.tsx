@@ -58,6 +58,10 @@ import { ChatBackgroundView } from '../ChatBackground';
 import { ArticleDetail } from '../KnowledgeBase/ArticleDetail';
 import { RequestsPortal } from '../Requests/RequestsPortal';
 import { REQUESTS_TEXT } from '../../core/requests';
+import { homeOn } from '../../core/home';
+import { HomeScreen } from '../Home/HomeScreen';
+import { ViewSwitch } from '../Home/ViewSwitch';
+import { KnowledgeBaseScreen } from '../KnowledgeBase/KnowledgeBaseScreen';
 
 // Maximum file size for attachments (5MB)
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
@@ -260,9 +264,28 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     openRequests,
     requestsOpen,
     requestsPortal,
+    // The home screen (core/home.ts): home, conversation, help centre
+    homeView,
+    showHome,
+    showHelp,
+    helpCategoryId,
+    knowledgeBase,
     // Actions
     resetConversation,
   } = useConferBot();
+  // The owner's home screen: the chat opens on it and its header's back returns there.
+  const hasHome = homeOn(serverCustomizations);
+  const view = homeView || 'chat';
+  // The help centre's topics, published articles only (web core/helpCentre.ts).
+  const helpCategories = useMemo(
+    () =>
+      (knowledgeBase?.categories || []).map((c: any) => ({
+        ...c,
+        articles: (Array.isArray(c?.articles) ? c.articles : []).filter((a: any) => a && a._id && (a.reviewStatus === undefined || a.reviewStatus === 'published')),
+      })),
+    [knowledgeBase]
+  );
+  const helpCategory = helpCategoryId ? helpCategories.find((c: any) => String(c._id ?? c.id ?? c.name) === helpCategoryId) || null : null;
   // The bot's settings as the web applies them; the defaults until it loads.
   const customizations = resolvedCustomizations || resolveCustomizations(serverCustomizations);
   // The theme paints the chat when the owner kept the default white (core/widgetTheme).
@@ -417,8 +440,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     ...(chatSessionId && !visitorBlocked
       ? [{ id: 'email-transcript', label: MAILCHAT_TEXT.menu, icon: '✉', onPress: () => openEmailTranscript?.() }]
       : []),
-    // The visitor's requests to the team, once they have one (web home
-    // screen's card, ts/home/requests/card.ts; RN has no home screen yet).
+    // The visitor's requests to the team, once they have one. The home
+    // screen has its own card (core/home.ts, web ts/home/requests/card.ts);
+    // the menu item stays for bots without a home screen.
     ...(requests && requests.length
       ? [{ id: 'requests', label: REQUESTS_TEXT.menu(requestsUnread || 0), icon: '☰', onPress: () => openRequests?.() }]
       : []),
@@ -955,8 +979,16 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       visible={isVisible}
       animationType="slide"
       transparent={false}
-      // Android's back inside the modal: the requests portal steps back first.
-      onRequestClose={() => (requestsOpen && requestsPortal ? requestsPortal.back() : handleClose())}
+      // Android's back inside the modal: the requests portal steps back
+      // first, then an open article, then the help centre or the chat back to
+      // the home screen, and only then the chat closes.
+      onRequestClose={() => {
+        if (requestsOpen && requestsPortal) return requestsPortal.back();
+        if (openedArticle) return closeArticle();
+        if (view === 'help') return hasHome ? showHome() : handleClose();
+        if (view === 'chat' && hasHome) return showHome();
+        handleClose();
+      }}
       statusBarTranslucent={false}
       accessible={true}
       accessibilityLabel="Chat modal"
@@ -967,94 +999,112 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.container, serverThemeOverride?.colors?.surface ? { backgroundColor: serverThemeOverride.colors.surface } : null]}
       >
-        {/* Header */}
-        <ChatHeader
-          title={serverCustomizations ? customizations.title : botName || title}
-          tagline={customizations.tagline || undefined}
-          logoUrl={customizations.logo}
-          hideLogo={customizations.hideLogo}
-          showOnline={!!serverCustomizations && customizations.showOnline}
-          statusText={status?.text}
-          subtitle={getSubtitle()}
-          botAvatarUrl={botAvatarUrl || undefined}
-          onClose={handleClose}
-          showConnectionStatus={true}
-          rightActions={<HeaderMenu items={headerMenuItems} testID={`${testID}-header-menu`} />}
-          testID={`${testID}-header`}
-        />
-
-        {/* The bot's chat background behind the messages (core/chatBackground) */}
-        <View style={styles.messagesArea}>
-        {serverCustomizations && <ChatBackgroundView background={chatBackground} testID={`${testID}-background`} />}
-        {/* Message List — interactive node renders inline at the end */}
-        <MessageList
-          transparent={!!serverCustomizations}
-          messages={record}
-          showTypingIndicator={isAgentTyping || isNodeProcessing || awaitingReply}
-          showTimestamps={showTimestamps}
-          testID={`${testID}-messages`}
-          activeNodeUI={!visitorBlocked && shouldShowNodeRenderer() && currentUIState ? currentUIState : null}
-          onNodeSubmit={handleNodeResponse}
-          isNodeLoading={isNodeProcessing}
-          footerExtras={
-            <>
-              <QueueCard />
-              <HandoverWaitingCard />
-              <LeaveMessageCard />
-              <FileRequestCard onUpload={canPickFiles ? handleAttachmentPress : undefined} />
-              <LeadCard />
-              <CsatCard />
-              <EmailTranscriptCard />
-              <ClosedChatCard closed={closed} onNewChat={() => resetConversation()} />
-            </>
-          }
-          footerExtrasKey={[
-            queue?.position ?? '',
-            !!handoverWaiting,
-            noAgentsAvailable,
-            fileRequestedBy || '',
-            leadCardOpen,
-            csatOpen,
-            emailTranscriptOpen,
-            emailTranscriptSentTo || '',
-            closed?.kind || '',
-          ].join(':')}
-        />
-        </View>
-
-        {lockedBy ? <SystemLine text="This conversation has been locked" testID={`${testID}-locked`} /> : null}
-        {agentConnectionLost ? (
-          <SystemLine text={`${agentConnectionLost}'s connection dropped. Hang on, they should be right back.`} testID={`${testID}-agent-lost`} />
-        ) : null}
-        {/* "Talk to a person" only while nobody is coming or here (core/handoverState.ts). */}
-        <QuickActionsStrip offerHuman={!!agentBot && talkToPersonAllowed(record) && !(currentAgent && currentAgent.isAIAgent === false)} />
-
-        {/* Unified input + footer — one seamless bottom bar */}
-        {shouldShowInput() && (
-          <ChatBottomBar
-            onSend={handleSendMessage}
-            onTyping={handleTyping}
-            placeholder={closed?.inputOff ? closed.text : lockedBy || !visitorInputEnabled ? 'Replies are turned off for now' : placeholder}
-            disabled={!isConnected || !!lockedBy || !visitorInputEnabled || !!closed?.inputOff}
-            onAttach={
-              isLiveChatMode && canPickFiles && (visitorUploadsOn(serverCustomizations) || !!fileRequestedBy)
-                ? handleAttachmentPress
-                : undefined
-            }
-            hideBrand={customizations.hideBrand}
-            customBrand={customizations.customBrand || undefined}
-            accent={serverCustomizations ? customizations.accent : undefined}
-            accentInk={customizations.accentInk || undefined}
-            fieldRadius={serverCustomizations ? customizations.fieldRadius : undefined}
-            fieldColor={serverThemeOverride?.mode ? widgetTheme?.tokens?.field : undefined}
-            testID={`${testID}-input`}
+        {/* Home, conversation or help centre, moving as the owner chose (core/viewTransition.ts). */}
+        <ViewSwitch view={view} kind={serverCustomizations?.viewTransition} sweep={serverCustomizations?.viewTransitionDirection} testID={`${testID}-views`}>
+        {view === 'home' ? (
+          <HomeScreen onClose={handleClose} testID={`${testID}-home`} />
+        ) : view === 'help' ? (
+          <KnowledgeBaseScreen
+            categories={helpCategories}
+            initialCategory={helpCategory}
+            onBack={hasHome ? showHome : undefined}
+            onClose={handleClose}
+            testID={`${testID}-help`}
           />
+        ) : (
+          <>
+            {/* Header */}
+            <ChatHeader
+              title={serverCustomizations ? customizations.title : botName || title}
+              tagline={customizations.tagline || undefined}
+              logoUrl={customizations.logo}
+              hideLogo={customizations.hideLogo}
+              showOnline={!!serverCustomizations && customizations.showOnline}
+              statusText={status?.text}
+              subtitle={getSubtitle()}
+              botAvatarUrl={botAvatarUrl || undefined}
+              onBack={hasHome ? showHome : undefined}
+              onClose={handleClose}
+              showConnectionStatus={true}
+              rightActions={<HeaderMenu items={headerMenuItems} testID={`${testID}-header-menu`} />}
+              testID={`${testID}-header`}
+            />
+
+            {/* The bot's chat background behind the messages (core/chatBackground) */}
+            <View style={styles.messagesArea}>
+            {serverCustomizations && <ChatBackgroundView background={chatBackground} testID={`${testID}-background`} />}
+            {/* Message List — interactive node renders inline at the end */}
+            <MessageList
+              transparent={!!serverCustomizations}
+              messages={record}
+              showTypingIndicator={isAgentTyping || isNodeProcessing || awaitingReply}
+              showTimestamps={showTimestamps}
+              testID={`${testID}-messages`}
+              activeNodeUI={!visitorBlocked && shouldShowNodeRenderer() && currentUIState ? currentUIState : null}
+              onNodeSubmit={handleNodeResponse}
+              isNodeLoading={isNodeProcessing}
+              footerExtras={
+                <>
+                  <QueueCard />
+                  <HandoverWaitingCard />
+                  <LeaveMessageCard />
+                  <FileRequestCard onUpload={canPickFiles ? handleAttachmentPress : undefined} />
+                  <LeadCard />
+                  <CsatCard />
+                  <EmailTranscriptCard />
+                  <ClosedChatCard closed={closed} onNewChat={() => resetConversation()} />
+                </>
+              }
+              footerExtrasKey={[
+                queue?.position ?? '',
+                !!handoverWaiting,
+                noAgentsAvailable,
+                fileRequestedBy || '',
+                leadCardOpen,
+                csatOpen,
+                emailTranscriptOpen,
+                emailTranscriptSentTo || '',
+                closed?.kind || '',
+              ].join(':')}
+            />
+            </View>
+
+            {lockedBy ? <SystemLine text="This conversation has been locked" testID={`${testID}-locked`} /> : null}
+            {agentConnectionLost ? (
+              <SystemLine text={`${agentConnectionLost}'s connection dropped. Hang on, they should be right back.`} testID={`${testID}-agent-lost`} />
+            ) : null}
+            {/* "Talk to a person" only while nobody is coming or here (core/handoverState.ts). */}
+            <QuickActionsStrip offerHuman={!!agentBot && talkToPersonAllowed(record) && !(currentAgent && currentAgent.isAIAgent === false)} />
+
+            {/* Unified input + footer — one seamless bottom bar */}
+            {shouldShowInput() && (
+              <ChatBottomBar
+                onSend={handleSendMessage}
+                onTyping={handleTyping}
+                placeholder={closed?.inputOff ? closed.text : lockedBy || !visitorInputEnabled ? 'Replies are turned off for now' : placeholder}
+                disabled={!isConnected || !!lockedBy || !visitorInputEnabled || !!closed?.inputOff}
+                onAttach={
+                  isLiveChatMode && canPickFiles && (visitorUploadsOn(serverCustomizations) || !!fileRequestedBy)
+                    ? handleAttachmentPress
+                    : undefined
+                }
+                hideBrand={customizations.hideBrand}
+                customBrand={customizations.customBrand || undefined}
+                accent={serverCustomizations ? customizations.accent : undefined}
+                accentInk={customizations.accentInk || undefined}
+                fieldRadius={serverCustomizations ? customizations.fieldRadius : undefined}
+                fieldColor={serverThemeOverride?.mode ? widgetTheme?.tokens?.field : undefined}
+                testID={`${testID}-input`}
+              />
+            )}
+          </>
         )}
+        </ViewSwitch>
 
         {/* Attachment Preview Modal */}
         {renderAttachmentPreview()}
 
-        {/* A help article opened from the chat (the while-you-wait card), over the conversation */}
+        {/* A help article opened from the chat or the home screen, over it */}
         {openedArticle ? (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background }]} testID={`${testID}-article`}>
             <ArticleDetail
@@ -1066,7 +1116,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           </View>
         ) : null}
 
-        {/* "Your requests" opened from the menu, over the conversation */}
+        {/* "Your requests" opened from the menu or the home screen, over it */}
         <RequestsPortal testID={`${testID}-requests`} />
       </KeyboardAvoidingView>
       </ThemeProvider>
