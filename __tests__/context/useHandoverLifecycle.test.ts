@@ -225,4 +225,42 @@ describe('useHandoverLifecycle', () => {
     expect(step).toBe('start');
     expect(socket.emitWithAck).not.toHaveBeenCalled();
   });
+
+  it('back in the queue: the requeued line, and a flow at its handover step waits again (#48)', () => {
+    const engine = { isAtHandover: () => true, waitAt: jest.fn(() => true) };
+    const state = fakeState([], 'h1');
+    const { socket, screen, props } = setup({ engine, state });
+    act(() => socket.fire('live-chat-requeued', { chatSessionId: 's1', teamName: 'Sales', waitEndsAt: Date.now() + 60000 }));
+    expect(screen()).toHaveLength(1);
+    expect(screen()[0]).toMatchObject({ type: 'live-chat-requeued', text: 'Connecting you to Sales...' });
+    expect(state.addRecord).toHaveBeenCalledWith(expect.objectContaining({ type: 'live-chat-requeued', text: 'Connecting you to Sales...' }));
+    expect(props.setCurrentAgent).toHaveBeenCalledWith(undefined);
+    expect(props.setIsLiveChatMode).toHaveBeenCalledWith(false);
+    expect(engine.waitAt).toHaveBeenCalledWith('h1', { type: 'humanHandover', nodeId: 'h1', stage: 'waiting' });
+    // Another session's requeue is not ours.
+    act(() => socket.fire('live-chat-requeued', { chatSessionId: 'other' }));
+    expect(screen()).toHaveLength(1);
+  });
+
+  it('a transfer is kept in the record, not drawn (#48)', () => {
+    const { socket, state, screen } = setup();
+    act(() => socket.fire('live-chat-transferred', { chatSessionId: 's1', entry: { id: 'transfer-1', text: 'Transferred from Maya to Sam', kind: 'agent' } }));
+    expect(state.addRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'transfer-1', type: 'live-chat-transfer', text: 'Transferred from Maya to Sam', kind: 'agent' }));
+    expect(screen()).toHaveLength(0);
+    act(() => socket.fire('live-chat-transferred', { chatSessionId: 's1', entry: { id: 3 } }));
+    expect(state.addRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocked: the Connecting line settles and the flow stops (#47)', () => {
+    const engine = { isAtHandover: () => false, reset: jest.fn() };
+    const { socket, props, screen, hook } = setup({ engine });
+    act(() => {
+      hook.result.current.onAgentLeft({ reason: 'escalated', agentDetails: { name: 'Ava', isAIAgent: true } });
+    });
+    act(() => socket.fire('visitor-blocked', { message: 'This conversation has been closed.' }));
+    expect(screen()[0].settled).toBe('ended');
+    expect(engine.reset).toHaveBeenCalled();
+    expect(props.setCurrentUIState).toHaveBeenCalledWith(null);
+    expect(props.setIsLiveChatMode).toHaveBeenCalledWith(false);
+  });
 });
