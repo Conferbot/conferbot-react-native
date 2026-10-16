@@ -14,6 +14,7 @@ import { getAnalyticsService } from '../../services/analytics';
 import { VoiceRecorder, VoiceRecordingResult } from '../VoiceRecorder';
 import { isAudioRecorderAvailable } from '../../utils/AudioRecorder';
 import { EmojiPicker, EmojiButton } from '../EmojiPicker';
+import { t } from '../../core/i18n';
 
 /**
  * ChatInput Props
@@ -100,7 +101,7 @@ export interface ChatInputProps {
  */
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
-  placeholder = 'Type a message...',
+  placeholder = t('chat.composer.placeholder'),
   disabled = false,
   enableAttachments = false,
   onAttachmentPress,
@@ -109,7 +110,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   enableEmoji = true,
   emojiPickerHeight = 300,
   maxLength = 1000,
-  sendButtonText = 'Send',
+  sendButtonText = t('chat.composer.send'),
   sendIcon,
   attachmentIcon,
   microphoneIcon,
@@ -339,7 +340,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       <View
         style={styles.container}
         accessible={true}
-        accessibilityLabel="Message input"
+        accessibilityLabel={t('chat.composer.label')}
         testID={testID}
       >
         {/* Attachment button */}
@@ -349,7 +350,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onPress={onAttachmentPress}
             disabled={disabled}
             accessible={true}
-            accessibilityLabel="Attach file"
+            accessibilityLabel={t('sdk.composer.attachFile')}
             accessibilityRole="button"
             testID={`${testID}-attachment`}
           >
@@ -387,7 +388,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onSubmitEditing={handleSend}
           accessible={true}
           accessibilityLabel={placeholder}
-          accessibilityHint="Type your message here"
+          accessibilityHint={t('sdk.composer.hint')}
           testID={`${testID}-input`}
         />
 
@@ -398,7 +399,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onPress={handleMicrophonePress}
             disabled={disabled || isSending}
             accessible={true}
-            accessibilityLabel="Record voice message"
+            accessibilityLabel={t('chat.composer.voice')}
             accessibilityRole="button"
             testID={`${testID}-microphone`}
           >
@@ -422,7 +423,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onPress={handleSend}
             disabled={!canSend}
             accessible={true}
-            accessibilityLabel="Send message"
+            accessibilityLabel={t('sdk.composer.sendMessage')}
             accessibilityRole="button"
             accessibilityState={{ disabled: !canSend }}
             testID={`${testID}-send`}
