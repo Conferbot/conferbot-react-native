@@ -191,4 +191,60 @@ describe('useLiveChatExtras', () => {
     expect(socket.emitToServer).toHaveBeenCalledTimes(1);
     expect(socket.emitToServer).toHaveBeenCalledWith('visitor-read-receipt', expect.objectContaining({ state: 'delivered' }));
   });
+
+  it('a blocked visitor: the closed line, and what was waiting goes (#47)', () => {
+    const { hook, socket } = setup();
+    act(() => socket.fire('no-agents-available'));
+    act(() => socket.fire('visitor-blocked', { chatSessionId: 's1', message: 'This conversation has been closed.' }));
+    expect(hook.result.current.blocked).toBe('This conversation has been closed.');
+    expect(hook.result.current.noAgents).toBe(false);
+    // At the handshake (no session in it) too.
+    act(() => hook.result.current.resetLiveChatExtras());
+    expect(hook.result.current.blocked).toBeNull();
+    act(() => socket.fire('visitor-blocked', { handshake: true }));
+    expect(hook.result.current.blocked).toBe('This conversation has been closed.');
+    // Another session's block is not ours.
+    act(() => hook.result.current.resetLiveChatExtras());
+    act(() => socket.fire('visitor-blocked', { chatSessionId: 'other' }));
+    expect(hook.result.current.blocked).toBeNull();
+  });
+
+  it('the same end again opens no second survey (#47)', () => {
+    const { hook, socket, state } = setup();
+    (state as any).getRecord = () => [{ type: 'agent-message' }, { type: 'agent-chat-ended' }];
+    act(() => socket.fire('chat-ended', { chatSessionId: 's1' }));
+    expect(hook.result.current.csatOpen).toBe(false);
+    (state as any).getRecord = () => [{ type: 'agent-message' }];
+    act(() => socket.fire('chat-ended', { chatSessionId: 's1' }));
+    expect(hook.result.current.csatOpen).toBe(true);
+  });
+
+  it('Email me this chat: sent to the address, kept as the visitor\'s (#46)', async () => {
+    const postTranscriptEmail = jest.fn().mockResolvedValue({ ok: true });
+    const { hook, socket, state } = setup({ postTranscriptEmail });
+    act(() => hook.result.current.openEmailTranscript());
+    expect(hook.result.current.mailOpen).toBe(true);
+    let r: any;
+    await act(async () => {
+      r = await hook.result.current.emailTranscript(' ada@example.com ');
+    });
+    expect(r).toEqual({ ok: true });
+    expect(postTranscriptEmail).toHaveBeenCalledWith('s1', 'ada@example.com');
+    expect(state.setUserMetadata).toHaveBeenCalledWith({ email: 'ada@example.com' });
+    expect(state.setAnswer).toHaveBeenCalledWith('email-transcript', 'email', 'ada@example.com');
+    expect(socket.sendResponseRecord).toHaveBeenCalled();
+    expect(hook.result.current.mailSentTo).toBe('ada@example.com');
+  });
+
+  it('Email me this chat: a refusal keeps the card and keeps nothing (#46)', async () => {
+    const postTranscriptEmail = jest.fn().mockResolvedValue({ ok: false, message: 'Too many requests. Please try again later.' });
+    const { hook, state } = setup({ postTranscriptEmail });
+    let r: any;
+    await act(async () => {
+      r = await hook.result.current.emailTranscript('ada@example.com');
+    });
+    expect(r.message).toBe('Too many requests. Please try again later.');
+    expect(state.setUserMetadata).not.toHaveBeenCalled();
+    expect(hook.result.current.mailSentTo).toBeNull();
+  });
 });
