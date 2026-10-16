@@ -15,6 +15,7 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, TextInputProps, ViewStyle } from 'react-native';
 import { useTheme } from '../../../theme';
+import { useChatFont } from '../../../hooks/useChatFont';
 
 /** What a step view gets: its waiting state (stamped with the step) and where the answer goes. */
 export interface StepViewProps {
@@ -41,10 +42,13 @@ export interface StepLook {
   /** Left inset: the cards line up with the bot's bubbles, past the avatar. */
   indent: number;
   gutter: number;
+  /** The chat's font (core/ownerFont.ts) as a style: {} for the platform font. */
+  ff: { fontFamily?: string };
 }
 
 export const useStepLook = (): StepLook => {
   const theme = useTheme();
+  const font = useChatFont();
   const c = theme.colors;
   return {
     option: c.optionBubble,
@@ -60,6 +64,7 @@ export const useStepLook = (): StepLook => {
     error: c.error,
     indent: theme.layout.avatarSize + 10 + theme.spacing.chatContentPadding,
     gutter: theme.spacing.chatContentPadding,
+    ff: font.body() || {},
   };
 };
 
@@ -123,8 +128,8 @@ export const StepButton: React.FC<{
         style,
       ]}
     >
-      {leading ? <Text style={{ color: filled ? look.accentInk : look.optionInk, fontSize: look.fontSize }}>{leading}</Text> : null}
-      <Text style={{ color: filled ? look.accentInk : look.optionInk, fontSize: look.fontSize, fontWeight: '500' }}>{title}</Text>
+      {leading ? <Text style={{ color: filled ? look.accentInk : look.optionInk, ...look.ff, fontSize: look.fontSize }}>{leading}</Text> : null}
+      <Text style={{ color: filled ? look.accentInk : look.optionInk, ...look.ff, fontSize: look.fontSize, fontWeight: '500' }}>{title}</Text>
     </TouchableOpacity>
   );
 };
@@ -149,14 +154,14 @@ export const StepLink: React.FC<{ look: StepLook; title: string; onPress: () => 
     testID={testID}
     style={{ paddingVertical: 4 }}
   >
-    <Text style={{ color: disabled ? look.muted : look.accent, fontSize: look.fontSize - 1, fontWeight: '500' }}>{title}</Text>
+    <Text style={{ color: disabled ? look.muted : look.accent, ...look.ff, fontSize: look.fontSize - 1, fontWeight: '500' }}>{title}</Text>
   </TouchableOpacity>
 );
 
 /** A labelled field. */
 export const StepField: React.FC<TextInputProps & { look: StepLook; label?: string }> = ({ look, label, style, ...rest }) => (
   <View style={{ gap: 4 }}>
-    {label ? <Text style={{ color: look.muted, fontSize: look.fontSize - 2, fontWeight: '500' }}>{label}</Text> : null}
+    {label ? <Text style={{ color: look.muted, ...look.ff, fontSize: look.fontSize - 2, fontWeight: '500' }}>{label}</Text> : null}
     <TextInput
       placeholderTextColor={look.muted}
       accessibilityLabel={label || rest.placeholder}
@@ -169,7 +174,7 @@ export const StepField: React.FC<TextInputProps & { look: StepLook; label?: stri
           paddingHorizontal: 10,
           paddingVertical: 9,
           color: look.text,
-          fontSize: look.fontSize,
+          ...look.ff, fontSize: look.fontSize,
         },
         style,
       ]}
@@ -182,7 +187,7 @@ export const StepStatus: React.FC<{ look: StepLook; error?: string; hint?: strin
   if (!error && !hint) return null;
   return (
     <Text
-      style={{ color: error ? look.error : look.muted, fontSize: look.fontSize - 2 }}
+      style={{ color: error ? look.error : look.muted, ...look.ff, fontSize: look.fontSize - 2 }}
       accessibilityLiveRegion="polite"
       testID={testID}
     >
