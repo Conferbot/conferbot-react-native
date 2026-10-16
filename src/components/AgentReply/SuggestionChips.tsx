@@ -7,6 +7,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 
 export const SuggestionChips: React.FC<{ items: string[]; onPick: (q: string) => void; testID?: string }> = ({ items, onPick, testID }) => {
   const theme = useTheme();
@@ -22,7 +23,7 @@ export const SuggestionChips: React.FC<{ items: string[]; onPick: (q: string) =>
         marginVertical: theme.spacing.sm,
       }}
       testID={testID}
-      accessibilityLabel="Suggested questions"
+      accessibilityLabel={t('chat.suggestedQuestions')}
     >
       {items.map((q) => (
         <TouchableOpacity
