@@ -19,6 +19,7 @@ import type {
 import { buildStandaloneHandoverPayload } from '../../core/handoverPayload';
 import { queueSelfResolvePayload } from '../../core/handoverState';
 import { surveyRatingPayload } from '../../core/liveChat';
+import { t } from '../../core/i18n';
 
 // ========================================
 // TYPES
@@ -90,14 +91,15 @@ interface UseHandoverReturn {
 // INITIAL STATE
 // ========================================
 
-const initialState: HandoverState = {
+// In the language being drawn in (core/i18n), read when the hook starts.
+const initialState = (): HandoverState => ({
   stage: 'pre_chat',
-  waitMessage: 'Please wait while we connect you with an agent...',
-  connectedMessage: 'You are now connected with an agent.',
-  endedMessage: 'The conversation has ended. Thank you for chatting with us!',
-  noAgentsMessage: 'Sorry, no agents are available at the moment.',
-  timeoutMessage: 'Connection timed out. Please try again later.',
-};
+  waitMessage: t('sdk.wait.message'),
+  connectedMessage: t('sdk.handover.connectedMessage'),
+  endedMessage: t('sdk.handover.endedMessage'),
+  noAgentsMessage: t('sdk.handover.noAgentsShort'),
+  timeoutMessage: t('sdk.handover.timedOut'),
+});
 
 // ========================================
 // HOOK IMPLEMENTATION
@@ -121,7 +123,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
   } = options;
 
   const [state, setState] = useState<HandoverState>({
-    ...initialState,
+    ...initialState(),
     preChatConfig,
     surveyConfig,
     selectedDepartment: department,
@@ -395,7 +397,7 @@ export function useHandover(options: UseHandoverOptions): UseHandoverReturn {
     isActive.current = false;
     conversationIdRef.current = null;
     setState({
-      ...initialState,
+      ...initialState(),
       preChatConfig,
       surveyConfig,
       selectedDepartment: department,
