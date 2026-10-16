@@ -34,7 +34,8 @@ The complete flow recorded live on an Android emulator against production: open 
 - **AI answers as on the web** - Tables, headings, quotes, code blocks and strikethrough in replies; "Helpful?" under each answer (a No is sent at once, then reasons, a comment, "Talk to a person", "Ask another way"; the vote can change); a notice when a reply takes longer than 45s; the device language sent so short messages are answered in it
 - **While you wait** - As on the web widget: 6s into a wait for a person, the help articles that may answer the visitor's question (or the server's own pick, with "That solved it" leaving the queue); 2.5s after the waiting signal, an offer of seven small games (owner setting `waitingGames`) that saves a game and steps aside the moment a person joins
 - **Email me this chat** - From the chat menu, the visitor gets the whole conversation in their inbox (`POST /api/v1/mobile/chat/transcript-email`)
-- **Your requests** - As on the web widget's home screen: the visitor's own conversations with the team, each saying where it stands ("We replied", "We're on it", "Solved"), a new reply marked, and a reply box (a reply to a solved one opens it again). In the chat menu once they have one, and as `useRequests()` + `<RequestsPortal />` for your own screens
+- **Your requests** - As on the web widget's home screen: the visitor's own conversations with the team, each saying where it stands ("We replied", "We're on it", "Solved"), a new reply marked, and a reply box (a reply to a solved one opens it again). On the home screen and in the chat menu once they have one, and as `useRequests()` + `<RequestsPortal />` for your own screens
+- **Home screen** - When the owner turns it on (Customize > Welcome), the chat opens on the web widget's home screen: a greeting by the clock or "Welcome back, Jamie", "Ask anything" (the AI agent answers the question, or the help articles that answer it), "Pick up where you left off", "Your requests", "Talk to us" with the team's reply time, faces and rating, recent articles and topics, the customer logos. `{{first_name|there}}` in the owner's texts is filled from your `user`
 - **Offline Support** - Messages are queued locally and retried when connectivity returns
 - **Session Persistence** - Conversations survive app restarts via AsyncStorage
 - **Push Token Registration** - Register device tokens for background message delivery
@@ -432,7 +433,7 @@ const { getMessageStatus, markMessageAsRead, markVisibleMessagesAsRead } = useCo
 
 ## Your requests
 
-A visitor who has asked the team something can follow it: the list of their requests, each one's conversation with the team, and a reply box. Team replies arrive live while a request is open. It is the web widget's "Your requests" (its home screen card); this SDK has no home screen yet, so it opens from the chat menu ("Your requests", once there is one) and from your own UI:
+A visitor who has asked the team something can follow it: the list of their requests, each one's conversation with the team, and a reply box. Team replies arrive live while a request is open. It is the web widget's "Your requests": a card on the [home screen](#home-screen) (up to two requests, "See all (n)", above "Talk to us" when a reply is new), the chat menu ("Your requests", once there is one, for bots without a home screen), and your own UI:
 
 ```tsx
 import { useRequests, RequestsPortal } from '@conferbot/react-native';
@@ -453,6 +454,36 @@ function SupportButton() {
 `open(requestId?)` opens the list or one request; `back()` / `close()`; `refresh(force?)` reads the list again (at most every 15s otherwise). `useConferBot()` has the same as `requests`, `requestsUnread`, `openRequests`, `closeRequests`, `refreshRequests` and `requestsPortal` (the screens' state, `getState()` / `subscribe()`).
 
 Which requests are the visitor's: the server lists a conversation only when its id is one this device started (kept per bot in AsyncStorage, the last 30) **and** its visitor id matches, or, for a signed-in user with an identity hash (see [Identity verification](#identity-verification)), their verified conversations from any device. Only conversations a person on the team handled count. Replies are text (the web has no attachments here either).
+
+## Home screen
+
+When the owner turns the home screen on (dashboard: Customize > Welcome > Home screen, `enableInitialPage`), `<ChatWidget />` and the floating bubble open on it, as the web widget does; with it off they open straight on the conversation. It follows each of the owner's settings:
+
+| Setting | On the home screen |
+|---|---|
+| Home screen (`enableInitialPage`) | Off: no home at all, the chat opens on the conversation |
+| Title, description, card title / tagline, button text, message | As written; early bots' placeholder copy ("Our usual reply time", "Later Today") shown as what is true |
+| "Ask anything" box (`homeAskBox`, on unless off) | With an AI agent: "Ask “...”" goes to the chat and asks it; the help articles that answer it; for a flow bot, "Chat with us" when nothing matches. Off: the help card searches itself |
+| Trust (`homeTeamPhotos`, `homeTrustLogos`, `homeTrustLabel`; `homeRating` from the server) | Up to 3 faces on "Talk to us", the real rating ("4.8 · 120 reviews"), up to 6 logos with their line, shown once a logo has loaded |
+| Greet by name (`{{first_name}}`, `{{name}}`, `{{company}}`, a fallback as `{{first_name\|there}}`) | Filled from `user.name` and `user.metadata` (and a name a flow asked for); also in the greeting card |
+| Recent articles (`enableKnowledgeBase`, `hideRecentArticles`) | The recent list, topics and "See all" (the help centre); none with the help centre off or no published article |
+| Hide online status (`hideOnlineStatus`) | No "Online" and no green dot; the reply-time words stay |
+| Reply time (`replyTime`) | "Online · Usually replies in a few minutes", "Team back tomorrow 9 AM", "Team replies by email", or nothing with Hide |
+| View transitions (`viewTransition`, `viewTransitionDirection`) | Fade and slide as on the web; classic and none switch at once; the other kinds slide; reduced motion fades |
+
+The visitor's first question and first name are kept on the device (per bot in AsyncStorage, forgotten after 60 days, never sent anywhere) for "Welcome back, Jamie" and, for an AI agent bot, "Pick up where you left off". The chat header's ‹ goes back to the home screen, and so does Android's back.
+
+For your own screens:
+
+```tsx
+import { useHome, HomeScreen } from '@conferbot/react-native';
+
+const { model, view, showChat, showHome, showHelp } = useHome();
+// model: what the home shows (null when the owner has none); view: 'home' | 'chat' | 'help'
+<HomeScreen onClose={close} />   // inside ConferBotProvider
+```
+
+`showChat(text?)` goes to the conversation (and asks `text` there); the decisions are pure in `src/core/home.ts` (`homeModel`).
 
 ## Knowledge Base
 
