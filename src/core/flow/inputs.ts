@@ -1,35 +1,48 @@
 /**
  * Checks on what the visitor types or picks, ported from the web widget
  * (conferbot-widget/src/ts/chat/nodeKit.ts, nodeLogic.ts, utils/emailTypos.ts)
- * with its English messages (ts/i18n/en.ts).
+ * with its messages (ts/i18n), in the active language.
  */
 import { plainText } from './text';
+import { t, tFor, localized, I18nKey } from '../i18n';
 
-/** English texts the steps say (web i18n en.ts). */
-export const EN = {
-  emailInvalid: 'Please enter a valid email address',
-  emailTypo: (email: string) => `Did you mean ${email}? Press Enter to send it, or edit it.`,
-  phoneInvalid: 'Please enter a valid phone number',
-  numberLike: 'Please enter a number, like 42',
-  numberBetween: (min: any, max: any) => `Please enter a number between ${min} and ${max}`,
-  numberMin: (min: any) => `Please enter ${min} or more`,
-  numberMax: (max: any) => `Please enter ${max} or less`,
-  link: 'Please enter a link, like example.com',
-  uploadOverSize: (mb: number) => `That file is over ${mb} MB - choose a smaller one.`,
-  uploadNotAllowed: (types: string) => `That file can't be sent here - choose ${types}.`,
-  uploadRetry: "That didn't upload - tap to try again.",
-  skipped: 'Skipped',
-  done: 'Done',
-  somethingWrong: 'Something went wrong. Please try again.',
-};
+/** The steps' plain texts by key (web i18n: validation.*, upload.*, common.*). */
+const EN_KEYS = {
+  emailInvalid: 'validation.email',
+  phoneInvalid: 'validation.phone',
+  numberLike: 'validation.numberLike',
+  link: 'validation.link',
+  numberInvalid: 'validation.number',
+  urlInvalid: 'validation.url',
+  uploadRetry: 'upload.tapRetry',
+  skipped: 'common.skipped',
+  done: 'common.done',
+  somethingWrong: 'common.somethingWrong',
+} as const;
+
+/**
+ * The texts the steps say, in the active language (the name stays from when
+ * they were English only).
+ */
+export const EN = Object.assign(localized(EN_KEYS), {
+  emailTypo: (email: string): string => t('validation.emailTypo', { email }),
+  numberBetween: (min: any, max: any): string => t('validation.numberBetween', { min, max }),
+  numberMin: (min: any): string => t('validation.numberMin', { min }),
+  numberMax: (max: any): string => t('validation.numberMax', { max }),
+  uploadOverSize: (mb: number): string => t('upload.overSize', { mb }),
+  uploadNotAllowed: (types: string): string => t('upload.notAllowed', { types }),
+});
 
 /**
  * The owner's own error text, or the default when they left it empty or kept
- * the stock English (web i18n ownerTextOr).
+ * the stock English (web i18n ownerTextOr). `fallback` is drawn in the
+ * active language; its English is stock too.
  */
 export const ownerTextOr = (value: unknown, fallback: string, stockEnglish: string[] = []): string => {
   const v = typeof value === 'string' ? plainText(value) : '';
-  if (!v || [fallback, ...stockEnglish].some((s) => plainText(s) === v)) return fallback;
+  const key = (Object.values(EN_KEYS) as I18nKey[]).find((k) => t(k) === fallback);
+  const stock = [fallback, ...(key ? [tFor('en', key)] : []), ...stockEnglish];
+  if (!v || stock.some((s) => plainText(s) === v)) return fallback;
   return value as string;
 };
 
@@ -145,7 +158,7 @@ export const suggestEmailFix = (email: string): string | null => {
 // ----- files -----
 export const DEFAULT_MAX_FILE_MB = 5;
 
-/** The allowed types in words: "PNG or IMAGE/JPEG", "images or PDF". */
+/** The allowed types in words: "PNG or IMAGE/JPEG", "images or PDF" (web nodeLogic.ts fileTypesWords). */
 export const fileTypesWords = (types: any): string => {
   const list = (Array.isArray(types) ? types : [])
     .map((t: any) => String(t).trim().toLowerCase())
@@ -153,16 +166,16 @@ export const fileTypesWords = (types: any): string => {
     .map((x: string) =>
       x.endsWith('/')
         ? x === 'image/'
-          ? 'images'
+          ? t('file.images')
           : x === 'video/'
-          ? 'videos'
+          ? t('file.videos')
           : x.replace('/', '')
         : x.replace(/^\./, '').replace(/^application\//, '').toUpperCase()
     )
     .map((t: string) => (t === 'JPEG' ? 'JPG' : t));
   const unique = [...new Set(list)];
   if (!unique.length) return '';
-  return unique.length === 1 ? unique[0] : `${unique.slice(0, -1).join(', ')} or ${unique[unique.length - 1]}`;
+  return unique.length === 1 ? unique[0] : `${unique.slice(0, -1).join(', ')} ${t('common.or')} ${unique[unique.length - 1]}`;
 };
 
 /** Why a picked file can't be sent, or null (web nodeLogic.fileUploadProblem). */
