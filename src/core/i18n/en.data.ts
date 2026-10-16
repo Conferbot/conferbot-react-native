@@ -854,6 +854,7 @@ export const en = {
   "sdk.bubble.reactHint": "Long press to add a reaction",
   "sdk.calendar.dayClosed": "This day isn't available.",
   "sdk.calendar.noTimes": "No times are free on this day.",
+  "sdk.calendar.slotBooked": "{time}, booked",
   "sdk.card.learnMore": "Learn more",
   "sdk.chat.complete": "Conversation complete",
   "sdk.chat.loadOlder": "Load older messages",
