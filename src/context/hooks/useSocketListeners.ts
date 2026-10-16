@@ -40,8 +40,8 @@ interface UseSocketListenersParams {
   lastUserChoiceRef: React.MutableRefObject<string | null>;
   // AI agent bots (useAgentBot)
   setAgentBot: (bot: AgentBot | null) => void;
-  /** The bot's data beyond the flow (post-chat rating settings, name). */
-  onChatbotData: (chatbotData: any) => void;
+  /** The bot's data beyond the flow (post-chat rating settings, name) and its help centre. */
+  onChatbotData: (chatbotData: any, knowledgeBaseData?: any) => void;
   onAgentBotReady: (sessionId: string, bot: AgentBot, nodes: any[]) => void;
   onAgentAccepted: (data: any) => boolean;
   onAgentMessage: (data: any) => Record<string, unknown>;
@@ -134,7 +134,7 @@ export function useSocketListeners({
       // No-flow AI agent bot (Agent Studio)? null for every flow bot.
       const agentBot = parseAgentBot(chatbotData);
       setAgentBot(agentBot);
-      onChatbotData(chatbotData);
+      onChatbotData(chatbotData, data?.knowledgeBaseData);
 
       // Parse elements (nodes and edges)
       const elements = Array.isArray(chatbotData.elements) && chatbotData.elements.length > 0
