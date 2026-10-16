@@ -6,6 +6,7 @@
  * email for the reply). The shapes are the embed-server's (queueService,
  * readReceipts, liveTranslation, aiFallback, handoverHandler). Pure.
  */
+import { t, ownerTextOr, I18nKey } from './i18n';
 
 export interface QueueStatus {
   status: 'waiting' | 'none' | 'busy';
@@ -56,9 +57,10 @@ export const ordinal = (n: number): string => {
 
 /** The queue line: "You're next in line", "You're 3rd in line", "Connecting you to the team". */
 export const queueLine = (q: QueueStatus): string => {
-  if (q.position === 1) return "You're next in line";
-  if (q.position && q.position > 1) return `You're ${ordinal(q.position)} in line`;
-  return 'Connecting you to the team';
+  // In the active language (web queueCard.ts positionText: queue.*; {ord} is English's "3rd").
+  if (q.position === 1) return t('queue.next');
+  if (q.position && q.position > 1) return t('queue.position', { n: q.position, ord: ordinal(q.position) });
+  return t('queue.connecting');
 };
 
 /** handover-waiting: nobody could take the chat (the AI took it back). */
@@ -151,14 +153,15 @@ export interface CsatConfig {
 export const csatConfigOf = (raw: any): CsatConfig | null => {
   if (!raw || typeof raw !== 'object' || raw.enabled === false || raw.enabled !== true) return null;
   const type = ['stars', 'thumbs', 'emoji', 'nps'].includes(raw.ratingType) ? raw.ratingType : 'stars';
-  const s = (v: unknown, d: string) => (typeof v === 'string' && v.trim() ? v.trim() : d);
+  // The owner's words, else the web's (postChatRating.ts csat.*) in the visitor's language.
+  const s = (v: unknown, key: I18nKey, stock: string[] = []) => ownerTextOr(typeof v === 'string' ? v.trim() : v, key, stock);
   return {
     ratingType: type,
-    titleText: s(raw.titleText, 'How was your experience?'),
-    subtitleText: s(raw.subtitleText, 'Your feedback helps us improve'),
-    thankYouText: s(raw.thankYouText, 'Thank you for your feedback!'),
+    titleText: s(raw.titleText, 'csat.title'),
+    subtitleText: s(raw.subtitleText, 'csat.subtitle'),
+    thankYouText: s(raw.thankYouText, 'csat.thanks'),
     showFeedbackInput: raw.showFeedbackInput !== false,
-    feedbackPlaceholder: s(raw.feedbackPlaceholder, 'Tell us more...'),
+    feedbackPlaceholder: s(raw.feedbackPlaceholder, 'csat.placeholder', ['Tell us more...']),
   };
 };
 
