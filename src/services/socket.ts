@@ -48,6 +48,9 @@ export const FORWARDED_SERVER_EVENTS = [
   'live-chat-requeued',
   'live-chat-transferred',
   'visitor-blocked',
+  // "Your requests": a team reply or a status change on the request open
+  // in the portal (core/requests.ts, embed-server visitorRequests.js).
+  'my-request-update',
 ] as const;
 
 // Socket connection options
@@ -149,6 +152,11 @@ class ConferBotSocket {
   }
 
   // Get current user ID
+  /** The visitor the handshake named ("Your requests" asks as this visitor). */
+  getVisitorId(): string | undefined {
+    return this.visitorId;
+  }
+
   getUserId(): string | undefined {
     return this.userId;
   }
@@ -171,6 +179,9 @@ class ConferBotSocket {
 
       // Send initialization payload
       this.sendInitPayload();
+      // Every connect, the first and each reconnect: the requests portal
+      // reads its open request again (the server forgot its room).
+      this.emit('connect');
       resolve();
     });
 
