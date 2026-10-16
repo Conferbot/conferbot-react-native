@@ -83,9 +83,10 @@ export function useLiveChat({
               text,
             });
 
-            if (socketClient.current?.isConnected() && !agentPendingRef?.current) {
+            // Offline, the socket hands it to the offline queue (#80).
+            if (socketClient.current && !agentPendingRef?.current) {
               const responseData = chatStateRef.current.buildResponseData();
-              socketClient.current.sendResponseRecord(responseData);
+              socketClient.current.sendResponseRecord(responseData, { messageId });
             }
           }
           onLiveSent?.();
@@ -126,11 +127,13 @@ export function useLiveChat({
             } as any);
           }
 
-          if (socketClient.current?.isConnected() && chatStateRef.current) {
+          // Offline, the socket hands it to the offline queue (#80).
+          if (socketClient.current && chatStateRef.current) {
+            const connected = socketClient.current.isConnected();
             const responseData = chatStateRef.current.buildResponseData();
-            socketClient.current.sendResponseRecord(responseData);
+            socketClient.current.sendResponseRecord(responseData, { messageId });
 
-            if (readReceiptsEnabled) {
+            if (connected && readReceiptsEnabled) {
               setTimeout(() => {
                 chatStateRef.current?.setMessageSent(messageId);
               }, 100);
