@@ -2,6 +2,7 @@
 import type { ResolvedCustomizations } from '../core/customizations';
 import type { ResolvedWidgetTheme } from '../core/widgetTheme';
 import type { WidgetLanguage } from '../core/i18n';
+import type { RedirectLine } from '../core/postChatRedirect';
 import type { WidgetSignalDetail, WidgetSignalName } from '../core/handoverWaiting';
 import type {
   ConferBotConfig,
@@ -241,6 +242,13 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   updateVisitorDraft: (text: string, field?: { secureTextEntry?: boolean; textContentType?: string; autoComplete?: string }) => void;
   /** Sent, or emptied: the agent's preview goes. */
   clearVisitorDraft: () => void;
+  // ---- Post-chat redirect (core/postChatRedirect.ts) ----
+  /** "Taking you to example.com in 10s" under the ended conversation (null: none). */
+  postChatRedirect?: RedirectLine | null;
+  /** Cancel: the countdown stops and the line goes. */
+  cancelPostChatRedirect?: () => void;
+  /** "Continue to example.com" (the system could not open it on its own). */
+  continuePostChatRedirect?: () => Promise<boolean> | void;
 }
 
 // ********** Extended Config Types ********** //
