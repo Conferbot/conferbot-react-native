@@ -188,6 +188,27 @@ export type { GamesCard as GamesCardController, GamesCardState, GameInput } from
 export { WaitHelpCard } from './components/LiveChat/WaitHelpCard';
 export { GamesCard, GamesCardView } from './components/LiveChat/GamesCard';
 
+// ========== Your requests (core/requests.ts, core/requestsPortal.ts) ========== //
+export {
+  REQUESTS_TEXT,
+  STATE_WORDS as REQUEST_STATE_WORDS,
+  REQUEST_EVENTS,
+  requestsApi,
+  requestsWho,
+  stateOf as requestStateOf,
+  isNewReply,
+  rowLine as requestRowLine,
+  whenWords,
+  unreadCount as requestsUnreadCount,
+} from './core/requests';
+export type { RequestSummary, RequestDetail, RequestMessage, RequestState, RequestsApi } from './core/requests';
+export { createRequestsPortal } from './core/requestsPortal';
+export type { RequestsPortal as RequestsPortalController, RequestsPortalState, PendingReply } from './core/requestsPortal';
+export { RequestsPortal } from './components/Requests/RequestsPortal';
+export type { RequestsPortalProps } from './components/Requests/RequestsPortal';
+export { useRequests } from './hooks/useRequests';
+export type { UseRequestsReturn } from './hooks/useRequests';
+
 // ========== Theme System ========== //
 export { ThemeProvider, useTheme, defaultTheme, darkTheme } from './theme';
 export type { ConferBotTheme, ConferBotThemeOverride } from './theme';
