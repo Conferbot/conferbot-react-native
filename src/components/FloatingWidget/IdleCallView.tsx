@@ -1,40 +1,29 @@
 import React, { useMemo, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { mascotLayers } from '../../core/mascotArt';
+import { mascotLayers, type MascotLook } from '../../core/mascotArt';
 import type { IdleCallPerformance } from '../../core/launcherIdleCall';
+import { MascotFigure } from '../Mascot/MascotFigure';
 
 type SvgComponent = React.ComponentType<{ xml: string; width: number | string; height: number | string }>;
 
 /**
  * The idle call's mascot on its stage over the launcher (idleCall.ts
- * perform): just behind the button (it slips out from behind it), or in
- * front for "knock" and "tap", whose paw lands on it; the white rings where
- * it lands. Each part of the drawing is its own layer, moved on the clock.
+ * perform): the owner's mascot (shape, eyes, accessory, colour), just behind
+ * the button (it slips out from behind it), or in front for "knock" and
+ * "tap", whose paw lands on it; the white rings where it lands. Each part
+ * of the drawing is its own layer, moved on the clock.
  */
-export const IdleCallStage: React.FC<{ perf: IdleCallPerformance; styles: any; accent: string; launcherAccent: string; Svg: SvgComponent }> = ({ perf, styles, accent, launcherAccent, Svg }) => {
-  const layers = useMemo(() => mascotLayers(accent, perf.mascot.arm, launcherAccent), [accent, perf.mascot.arm, launcherAccent]);
+export const IdleCallStage: React.FC<{ perf: IdleCallPerformance; styles: any; look?: Partial<MascotLook>; launcherAccent: string; Svg: SvgComponent }> = ({ perf, styles, look, launcherAccent, Svg }) => {
+  const layers = useMemo(
+    () => mascotLayers(launcherAccent, perf.mascot.arm, look),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [launcherAccent, perf.mascot.arm, look?.shape, look?.eyes, look?.accessory, look?.color]
+  );
   const n = perf.mascot.size;
-  const layer = (xml: string | null, style?: any) =>
-    xml ? (
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
-        <Svg xml={xml} width={n} height={n} />
-      </Animated.View>
-    ) : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: perf.mascot.x, top: perf.mascot.y, width: n, height: n }, styles.mascot]}>
-        {layer(layers.shadow)}
-        <Animated.View style={[StyleSheet.absoluteFill, styles.body]}>
-          {layer(layers.armBack, styles.arm)}
-          {layer(layers.body)}
-          {layer(layers.look, styles.look)}
-          {layer(layers.lids, styles.lid)}
-          {layer(layers.brows, styles.brow)}
-          {layer(layers.armFront, styles.arm)}
-          {layer(layers.smile, styles.smile)}
-          {layer(layers.o, styles.o)}
-          {layer(layers.grin, styles.grin)}
-        </Animated.View>
+        <MascotFigure layers={layers} size={n} Svg={Svg} styles={{ body: styles.body, arm: styles.arm, look: styles.look, lid: styles.lid, brow: styles.brow, smile: styles.smile, o: styles.o, grin: styles.grin }} />
       </Animated.View>
       {styles.rings.map((r: any, i: number) => (
         <Animated.View
