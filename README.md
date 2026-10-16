@@ -86,7 +86,7 @@ Each package below switches on one feature. Without it, that feature is simply l
 | `expo-av` | The owner's message sounds, sound pack and launcher sound (without it, the chat is silent). Also voice notes. |
 | `expo-file-system` | Plays the synthesised sounds on iOS. Without it, the launcher sound still plays, and the synthesised tones play on Android only. |
 | `expo-font` | Loads the owner's Google font and the widget theme's font at run time. Without it, the chat uses the platform font. A system font the owner picked (Georgia, Verdana...) is still used by name. |
-| `@react-native-community/netinfo` | `useNetworkStatus()` (online / offline state). |
+| `@react-native-community/netinfo` | The device's own network in `isOnline` (without it, `isOnline` is the socket's state), and `useNetworkStatus()`. |
 | `react-native-document-picker` + `react-native-image-picker`, or `expo-document-picker` + `expo-image-picker` | Attachments (`enableAttachments`): files, the photo library and the camera. |
 | `react-native-audio-recorder-player` (or `expo-av`) | Voice notes (`enableVoiceMessage`). |
 
@@ -179,6 +179,8 @@ The launcher reads your dashboard settings: colour or gradient, icon, size, side
 
 `widgetConfig` also takes `borderRadius`, `themeType` (`'solid'` / `'gradient'`), `gradientColorStart`, `gradientColorEnd`, `iconName`, `iconImageUrl`, `iconScale` and `showShadow`. `ConferBotWidgetProps` extends `ChatWidgetProps`, so the chat's own props (`title`, `placeholder`, `enableAttachments`, `enableVoiceMessage`, ...) pass straight through.
 
+Inside the provider, the launcher's chat follows the provider's open state: `openChat()` and `closeChat()` from `useConferBot()`, from any screen, open and close it, and so does a [push notification](#push-notifications) tap. Tapping the launcher calls them too.
+
 ### Full screen, from your own button
 
 `ChatWidget` is the chat itself, presented as a full-screen modal that slides up. Give it `visible` and `onClose` to open it from your own button:
@@ -203,7 +205,7 @@ A `ChatWidget` without `visible` opens as soon as it mounts and stays open. Use 
 
 ### Open it from anywhere
 
-To open the chat from any screen, or from a [push notification](#push-notifications) tap, mount one `ChatWidget` that follows the provider's open state. Then call `openChat()` wherever you need it:
+To open the chat from any screen, or from a [push notification](#push-notifications) tap, call `openChat()` wherever you need it. With the [floating launcher](#floating-launcher-recommended) mounted, that is all: its chat follows the provider's open state. Without the launcher, mount one `ChatWidget` that follows it:
 
 ```tsx
 import React from 'react';
@@ -232,7 +234,7 @@ export default function App() {
 }
 ```
 
-The floating `ConferBotWidget` keeps its own open state: in this version it does not open when you call `openChat()`. If your app opens the chat from code (push taps included), use this pattern instead of the floating launcher, or as well as it.
+Mount either the launcher or this `ChatWidget`, not both: both follow `isOpen`, so both would open.
 
 ### Home screen
 
@@ -423,7 +425,7 @@ When an agent or the AI replies while the visitor is not in the chat (the app is
 
 1. Get the token with your push library. For example, `@react-native-firebase/messaging` gives an FCM token on both platforms with `messaging().getToken()`. You can also use the APNs device token as hex.
 2. Pass the token to the SDK. It is registered with the current conversation (`POST /api/v1/mobile/push/register` with `chatSessionId` and `tokenType`), and again for each new conversation. It is unregistered when your `user` goes away (logout), on `clearPersistedData()` and on `unregisterPush()`.
-3. Forward notifications to `handlePushNotification`. It returns `true` when the notification is this bot's Conferbot message, and opens its conversation: the chat, or that conversation in "Your requests". The chat opens with `openChat()`, so render it as in [Open it from anywhere](#open-it-from-anywhere).
+3. Forward notifications to `handlePushNotification`. It returns `true` when the notification is this bot's Conferbot message, and opens its conversation: the chat, or that conversation in "Your requests". The chat opens with `openChat()`: the floating `ConferBotWidget` opens, or a `ChatWidget` rendered as in [Open it from anywhere](#open-it-from-anywhere).
 
 ```tsx
 import { useEffect } from 'react';
@@ -519,7 +521,11 @@ export const App = () => (
 | `enableReadReceipts` | `boolean` | Read receipts (default `true`). |
 | `readReceiptConfig` | `ReadReceiptConfig` | `enabled`, `showIndicators`, `batchDebounceMs`, `autoMarkAsRead`. |
 | `autoConnect` | `boolean` | Connect the socket on mount (default `true`). |
-| `enableNotifications`, `enableOfflineMode`, `offlineQueueConfig`, `reconnectionAttempts`, `reconnectionDelay` | | Accepted for compatibility, but the provider doesn't read them in this version. Push is switched on by `setPushToken`. For the offline queue, see [Offline support](#offline-support). |
+| `reconnectionAttempts` | `number` | How many times the socket tries to reconnect after losing the server (default `5`; `0` never retries). |
+| `reconnectionDelay` | `number` | The first wait before a reconnect, in ms (default `1000`, doubling up to 5 s). |
+| `enableOfflineMode` | `boolean` | A message sent while offline waits and is sent on reconnect (default `true`). `false`: it is not sent. See [Offline support](#offline-support). |
+| `offlineQueueConfig` | `OfflineQueueConfig` | The offline queue: `maxQueueSize` (50), `maxRetries` (5), `initialRetryDelay`, `maxRetryDelay`, `backoffMultiplier`, `persistQueue` (default `true`: kept on the device when AsyncStorage is there), `keyPrefix`, `autoProcess`. |
+| `enableNotifications` | `boolean` | Deprecated, no effect (a development warning says so). Push is switched on by `setPushToken` and off by `unregisterPush`. |
 
 The `customization` prop (`ConferBotCustomization`) is accepted for forward compatibility, but the built-in UI doesn't apply it. Use the dashboard, or `ThemeProvider` for your own components.
 
@@ -842,10 +848,29 @@ The engine also reports every step it enters, every handle it takes and the end,
 
 - **Reactions**: the built-in emoji set is `REACTION_EMOJIS` (👍 👎 ❤️ 😊 😮 😢), synced in real time. Use `addReaction(messageId, '👍')`, `removeReaction` and `getReactions` on `useConferBot()`. `ReactionPicker` and `MessageReactions` render them, and `useReactions()` adds `toggleReaction`, `getGroupedReactions` and `hasUserReacted` for your own UI.
 - **Read receipts**: sent / delivered / read statuses update in real time (on by default; tune them with `config.readReceiptConfig`). Use `getMessageStatus`, `markMessageAsRead` and `markVisibleMessagesAsRead`. `MessageList` takes `messageStatuses` and `showReadReceipts`, and `MessageStatusIndicator` draws the ticks.
-- <a id="offline-support"></a>**Offline support**: the provider doesn't queue outbound messages in this version. `isOnline`, `pendingMessageCount`, `failedMessageCount`, `retryFailedMessage`, `retryAllFailedMessages` and `clearFailedMessages` are on the `ConferBotContext` type, but `useConferBot()` doesn't fill them in. For a queue of your own, use these building blocks:
-  - `useOfflineQueue({ botId, asyncStorage, sendMessage, config })` or the `OfflineQueueService` class: a persistent retry queue with exponential backoff;
-  - `useNetworkStatus()`, which needs `@react-native-community/netinfo` and returns `isConnected`, `isInternetReachable`, `type` and `refresh()`;
-  - `OfflineBanner`, which draws a "you are offline" banner.
+- <a id="offline-support"></a>**Offline support**: as on the web, a message the visitor sends while the connection is down waits, and is sent when the socket reconnects. The conversation's latest record goes once, carrying every message that waited. The queue is kept on the device when AsyncStorage is installed, so a message still waiting when the app closes goes at the next connect. `useConferBot()` gives you the state:
+  - `isOnline`: the socket is connected and, with `@react-native-community/netinfo` installed, the device is online. Without NetInfo it is the socket's state alone.
+  - `pendingMessageCount`: messages waiting to send.
+  - `failedMessageCount`, `retryFailedMessage(messageId)`, `retryAllFailedMessages()` and `clearFailedMessages()`: a send that gave up after `offlineQueueConfig.maxRetries` tries.
+
+  Turn the queue off with `config.enableOfflineMode: false`. The building blocks are exported for a UI of your own: `OfflineBanner` (a "you are offline" banner), `useNetworkStatus()` (needs NetInfo), and `useOfflineQueue()` / `OfflineQueueService`, a separate queue for your own sends.
+
+```tsx
+import React from 'react';
+import { Button, Text, View } from 'react-native';
+import { useConferBot } from '@conferbot/react-native';
+
+export function ConnectionLine() {
+  const { isOnline, pendingMessageCount, failedMessageCount, retryAllFailedMessages } = useConferBot();
+  if (isOnline && !failedMessageCount) return null;
+  return (
+    <View>
+      <Text>{isOnline ? 'Online' : `Offline: ${pendingMessageCount} waiting to send`}</Text>
+      {failedMessageCount > 0 ? <Button title="Retry" onPress={() => retryAllFailedMessages()} /> : null}
+    </View>
+  );
+}
+```
 
 ### Analytics
 
@@ -909,6 +934,7 @@ export function useCheckoutHelp() {
 | Field | Type | Meaning |
 |---|---|---|
 | `isInitialized`, `isConnected`, `isOpen` | `boolean` | The SDK is ready, the socket is connected, the chat is open. |
+| `isOnline`, `pendingMessageCount`, `failedMessageCount` | `boolean`, `number`, `number` | Online (socket and NetInfo), messages waiting to send, sends that gave up (see [Offline support](#offline-support)). |
 | `chatSessionId` | `string \| undefined` | The current conversation. |
 | `unreadCount` | `number` | Messages that arrived while the chat was closed. |
 | `record` | `RecordItem[]` | The conversation. |
@@ -953,12 +979,13 @@ export function useCheckoutHelp() {
 | `rateKBArticle` | `(articleId: string, helpful: boolean, rating: number, feedback?: string) => void` | Rate a help article. |
 | `sendVisitorTyping` | `(isTyping: boolean) => void` | Send the visitor's typing status. |
 | `clearPersistedData` / `resetConversation` | `() => Promise<void>` | Forget what is kept on the device / start a fresh conversation. |
+| `retryFailedMessage` / `retryAllFailedMessages` / `clearFailedMessages` | `(messageId: string) => Promise<boolean>` / `() => Promise<number>` / `() => Promise<number>` | Try a failed send again, all of them, or drop them. |
 
 ### Events
 
 Two kinds of events can be subscribed to from `useConferBot()`:
 
-- **Socket events**: `on(event, callback)` returns an unsubscribe function. The event names are the kebab-case strings of `SocketEvents`, which the package exports as a type only, so pass the string with a cast.
+- **Socket events**: `on(event, callback)` returns an unsubscribe function. The event names are the `SocketEvents` enum (`SocketEvents.BOT_RESPONSE` is `'bot-response'`).
 - **Waiting signals**: the same signals as the web widget, for your own waiting experience (a game, an article, a banner). `onWidgetSignal()` returns an unsubscribe function, and no detail carries personal data.
 
 ```tsx
@@ -968,13 +995,13 @@ import {
   WAITING_FOR_HUMAN_EVENT,
   HUMAN_JOINED_EVENT,
   WAIT_OVER_EVENT,
+  SocketEvents,
 } from '@conferbot/react-native';
-import type { SocketEvents } from '@conferbot/react-native';
 
 export function useChatEvents() {
   const { on, onWidgetSignal } = useConferBot();
 
-  useEffect(() => on('bot-response' as SocketEvents, (data) => console.log('bot', data)), [on]);
+  useEffect(() => on(SocketEvents.BOT_RESPONSE, (data) => console.log('bot', data)), [on]);
 
   useEffect(() => {
     const offs = [
@@ -995,13 +1022,13 @@ export function useChatEvents() {
 
 | Socket event | Sent when |
 |---|---|
-| `'bot-response'` | The bot answered. |
-| `'agent-message'` | A person wrote. |
-| `'agent-accepted'` | A person took the chat. |
-| `'agent-left'` | The person left. |
-| `'agent-typing-status'` | The person is typing, or stopped. |
-| `'chat-ended'` | The chat was ended. |
-| `'connection-error'` | The socket couldn't connect. |
+| `SocketEvents.BOT_RESPONSE` (`'bot-response'`) | The bot answered. |
+| `SocketEvents.AGENT_MESSAGE` (`'agent-message'`) | A person wrote. |
+| `SocketEvents.AGENT_ACCEPTED` (`'agent-accepted'`) | A person took the chat. |
+| `SocketEvents.AGENT_LEFT` (`'agent-left'`) | The person left. |
+| `SocketEvents.AGENT_TYPING_STATUS` (`'agent-typing-status'`) | The person is typing, or stopped. |
+| `SocketEvents.CHAT_ENDED` (`'chat-ended'`) | The chat was ended. |
+| `SocketEvents.CONNECTION_ERROR` (`'connection-error'`) | The socket couldn't connect. |
 
 | Callback | Where | What it does |
 |---|---|---|
@@ -1059,10 +1086,7 @@ export function useChatEvents() {
 - **The visitor is in the chat**: no push is sent while the visitor is in the chat.
 
 **A notification tap doesn't open the chat**
-- `handlePushNotification` opens the chat with `openChat()`. The floating `ConferBotWidget` doesn't follow `openChat()` in this version, so render the chat as in [Open it from anywhere](#open-it-from-anywhere).
-
-**TypeScript: `'SocketEvents' cannot be used as a value`**
-- `SocketEvents` is exported as a type. Pass the event's string: `on('bot-response' as SocketEvents, ...)`.
+- `handlePushNotification` opens the chat with `openChat()`. Check that `ConferBotWidget`, or a `ChatWidget` rendered as in [Open it from anywhere](#open-it-from-anywhere), is mounted inside the same provider, and that the call runs inside it (`useConferBot()`).
 
 **Stale build**
 - Reset Metro (`npx react-native start --reset-cache`), and rebuild the app after adding a native package.
