@@ -34,6 +34,7 @@ import {
   isFilePickerAvailable,
   isImagePickerAvailable,
 } from '../../utils/FilePicker';
+import { t as tr, monthNames, weekdayNames, widgetLanguage, widgetLocale } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_WIDTH = SCREEN_WIDTH - 24;
@@ -74,18 +75,25 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMonth, setViewMonth] = useState(new Date());
 
-  const months = [
+  const months = monthNames('long', [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
-  ];
+  ]);
 
-  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const daysOfWeek = weekdayNames('short', ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
 
   const formatDate = (date: Date): string => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
 
   const formatDisplayDate = (date: Date): string => {
+    if (widgetLanguage() !== 'en') {
+      try {
+        return new Intl.DateTimeFormat(widgetLocale(), { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+      } catch {
+        /* no Intl: the month name below */
+      }
+    }
     return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
   };
 
@@ -296,7 +304,7 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
     return (
       <View style={styles.timeSlotsContainer}>
         <Text style={[styles.timeSlotsTitle, { color: theme.colors.text }]}>
-          Select a time
+          {tr('booking.selectTime')}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {times.map(time => (
@@ -340,7 +348,7 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
   };
 
   const getDisplayValue = (): string => {
-    if (!selectedDate) return 'Select a date...';
+    if (!selectedDate) return tr('sdk.date.placeholder');
 
     let display = formatDisplayDate(selectedDate);
 
@@ -471,7 +479,7 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
                   },
                 ]}
               >
-                Confirm
+                {tr('action.confirm')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -491,7 +499,7 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
         onPress={handleSubmit}
         disabled={!canSubmit() || isSubmitting}
         accessibilityRole="button"
-        accessibilityLabel="Submit"
+        accessibilityLabel={tr('common.submit')}
       >
         <Text
           style={[
@@ -504,7 +512,7 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
             },
           ]}
         >
-          {isSubmitting ? 'Sending...' : 'Submit'}
+          {isSubmitting ? tr('common.sending') : tr('common.submit')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -528,10 +536,11 @@ export const MultiFieldForm: React.FC<MultiFieldFormProps> = ({
   nodeId,
   title,
   questions,
-  submitLabel = 'Submit',
+  submitLabel: submitLabelProp,
   onSubmit,
 }) => {
   const theme = useTheme();
+  const submitLabel = submitLabelProp ?? tr('common.submit');
   const [values, setValues] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -554,21 +563,21 @@ export const MultiFieldForm: React.FC<MultiFieldFormProps> = ({
       const value = values[q.id];
 
       if (q.required && (!value || (typeof value === 'string' && !value.trim()))) {
-        newErrors[q.id] = 'This field is required';
+        newErrors[q.id] = tr('sdk.validation.required');
         return;
       }
 
       if (value && q.type === 'email') {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(value)) {
-          newErrors[q.id] = 'Please enter a valid email';
+          newErrors[q.id] = tr('validation.email');
         }
       }
 
       if (value && q.type === 'phone') {
         const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/;
         if (!phoneRegex.test(value)) {
-          newErrors[q.id] = 'Please enter a valid phone number';
+          newErrors[q.id] = tr('validation.phone');
         }
       }
     });
@@ -755,7 +764,7 @@ export const MultiFieldForm: React.FC<MultiFieldFormProps> = ({
             },
           ]}
         >
-          {isSubmitting ? 'Sending...' : submitLabel}
+          {isSubmitting ? tr('common.sending') : submitLabel}
         </Text>
       </TouchableOpacity>
     </View>
@@ -945,13 +954,13 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
     } catch (error) {
       if (error instanceof FilePickerError) {
         if (error.code === 'FILE_TOO_LARGE') {
-          setUploadError(`File too large. Maximum size is ${formatFileSize(maxSize)}`);
+          setUploadError(tr('upload.overSize', { mb: Math.round((maxSize / (1024 * 1024)) * 10) / 10 }));
         } else if (error.code !== 'NOT_AVAILABLE') {
-          setUploadError(error.message);
+          setUploadError(tr('common.somethingWrong'));
         }
       } else {
         console.error('[FileUploadButton] Pick error:', error);
-        setUploadError('Failed to select file. Please try again.');
+        setUploadError(tr('common.somethingWrong'));
       }
     }
   }, [multiple, maxSize]);
@@ -964,18 +973,18 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
 
     if (hasImagePicker) {
       buttons.push({
-        text: 'Take Photo',
+        text: tr('sdk.file.takePhoto'),
         onPress: () => handleFilePick('camera'),
       });
       buttons.push({
-        text: 'Choose from Gallery',
+        text: tr('sdk.file.gallery'),
         onPress: () => handleFilePick('image'),
       });
     }
 
     if (hasFilePicker) {
       buttons.push({
-        text: 'Choose Document',
+        text: tr('sdk.file.document'),
         onPress: () => handleFilePick('document'),
       });
     }
@@ -991,12 +1000,12 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
     }
 
     buttons.push({
-      text: 'Cancel',
+      text: tr('common.cancel'),
       style: 'cancel',
       onPress: () => {},
     });
 
-    Alert.alert('Select File', 'Choose how you want to add a file', buttons);
+    Alert.alert(tr('sdk.file.selectTitle'), tr('sdk.file.selectMessage'), buttons);
   }, [hasFilePicker, hasImagePicker, hasAnyPicker, handleFilePick]);
 
   /**
@@ -1067,7 +1076,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
       });
     } catch (error: any) {
       console.error('[FileUploadButton] Upload error:', error);
-      setUploadError(error.message || 'Failed to upload file. Please try again.');
+      setUploadError(tr('upload.failed'));
       setIsUploading(false);
     }
   }, [selectedFiles, uploadedUrls, uploadFileToServer, onSubmit, variableName]);
@@ -1077,7 +1086,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
    */
   const getAcceptedTypesText = (): string => {
     if (!acceptedTypes || acceptedTypes.length === 0) {
-      return 'All files';
+      return tr('file.any');
     }
     return acceptedTypes.map(t => t.replace('.', '').toUpperCase()).join(', ');
   };
@@ -1138,7 +1147,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
         onPress={showPickerOptions}
         disabled={isUploading}
         accessibilityRole="button"
-        accessibilityLabel="Select file to upload"
+        accessibilityLabel={tr('file.chooseLabel')}
       >
         <Text style={styles.uploadIcon}>{'\uD83D\uDCC1'}</Text>
         <Text
@@ -1150,7 +1159,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
             },
           ]}
         >
-          {multiple ? 'Choose Files' : 'Choose File'}
+          {multiple ? tr('sdk.file.chooseMany') : tr('sdk.file.chooseOne')}
         </Text>
         <Text
           style={[
@@ -1173,7 +1182,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
               },
             ]}
           >
-            File picker library not installed
+            {tr('sdk.file.pickerMissing')}
           </Text>
         )}
       </TouchableOpacity>
@@ -1234,7 +1243,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
                     ]}
                   >
                     {formatFileSize(file.size)}
-                    {isUploaded && ' - Uploaded'}
+                    {isUploaded && ` - ${tr('sdk.file.uploaded')}`}
                   </Text>
 
                   {/* Upload Progress */}
@@ -1269,7 +1278,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
                   onPress={() => handleRemoveFile(file.id)}
                   disabled={isUploading}
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove ${file.name}`}
+                  accessibilityLabel={tr('sdk.file.remove', { name: file.name })}
                 >
                   <Text style={[styles.removeFileIcon, { color: theme.colors.error }]}>
                     {'\u2715'}
@@ -1296,7 +1305,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
         onPress={handleSubmit}
         disabled={selectedFiles.length === 0 || isUploading}
         accessibilityRole="button"
-        accessibilityLabel="Upload files"
+        accessibilityLabel={tr('sdk.file.uploadMany')}
       >
         {isUploading ? (
           <View style={styles.uploadingContainer}>
@@ -1307,7 +1316,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
                 { color: theme.colors.textInverse, marginLeft: 8 },
               ]}
             >
-              Uploading...
+              {tr('sdk.file.uploading')}
             </Text>
           </View>
         ) : (
@@ -1323,7 +1332,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
               },
             ]}
           >
-            Upload
+            {tr('sdk.file.upload')}
           </Text>
         )}
       </TouchableOpacity>
@@ -1427,7 +1436,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         onPress={handleGetCurrentLocation}
         disabled={isGettingLocation || isSubmitting}
         accessibilityRole="button"
-        accessibilityLabel="Use current location"
+        accessibilityLabel={tr('address.useLocation')}
       >
         <Text style={styles.locationButtonIcon}>{'\uD83D\uDCCD'}</Text>
         <Text
@@ -1439,7 +1448,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
             },
           ]}
         >
-          {isGettingLocation ? 'Getting location...' : 'Use Current Location'}
+          {isGettingLocation ? tr('address.locating') : tr('address.useLocation')}
         </Text>
       </TouchableOpacity>
 
@@ -1454,7 +1463,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
               },
             ]}
           >
-            or enter manually
+            {tr('sdk.location.orManual')}
           </Text>
 
           <TextInput
@@ -1470,7 +1479,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
             ]}
             value={address}
             onChangeText={setAddress}
-            placeholder="Enter your address..."
+            placeholder={tr('address.placeholder')}
             placeholderTextColor={theme.colors.textDisabled}
             multiline
             numberOfLines={3}
@@ -1517,7 +1526,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         onPress={handleSubmit}
         disabled={(!address.trim() && !coordinates) || isSubmitting}
         accessibilityRole="button"
-        accessibilityLabel="Submit location"
+        accessibilityLabel={tr('sdk.location.submit')}
       >
         <Text
           style={[
@@ -1531,7 +1540,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
             },
           ]}
         >
-          {isSubmitting ? 'Sending...' : 'Submit'}
+          {isSubmitting ? tr('common.sending') : tr('common.submit')}
         </Text>
       </TouchableOpacity>
     </View>
