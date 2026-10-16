@@ -4,6 +4,7 @@ import { useTheme } from '../../theme';
 import type { ConferBotTheme } from '../../theme/types';
 import { EmojiGrid } from './EmojiGrid';
 import type { EmojiCategory as EmojiCategoryType } from './emojiData';
+import { emojiCategoryName } from './emojiData';
 
 export interface EmojiCategoryProps {
   category: EmojiCategoryType;
@@ -37,7 +38,7 @@ export const EmojiCategory: React.FC<EmojiCategoryProps> = ({
       {showHeader && (
         <View style={styles.header}>
           <Text style={styles.headerIcon}>{category.icon}</Text>
-          <Text style={styles.headerText}>{category.name}</Text>
+          <Text style={styles.headerText}>{emojiCategoryName(category)}</Text>
         </View>
       )}
       <EmojiGrid
