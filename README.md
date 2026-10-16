@@ -38,7 +38,7 @@ The complete flow recorded live on an Android emulator against production: open 
 - **Home screen** - When the owner turns it on (Customize > Welcome), the chat opens on the web widget's home screen: a greeting by the clock or "Welcome back, Jamie", "Ask anything" (the AI agent answers the question, or the help articles that answer it), "Pick up where you left off", "Your requests", "Talk to us" with the team's reply time, faces and rating, recent articles and topics, the customer logos. `{{first_name|there}}` in the owner's texts is filled from your `user`
 - **Offline Support** - Messages are queued locally and retried when connectivity returns
 - **Session Persistence** - Conversations survive app restarts via AsyncStorage
-- **Push Token Registration** - Register device tokens for background message delivery
+- **Push notifications** - Opt-in: pass your FCM / APNs token with `setPushToken`, and a tapped Conferbot notification opens its conversation (`handlePushNotification`). No Firebase dependency in the SDK
 - **Message Reactions** - Emoji reactions with real-time sync
 - **Read Receipts** - Sent, delivered, and read status indicators
 - **File Attachments** - Camera, gallery, and document picker support
@@ -433,18 +433,41 @@ import { ThemeProvider, darkTheme } from '@conferbot/react-native';
 
 Read the active theme in your own components with `useTheme()`. The full token set (`colors`, `typography`, `spacing`, `borderRadius`, `shadows`, `animations`, `layout`) is defined in the `ConferBotTheme` type.
 
-## Push Notifications
+## Push notifications
 
-Register a device push token (from Firebase, APNs, or Expo) so the visitor can receive messages while the app is backgrounded. The SDK detects the platform automatically and posts to the Conferbot mobile API:
+When an agent or the AI replies while the visitor is not in the chat (the app is in the background or closed), the Conferbot server sends a push: FCM on Android, APNs on iOS. The SDK does not depend on Firebase or any push library; push is off until your app hands it a token.
+
+1. Get the token with your push library, e.g. `@react-native-firebase/messaging` (`messaging().getToken()`, an FCM token on both platforms) or the APNs device token as hex.
+2. Pass it to the SDK. It is registered with the current conversation (`POST /api/v1/mobile/push/register` with `chatSessionId` and `tokenType`), again for each new conversation, and unregistered when your `user` goes away (logout), on `clearPersistedData()` or `unregisterPush()`.
+3. Forward notifications to `handlePushNotification`. It returns `true` when it was this bot's Conferbot message and opens its conversation (the chat, or that conversation in "Your requests").
 
 ```tsx
-const { registerPushToken } = useConferBot();
+import messaging from '@react-native-firebase/messaging';
+import { useConferBot } from '@conferbot/react-native';
 
-// After obtaining a token from your push provider:
-await registerPushToken(deviceToken);
+function ConferbotPush() {
+  const { setPushToken, handlePushNotification } = useConferBot();
+
+  useEffect(() => {
+    messaging().getToken().then((t) => setPushToken(t, 'fcm'));
+    const offRefresh = messaging().onTokenRefresh((t) => setPushToken(t, 'fcm'));
+    // Tapped while in the background / from a cold start.
+    const offOpened = messaging().onNotificationOpenedApp((m) => handlePushNotification(m));
+    messaging().getInitialNotification().then((m) => m && handlePushNotification(m));
+    // Arrived in the foreground: count it as unread instead of taking the screen.
+    const offMessage = messaging().onMessage((m) => handlePushNotification(m, { open: false }));
+    return () => { offRefresh(); offOpened(); offMessage(); };
+  }, []);
+  return null;
+}
 ```
 
-Obtaining the token itself (e.g. via `@react-native-firebase/messaging`) and displaying notifications is up to your app - the SDK only registers the token with Conferbot. There is currently no public unregister method.
+- `setPushToken(token, type?)`: `type` is `'fcm'` or `'apns'`; an iOS app using Firebase Messaging passes `'fcm'`. Without it a 64-character hex token is taken as APNs. `setPushToken(null)` unregisters.
+- `handlePushNotification(data, { open? })` takes the data map or the library's message object (RNFirebase `RemoteMessage`, Notifee's `notification`, Expo's notification or response, iOS `userInfo`). Outside the provider, `isConferbotPush(data)` / `parseConferbotPush(data)` say whether a notification is Conferbot's (data `source: "conferbot"`, `type: "conferbot_message"`, `botId`, `chatSessionId`, `messageId`, `senderType`, `senderName`, `body`).
+- Android: the server sends on the channel `conferbot_messages` (`PUSH_CHANNEL_ID`). Create it in your app (e.g. with Notifee) so the visitor can control it; otherwise Android uses its fallback channel. One notification per conversation (collapse key / tag and iOS `thread-id` = the conversation).
+- `registerPushToken(token)` still works: it is `setPushToken(token)`.
+
+Server side: sending is off until the workspace's embed-server has `MOBILE_PUSH_ENABLED=true` and the FCM / APNs credentials (embed-server `docs/mobile-push.md`). The credentials are platform-wide for now: pushes reach only apps built on Conferbot's Firebase project and bundle id. Your own app's Firebase project / bundle id needs per-workspace credentials, which are not built yet (embed-server #197); until then its tokens register but its pushes are refused by FCM / APNs.
 
 ## Offline Support
 
@@ -732,7 +755,10 @@ Actions:
 | `openChat` / `closeChat` | `() => void` | Toggle the open state / reset unread count |
 | `sendMessage` | `(text: string, attachments?: MessageAttachment[]) => Promise<void>` | Send a visitor message |
 | `submitNodeResponse` | `(response: any, portName?: string) => void` | Answer the active interactive flow node |
-| `registerPushToken` | `(token: string) => Promise<void>` | Register a device push token |
+| `setPushToken` | `(token: string \| null, type?: 'fcm' \| 'apns') => Promise<void>` | Push notifications: register the device token with the conversation (null unregisters) |
+| `handlePushNotification` | `(data: unknown, options?: { open?: boolean }) => boolean` | A Conferbot notification: true, and its conversation opened |
+| `unregisterPush` | `() => Promise<void>` | Stop this device's pushes |
+| `registerPushToken` | `(token: string) => Promise<void>` | Deprecated: `setPushToken(token)` |
 | `on` / `off` | `(event: SocketEvents, cb: (...args: any[]) => void) => () => void` | Subscribe to socket events (`on` returns unsubscribe) |
 | `addReaction` / `removeReaction` | `(messageId: string, emoji: ReactionEmoji) => void` | React to a message |
 | `getReactions` | `(messageId: string) => Reaction[]` | Read reactions for a message |
