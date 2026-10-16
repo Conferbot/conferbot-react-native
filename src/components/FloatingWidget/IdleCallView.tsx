@@ -3,6 +3,7 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 import { mascotLayers, type MascotLook } from '../../core/mascotArt';
 import type { IdleCallPerformance } from '../../core/launcherIdleCall';
 import { MascotFigure } from '../Mascot/MascotFigure';
+import { t } from '../../core/i18n';
 
 type SvgComponent = React.ComponentType<{ xml: string; width: number | string; height: number | string }>;
 
@@ -64,7 +65,7 @@ export const IdleCallBubble: React.FC<{
       style={[{ position: 'absolute', left, bottom: launcherHeight - (perf.sayY - 10), zIndex: 10002, elevation: 9 }, style, bw ? null : { opacity: 0 }]}
       onLayout={(e) => setBw(e.nativeEvent.layout.width)}
     >
-      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${line} Open the chat`} style={bubble.box}>
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${line} ${t('launcher.openThe')}`} style={bubble.box}>
         <Text style={[bubble.text, font ? { fontFamily: font } : null]} numberOfLines={1}>
           {line}
         </Text>
