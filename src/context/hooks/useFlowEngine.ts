@@ -53,6 +53,8 @@ interface UseFlowEngineParams {
   persistFlowState: () => Promise<void>;
   /** The flow reached its end: the conversation is over (the post-chat redirect). */
   onConversationEnd?: () => void;
+  /** The flow reached its end, not an agent ending the chat: the post-chat rating (#76). */
+  onFlowEnd?: () => void;
 }
 
 export function useFlowEngine({
@@ -66,6 +68,7 @@ export function useFlowEngine({
   persistAnswerVariables,
   persistFlowState,
   onConversationEnd,
+  onFlowEnd,
 }: UseFlowEngineParams) {
   const [currentUIState, setCurrentUIState] = useState<NodeUIState | null>(null);
   const [isNodeProcessing, setIsNodeProcessing] = useState(false);
@@ -215,6 +218,8 @@ export function useFlowEngine({
             setCurrentUIState(null);
             setIsNodeProcessing(false);
             persistFlowState();
+            // The post-chat rating first, so the redirect already waits for it.
+            onFlowEnd?.();
             onConversationEnd?.();
           },
           onError: (error, nodeId) => {
