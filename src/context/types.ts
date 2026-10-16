@@ -210,6 +210,35 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   knowledgeBase: { categories: any[]; recentArticles: any[] };
   /** Matches inside article text from the server (the ask box). */
   searchArticleText: (query: string) => Promise<Array<{ _id: string; snippet: string }>>;
+  // ---- The chat's font (core/ownerFont.ts, hooks/useChatFont.ts) ----
+  /** `chatFont.body(weight)` / `chatFont.display(weight)`: a { fontFamily } style, or null for the platform font. */
+  chatFont: import('../hooks/useChatFont').ChatFont;
+  // ---- Sounds (core/messageSound.ts, context/hooks/useChatSounds.ts) ----
+  /** The visitor's Sound on / off (kept on the device). */
+  soundOn: boolean;
+  /** The bot has a sound (message sound, sound pack or launcher sound): the menu offers the switch. */
+  hasSounds: boolean;
+  toggleSound: () => void;
+  /** The visitor sent from the composer (a sound pack's send sound). */
+  playSendSound: () => boolean;
+  // ---- Human touches (core/delight.ts, context/hooks/useDelight.ts) ----
+  /** The bot's tapback and the celebration, per answer row id. */
+  answerTouches: Record<string, import('./hooks/useDelight').AnswerTouch>;
+  /** The answer row that shows "Edit", if any. */
+  changeAnswerRowId: string | null;
+  /** "Edit": back to that question. */
+  changeAnswer: () => void;
+  /** "No rush - ..." under a question that has waited, or null. */
+  stallHint: string | null;
+  /** The visitor touched, scrolled or typed in the chat (the nudge waits). */
+  noteChatActivity: () => void;
+  /** The burst on an answer finished. */
+  clearAnswerTouch: (rowId: string) => void;
+  // ---- Typing preview (core/typingPreview.ts) ----
+  /** The composer's text changed: the agent's preview while a person is in the chat. */
+  updateVisitorDraft: (text: string, field?: { secureTextEntry?: boolean; textContentType?: string; autoComplete?: string }) => void;
+  /** Sent, or emptied: the agent's preview goes. */
+  clearVisitorDraft: () => void;
 }
 
 // ********** Extended Config Types ********** //
