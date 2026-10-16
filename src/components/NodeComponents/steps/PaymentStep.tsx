@@ -12,13 +12,14 @@ import React, { useEffect, useState } from 'react';
 import { Linking } from 'react-native';
 import { isCheckoutUrl, paymentCountdown } from '../../../core/flow/rich';
 import { StepButton, StepCard, StepRow, StepStatus, StepViewProps, useStepLook } from './stepKit';
+import { t } from '../../../core/i18n';
 
 /** "12:05 left" until the step times out, or nothing. */
 export const paymentTimeLeft = (expiresAt: any, now: number): string => {
   const at = Number(expiresAt);
   if (!Number.isFinite(at) || at <= 0) return '';
   const left = at - now;
-  return left > 0 ? `${paymentCountdown(left)} left` : '';
+  return left > 0 ? t('sdk.pay.timeLeft', { time: paymentCountdown(left) }) : '';
 };
 
 export const PaymentStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 'step-payment' }) => {
