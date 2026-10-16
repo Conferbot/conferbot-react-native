@@ -70,6 +70,8 @@ export interface RichEntry {
   [key: string]: unknown;
 }
 
+import { t } from './i18n';
+
 export const DEFAULT_AGENT_NAME = 'AI Assistant';
 /**
  * How long the "writing a reply" dots may wait for the AI (web
@@ -80,16 +82,20 @@ export const AWAIT_REPLY_MS = 45000;
 
 /** Said when that ceiling is hit, so the dots do not just vanish (web chat.replyTimeout). */
 export const REPLY_TIMEOUT_TEXT = 'That took too long. Try again, or ask for a human.';
+/** The same in the active language. */
+export const replyTimeoutText = (): string => t('chat.replyTimeout');
 
 /** The notice as an on-screen line (not part of the conversation's record, as on the web). */
 export const replyTimeoutNotice = (now: number = Date.now()) => ({
   _id: `reply-timeout-${now}`,
   type: 'system-message' as const,
-  text: REPLY_TIMEOUT_TEXT,
+  text: replyTimeoutText(),
   time: new Date(now).toISOString(),
 });
 
 export const DEFAULT_AGENT_GREETING = 'Hi! How can I help you today?';
+/** The greeting when the owner wrote none, in the active language (web index.ts t("agent.defaultGreeting")). */
+export const defaultAgentGreeting = (): string => t('agent.defaultGreeting');
 export const MAX_AGENT_SOURCES = 3;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -121,7 +127,7 @@ export const parseAgentBot = (chatbotData: any): AgentBot | null => {
   if (!a || typeof a !== 'object' || !a.agentId) return null;
   return {
     agentId: String(a.agentId),
-    displayName: clean(a.displayName, 60) || clean(chatbotData?.name, 60) || DEFAULT_AGENT_NAME,
+    displayName: clean(a.displayName, 60) || clean(chatbotData?.name, 60) || t('agent.defaultName'),
     greeting: typeof a.greeting === 'string' ? a.greeting.trim() : '',
     starters: startersOf(a.starters),
     avatar: typeof a.avatar === 'string' && a.avatar ? a.avatar : null,
@@ -194,7 +200,7 @@ export const normalizeAgentSources = (raw: unknown): AgentSource[] => {
     if ((!articleId && !/^https?:\/\//i.test(url)) || seen.has(key)) continue;
     seen.add(key);
     const source: AgentSource = articleId
-      ? { title: clean(item?.title, 160) || 'Help article', articleId, ...(httpUrl(url) ? { url } : {}) }
+      ? { title: clean(item?.title, 160) || t('kb.helpArticle'), articleId, ...(httpUrl(url) ? { url } : {}) }
       : { title: clean(item?.title, 160) || sourceHost(url), url };
     const snippet = clean(item?.snippet || item?.description || item?.excerpt, 220);
     if (snippet) source.snippet = snippet;
@@ -243,11 +249,11 @@ export const resultCardOf = (v: any): ResultCard | null => {
   const tone = ['done', 'moving', 'problem', 'neutral'].includes(v.tone) ? v.tone : 'neutral';
   const url = httpsUrl(v.link?.url);
   return {
-    title: clean(v.title, 50) || 'Done',
+    title: clean(v.title, 50) || t('result.done'),
     status,
     tone,
     rows,
-    link: url ? { url, label: clean(v.link?.label, 24) || 'Open' } : null,
+    link: url ? { url, label: clean(v.link?.label, 24) || t('result.open') } : null,
   };
 };
 
