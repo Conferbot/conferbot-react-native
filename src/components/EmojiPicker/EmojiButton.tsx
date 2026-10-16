@@ -6,6 +6,7 @@ import {
   View,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 
 export interface EmojiButtonProps {
@@ -43,7 +44,7 @@ export const EmojiButton: React.FC<EmojiButtonProps> = ({
       ]}
       activeOpacity={0.7}
       accessible={true}
-      accessibilityLabel={isActive ? 'Close emoji picker' : 'Open emoji picker'}
+      accessibilityLabel={isActive ? t('sdk.emoji.close') : t('sdk.emoji.open')}
       accessibilityRole="button"
       accessibilityState={{ expanded: isActive, disabled }}
       testID={testID}
