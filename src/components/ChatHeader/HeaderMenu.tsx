@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../theme';
 import type { ConferBotTheme } from '../../theme/types';
+import { t } from '../../core/i18n';
 
 export interface HeaderMenuItem {
   id: string;
@@ -51,7 +52,7 @@ export const HeaderMenu: React.FC<HeaderMenuProps> = ({ items, testID }) => {
         style={styles.menuButton}
         onPress={() => setVisible(true)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityLabel="More options"
+        accessibilityLabel={t('chat.menu.label')}
         accessibilityRole="button"
       >
         <View style={styles.dotsContainer}>
