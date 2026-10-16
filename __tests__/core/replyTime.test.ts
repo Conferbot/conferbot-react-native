@@ -91,3 +91,28 @@ describe('homeLine / homePeople (web replyTime.ts)', () => {
     expect(p({ mode: 'hide', handover: true }, { agent: true }).text).toBe('Answers instantly, day or night');
   });
 });
+
+describe('typicalWait (the wait card, web replyTime.ts typicalWait)', () => {
+  const { typicalWait } = require('../../src/core/replyTime');
+  const { setWidgetLanguage } = require('../../src/core/i18n');
+  afterEach(() => setWidgetLanguage('en'));
+
+  it('says the routed team\'s usual wait first, else the workspace\'s', () => {
+    expect(typicalWait({ mode: 'auto', bucket: 'few_hours' }, { bucket: 'under_minute' })).toBe('Typical wait: under a minute');
+    expect(typicalWait({ mode: 'auto', bucket: 'few_hours' }, null)).toBe('Typical wait: a few hours');
+    expect(typicalWait({ mode: 'auto', bucket: 'unknown', wait: 'about 3 minutes' }, null)).toBe('Typical wait: about 3 minutes');
+    expect(typicalWait(null, { bucket: 'day' })).toBe('Typical wait: up to a day');
+  });
+
+  it('says nothing when the owner chose Fixed or Hide, or there is no data', () => {
+    expect(typicalWait({ mode: 'hide', bucket: 'few_minutes' }, { bucket: 'few_minutes' })).toBeNull();
+    expect(typicalWait({ mode: 'fixed', text: 'Within a day', bucket: 'few_minutes' }, null)).toBeNull();
+    expect(typicalWait({ mode: 'auto' }, null)).toBeNull();
+    expect(typicalWait(null, null)).toBeNull();
+  });
+
+  it('is in the visitor\'s language', () => {
+    setWidgetLanguage('de');
+    expect(typicalWait({ mode: 'auto', bucket: 'few_minutes' })).not.toMatch(/Typical/);
+  });
+});
