@@ -122,6 +122,28 @@ describe('ConferBotSocket', () => {
       await expect(connectPromise).rejects.toThrow('Connection failed');
     });
 
+    it('a blocked visitor: refused at the handshake, told to the listeners (#47)', async () => {
+      const blockedClient = new ConferBotSocket({ apiKey, botId, userId, socketUrl, visitorId: 'v-9' });
+      const onBlocked = jest.fn();
+      blockedClient.on('visitor-blocked', onBlocked);
+      const connectPromise = blockedClient.connect();
+      // The visitor travels with the handshake, so the server can refuse them.
+      expect(io).toHaveBeenLastCalledWith(socketUrl, expect.objectContaining({
+        auth: { botId, visitorId: 'v-9' },
+        query: { botId, visitorId: 'v-9' },
+      }));
+      const errorHandler = mockSocket.on.mock.calls.filter((call: any[]) => call[0] === 'connect_error').pop();
+      errorHandler[1](new Error('visitor_blocked'));
+      await expect(connectPromise).rejects.toThrow('visitor_blocked');
+      expect(onBlocked).toHaveBeenCalledWith({ handshake: true });
+    });
+
+    it('forwards the requeue, transfer and block events (#47, #48)', () => {
+      socketClient.connect();
+      const registered = mockSocket.on.mock.calls.map((call: any[]) => call[0]);
+      expect(registered).toEqual(expect.arrayContaining(['live-chat-requeued', 'live-chat-transferred', 'visitor-blocked']));
+    });
+
     it('should send initialization payload on connect', async () => {
       const connectPromise = socketClient.connect();
 
