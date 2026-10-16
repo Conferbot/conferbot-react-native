@@ -15,6 +15,7 @@ import { useTheme } from '../../theme';
 import { readableOn } from '../../theme/color';
 import type { ConferBotTheme } from '../../theme/types';
 import { t } from '../../core/i18n';
+import { useChatFont } from '../../hooks/useChatFont';
 
 const CONFERBOT_URL = 'https://www.conferbot.com';
 const CONFERBOT_LOGO_URL =
@@ -36,6 +37,8 @@ export interface ChatBottomBarProps {
   /** The field's corner radius and fill, from the widget theme (a pill on the surface by default). */
   fieldRadius?: number;
   fieldColor?: string;
+  /** The text as it changes, and "" once sent (the agent's typing preview, the waiting nudge). */
+  onDraft?: (text: string) => void;
   testID?: string;
 }
 
@@ -57,9 +60,11 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
   onAttach,
   fieldRadius,
   fieldColor,
+  onDraft,
   testID,
 }) => {
   const theme = useTheme();
+  const font = useChatFont();
   const styles = createStyles(theme);
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -78,6 +83,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
     try {
       await onSend(trimmed);
       setText('');
+      onDraft?.('');
     } catch (e) {
       // Handle error silently
     } finally {
@@ -109,10 +115,11 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
         {/* Pill-shaped input with subtle border */}
         <View style={[styles.inputPill, fieldRadius !== undefined && { borderRadius: Math.min(fieldRadius, 25) }, fieldColor ? { backgroundColor: fieldColor } : null]}>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, font.body()]}
             value={text}
             onChangeText={(newText) => {
               setText(newText);
+              onDraft?.(newText);
               if (onTyping) {
                 if (newText.length > 0) {
                   onTyping(true);
