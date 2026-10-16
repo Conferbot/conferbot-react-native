@@ -8,6 +8,7 @@ import { ChatState } from '../../src/core/state/ChatState';
 import { NodeResult } from '../../src/core/nodes/NodeHandler';
 import { CalendarHandler, MultipleQuestionsHandler, advancedInputHandlers } from '../../src/core/nodes/handlers/AdvancedInputHandlers';
 import { createNode } from '../testUtils';
+import { bookedLabels, dayKeyInZone, isDayFullyBooked } from '../../src/core/flow/calendar';
 
 describe('Advanced Input Handlers', () => {
   let state: ChatState;
@@ -49,6 +50,58 @@ describe('Advanced Input Handlers', () => {
         "Wednesday, October 21, 2026 05:30 - 06:00 (Visitor's local time) / 09:30 - 10:00 (Bot's time)"
       );
       expect(emitted[0][0]).toBe('calendar-slot-selection-record');
+    });
+  });
+
+  describe('calendar-node booked slots (web displayStep.ts daySlotsFor, nodeLogic.ts isDayFullyBooked)', () => {
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const data = {
+      timeZone: 'Asia/Dubai',
+      showTimeSelection: true,
+      slotDuration: 30,
+      weeklyHours: DAYS.map((dayName) => ({ dayName, available: true, slots: [{ start: '09:00', end: '10:00' }] })),
+      answerVariable: 'meeting',
+    };
+    // A day three days ahead, on the bot's clock.
+    const ahead = (n: number) => dayKeyInZone(new Date(Date.now() + n * 86400000), 'Asia/Dubai');
+    const bookingOn = (day: string, slot: string, extra: any = {}) => ({ date: `${day}T08:00:00.000Z`, timeSlotSelected: slot, ...extra });
+
+    it('shows a taken slot as booked and refuses it; another node\'s booking does not count', async () => {
+      const day = ahead(3);
+      const node = {
+        ...createNode('calendar-node', data, { id: 'cal' }),
+        ctx: { ...ctx, calendarBookings: [bookingOn(day, '09:00 - 09:30'), bookingOn(day, '09:30 - 10:00', { nodeId: 'other' })] },
+      };
+      const ui: any = (await new CalendarHandler().handle(node, state)).uiState;
+      const entry = ui.availableSlots.find((d: any) => d.date === day);
+      expect(entry).toEqual({ date: day, times: ['09:00', '09:30'], booked: ['09:00'] });
+      expect(await new CalendarHandler().handleResponse({ date: day, slot: '09:00' }, node, state)).toMatchObject({ type: 'displayUI' });
+      expect(state.getAnswer('meeting') ?? null).toBeNull();
+      expect(await new CalendarHandler().handleResponse({ date: day, slot: '09:30' }, node, state)).toEqual(NodeResult.delayedProceed(null, 400));
+    });
+
+    it('leaves out a day with every slot taken (the node\'s own bookings count too)', async () => {
+      const day = ahead(4);
+      const node = {
+        ...createNode('calendar-node', { ...data, bookings: [bookingOn(day, '09:30 - 10:00')] }, { id: 'cal' }),
+        ctx: { ...ctx, calendarBookings: [bookingOn(day, '09:00 - 09:30', { nodeId: 'cal' })] },
+      };
+      const ui: any = (await new CalendarHandler().handle(node, state)).uiState;
+      expect(ui.availableSlots.some((d: any) => d.date === day)).toBe(false);
+      expect(ui.availableSlots.some((d: any) => d.date === ahead(5))).toBe(true);
+    });
+
+    it('reads bookings on the bot\'s clock, for this node only', () => {
+      const bookings = [
+        { date: '2026-11-02T21:30:00.000Z', timeSlotSelected: '09:00 - 09:30' }, // 01:30 on the 3rd in Dubai
+        { date: '2026-11-03T08:00:00.000Z', timeSlotSelected: '10:00 - 10:30', nodeId: 'cal' },
+        { date: '2026-11-03T08:00:00.000Z', timeSlotSelected: '11:00 - 11:30', nodeId: 'x' },
+        null,
+      ];
+      expect(bookedLabels(bookings, { id: 'cal' }, '2026-11-03', 'Asia/Dubai')).toEqual(['09:00 - 09:30', '10:00 - 10:30']);
+      expect(bookedLabels(bookings, { id: 'cal' }, '2026-11-02', 'UTC')).toEqual(['09:00 - 09:30']);
+      expect(isDayFullyBooked([{ start: '09:00', end: '09:30' }], ['09:00 - 09:30'])).toBe(true);
+      expect(isDayFullyBooked([], [])).toBe(false);
     });
   });
 
