@@ -478,7 +478,11 @@ export const MessageList: React.FC<MessageListProps> = ({
                   shape={conferBot?.serverCustomizations ? conferBot.customizations.avatarShape : undefined}
                 />
               )}
-              <TypingIndicator visible={true} variant={conferBot?.customizations?.typingStyle} />
+              <TypingIndicator
+                visible={true}
+                variant={conferBot?.customizations?.typingStyle}
+                mascot={conferBot?.customizations?.mascot ? { look: conferBot.customizations.mascot, accent: conferBot.customizations.mascotAccent } : null}
+              />
             </View>
           </View>
         )}
