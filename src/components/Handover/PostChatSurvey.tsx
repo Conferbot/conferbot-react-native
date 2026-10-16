@@ -28,6 +28,7 @@ import type {
   SurveyRatingStyle,
   AgentInfo,
 } from './types';
+import { t, tPlural } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -57,7 +58,7 @@ const StarRating: React.FC<RatingProps> = ({ maxRating, value, onChange, theme }
             style={styles.ratingItem}
             accessibilityRole="radio"
             accessibilityState={{ checked: isFilled }}
-            accessibilityLabel={`${rating} star${rating > 1 ? 's' : ''}`}
+            accessibilityLabel={tPlural('sdk.survey.stars', rating)}
           >
             <Text style={[styles.starIcon, { opacity: isFilled ? 1 : 0.3 }]}>
               {isFilled ? '\u2B50' : '\u2606'}
@@ -85,7 +86,7 @@ const ThumbsRating: React.FC<Omit<RatingProps, 'maxRating'>> = ({ value, onChang
         ]}
         accessibilityRole="radio"
         accessibilityState={{ checked: value === 1 }}
-        accessibilityLabel="Thumbs up - Good"
+        accessibilityLabel={t('rating.good')}
       >
         <Text style={[styles.thumbIcon, { opacity: value === 1 ? 1 : 0.5 }]}>
           {'\uD83D\uDC4D'}
@@ -96,7 +97,7 @@ const ThumbsRating: React.FC<Omit<RatingProps, 'maxRating'>> = ({ value, onChang
             { color: value === 1 ? theme.colors.success : theme.colors.textSecondary },
           ]}
         >
-          Good
+          {t('rating.good')}
         </Text>
       </TouchableOpacity>
 
@@ -112,7 +113,7 @@ const ThumbsRating: React.FC<Omit<RatingProps, 'maxRating'>> = ({ value, onChang
         ]}
         accessibilityRole="radio"
         accessibilityState={{ checked: value === 0 }}
-        accessibilityLabel="Thumbs down - Bad"
+        accessibilityLabel={t('rating.bad')}
       >
         <Text style={[styles.thumbIcon, { opacity: value === 0 ? 1 : 0.5 }]}>
           {'\uD83D\uDC4E'}
@@ -123,7 +124,7 @@ const ThumbsRating: React.FC<Omit<RatingProps, 'maxRating'>> = ({ value, onChang
             { color: value === 0 ? theme.colors.error : theme.colors.textSecondary },
           ]}
         >
-          Bad
+          {t('rating.bad')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -133,7 +134,7 @@ const ThumbsRating: React.FC<Omit<RatingProps, 'maxRating'>> = ({ value, onChang
 // Emoji Rating
 const EmojiRating: React.FC<RatingProps> = ({ maxRating, value, onChange, theme }) => {
   const emojis = ['\uD83D\uDE21', '\uD83D\uDE1E', '\uD83D\uDE10', '\uD83D\uDE42', '\uD83D\uDE0D'];
-  const labels = ['Very Bad', 'Bad', 'Okay', 'Good', 'Excellent'];
+  const labels = [t('rating.terrible'), t('rating.bad'), t('rating.okay'), t('rating.good'), t('rating.excellent')];
   const displayCount = Math.min(maxRating, 5);
 
   return (
@@ -201,7 +202,7 @@ const NumberRating: React.FC<RatingProps> = ({ maxRating, value, onChange, theme
               ]}
               accessibilityRole="radio"
               accessibilityState={{ checked: isSelected }}
-              accessibilityLabel={`${rating} out of ${maxRating}`}
+              accessibilityLabel={t('rating.outOf', { n: rating, max: maxRating })}
             >
               <Text
                 style={[
@@ -266,7 +267,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, theme }) => {
             { color: theme.colors.text, fontSize: theme.typography.fontSize.md },
           ]}
         >
-          {agent.name || 'Agent'}
+          {agent.name || t('agent.agent')}
         </Text>
         {agent.role && (
           <Text
@@ -412,7 +413,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
             { color: theme.colors.text, fontSize: theme.typography.fontSize.lg },
           ]}
         >
-          {config.thankYouMessage || 'Thank you for your feedback!'}
+          {config.thankYouMessage || t('csat.thanks')}
         </Text>
       </Animated.View>
     );
@@ -441,7 +442,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
           { color: theme.colors.text, fontSize: theme.typography.fontSize.xl },
         ]}
       >
-        {config.title || 'How was your experience?'}
+        {config.title || t('csat.title')}
       </Text>
 
       {/* Agent Card */}
@@ -466,7 +467,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
               { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
             ]}
           >
-            {config.ratingQuestion || 'Please rate your conversation'}
+            {config.ratingQuestion || t('sdk.survey.ratingQuestion')}
           </Text>
           {renderRating()}
         </>
@@ -481,7 +482,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
               { color: theme.colors.text, fontSize: theme.typography.fontSize.sm },
             ]}
           >
-            {config.feedbackQuestion || 'Any additional feedback? (optional)'}
+            {config.feedbackQuestion || t('sdk.survey.feedbackQuestion')}
           </Text>
           <TextInput
             style={[
@@ -499,13 +500,13 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
             placeholder={
               config.commentPlaceholder ||
               config.feedbackPlaceholder ||
-              'Tell us more about your experience...'
+              t('sdk.survey.feedbackPlaceholder')
             }
             placeholderTextColor={theme.colors.textDisabled}
             multiline
             numberOfLines={3}
             textAlignVertical="top"
-            accessibilityLabel="Feedback text input"
+            accessibilityLabel={t('sdk.survey.feedbackLabel')}
           />
         </View>
       )}
@@ -524,7 +525,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
           onPress={handleSubmit}
           disabled={ratingMissing || isSubmitting}
           accessibilityRole="button"
-          accessibilityLabel={submitButtonText || config.submitButtonText || 'Submit survey'}
+          accessibilityLabel={submitButtonText || config.submitButtonText || t('sdk.survey.submitLabel')}
           accessibilityState={{ disabled: ratingMissing || isSubmitting }}
         >
           {isSubmitting ? (
@@ -539,7 +540,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
                 },
               ]}
             >
-              {submitButtonText || config.submitButtonText || 'Submit'}
+              {submitButtonText || config.submitButtonText || t('common.submit')}
             </Text>
           )}
         </TouchableOpacity>
@@ -550,7 +551,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
             onPress={onSkip}
             disabled={isSubmitting}
             accessibilityRole="button"
-            accessibilityLabel={skipButtonText || config.skipButtonText || 'Skip survey'}
+            accessibilityLabel={skipButtonText || config.skipButtonText || t('sdk.survey.skipLabel')}
           >
             <Text
               style={[
@@ -558,7 +559,7 @@ export const PostChatSurvey: React.FC<PostChatSurveyProps> = ({
                 { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
               ]}
             >
-              {skipButtonText || config.skipButtonText || 'Skip'}
+              {skipButtonText || config.skipButtonText || t('common.skip')}
             </Text>
           </TouchableOpacity>
         )}
