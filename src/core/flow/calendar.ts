@@ -146,3 +146,33 @@ export const visitorTimeZone = (): string => {
     return 'UTC';
   }
 };
+
+/**
+ * The slots already taken on a day, as "HH:MM - HH:MM" on the bot's clock
+ * (web displayStep.ts daySlotsFor `booked`): the bot's bookings (the bot
+ * data's calendarBookings, populated by the server) plus any the node
+ * carries itself (data.bookings), for this node only (a booking with no
+ * nodeId counts for every calendar), on this day in the bot's zone.
+ */
+export const bookedLabels = (
+  calendarBookings: any,
+  node: { id?: string; data?: any } | null | undefined,
+  dayKey: string,
+  timeZone: string
+): string[] => {
+  const nodeBookings = (Array.isArray(node?.data?.bookings) ? node!.data.bookings : []).filter(
+    (b: any) => b && typeof b === 'object' && b.date
+  );
+  return [...(Array.isArray(calendarBookings) ? calendarBookings : []), ...nodeBookings]
+    .filter((b: any) => b && typeof b === 'object')
+    .filter((b: any) => !b.nodeId || b.nodeId === node?.id)
+    .filter((b: any) => dayKeyInZone(new Date(b.date), timeZone) === dayKey)
+    .map((b: any) => String(b.timeSlotSelected || '').trim());
+};
+
+/** Every slot of the day taken (web nodeLogic.ts isDayFullyBooked): the day greys out. */
+export const isDayFullyBooked = (slots: CalendarSlot[], booked: string[]): boolean => {
+  if (!Array.isArray(slots) || slots.length === 0) return false;
+  const taken = new Set((booked || []).map((l) => String(l).trim()));
+  return slots.every((s) => taken.has(slotLabel(s)));
+};
