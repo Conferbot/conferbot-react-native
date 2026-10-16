@@ -28,6 +28,7 @@ import { IdleCallStage, IdleCallBubble } from './IdleCallView';
 import { LauncherMascot, mascotButtonXml } from '../Mascot/LauncherMascot';
 import { WAVING_HAND } from '../../core/launcherAttention';
 import { linearBox, radialDisc, stops } from '../../core/fxPaint';
+import { t } from '../../core/i18n';
 
 // react-native-svg draws a gradient launcher when the app has it; else its first colour.
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
@@ -688,7 +689,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
             onPress={toggleChat}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            accessibilityLabel={isChatOpen ? 'Close chat' : 'Open chat'}
+            accessibilityLabel={t(isChatOpen ? 'launcher.close' : 'launcher.open')}
             accessibilityRole="button"
           >
             {renderButtonContent()}
