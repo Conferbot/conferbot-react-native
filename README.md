@@ -76,7 +76,19 @@ npm install @react-native-async-storage/async-storage
 npm install react-native-svg
 ```
 
-Both of these are native modules, so after installing them run the usual native steps:
+Three more are optional and only add the owner's sounds and fonts (all are part of Expo; a bare app adds them with `npx expo install`):
+
+```bash
+# The owner's message sounds, sound pack and launcher sound
+npx expo install expo-av expo-file-system
+
+# The owner's Google font and the widget theme's font, loaded at run time
+npx expo install expo-font
+```
+
+Without `expo-av` the chat is silent (as before). Without `expo-file-system` the launcher sound still plays and the synthesised tones play on Android only. Without `expo-font` a web font is not fetched and the chat keeps the platform font; a system font the owner picked (Georgia, Verdana...) is still used by name, so a family your app bundles is picked up.
+
+These are native modules, so after installing them run the usual native steps:
 
 ```bash
 cd ios && pod install && cd ..
@@ -351,7 +363,14 @@ Everything you configure in the Conferbot dashboard (Widget Customization / flow
 - **Mascot** (Customize > Launcher > Mascot): the owner's character, any of the 27 (10 originals and 17 industry ones: medic, tooth, piggy, shield, house, justice, bag, chef, suitcase, scholar, laptop, athlete, stylist, car, parcel, civic, heart), with its eyes (round, happy, sleepy, star, shades), accessory (headset, bow, cap, crown, flower, glasses), colour and name. It is the launcher with the mascot style (its head at `mascotLauncherScale`%, 112 by default, blinking, a happy hop when a reply arrives while the chat is closed), greets on the greeting card in place of the avatar, by its name, with `mascotInGreeting`, types in the chat with the mascot typing style ("Pip is typing"), and is the one that calls in the idle call. The greeting card and its figure move as `mascotMotion` says: lively (the default; the card springs up, the figure pops in, waves, nods, breathes and makes at most three small gestures, then stands still for good, the words fade up and the "Online" dot pings once), subtle (a rise, the ping, one tilt) or off; opening the chat from the card hands the figure off to the launcher, the x sends it off with a bow. Needs `react-native-svg`; nothing moves with reduced motion. `<Mascot look accent mood />` draws it on your own screens (`<HomeScreen renderMascot={(m) => <Mascot look={m.look} accent={m.accent} mood="wave" />} />`).
 - **Typing indicator** (`typingStyle`): dots, an equaliser wave, a shimmering "Typing...", a pencil writing a line, or the mascot swaying beside three thought dots (pencil and mascot need `react-native-svg`, else dots).
 - **Chat background**: solid, gradient (linear, radial, mesh, blur), image with its mask, or one of the 13 patterns (drawn with `react-native-svg` when installed, else the base colour)
-- **Widget theme**: all 27 dashboard themes (Classic, Minimal, Glass, Neo-brutal, Midnight, Aurora and the rest). Each brings its surfaces, text colours, corner radii and bubble outline, as on the web widget. **Appearance** light, dark, or auto (follows the phone's dark mode); Midnight, Neon, Chalkboard, Cyberpunk and Space are always dark. **Colours** "Brand" keeps your colours; "Theme palette" swaps in the theme's own header, bubble, option, launcher and send-button colours. Your own bubble radius, option radius and chat background still win over the theme. Theme fonts are not loaded on mobile; the app's font is used.
+- **Widget theme**: all 27 dashboard themes (Classic, Minimal, Glass, Neo-brutal, Midnight, Aurora and the rest). Each brings its surfaces, text colours, corner radii and bubble outline, as on the web widget. **Appearance** light, dark, or auto (follows the phone's dark mode); Midnight, Neon, Chalkboard, Cyberpunk and Space are always dark. **Colours** "Brand" keeps your colours; "Theme palette" swaps in the theme's own header, bubble, option, launcher and send-button colours. Your own bubble radius, option radius and chat background still win over the theme.
+- **Font**: the owner's font (any of the dashboard's Google fonts) wins, for all text; else the theme's font, for all text ("body" themes) or only the header title and headings ("display" themes). Fetched from Google Fonts and registered with `expo-font` at run time (see Peer Dependencies), under a "CB Font" name your app's own text never picks up. Applied to the bubbles, the agent's formatted replies, the composer, the header, the home screen and the step cards' buttons and fields; the older built-in node components, handover panels and help-centre screens keep the platform font.
+- **Sounds** (`messageSound` pop / chime / bubble, a `soundPack` soft / playful / retro / bubbly / premium for opening, a message, sending and closing, and the launcher sound file): the web's own tones, rendered on the phone, at most one message sound every 0.8s. The chat menu has Sound on / off when the bot has a sound; the choice is kept on the device. iOS's ring / silent switch silences them; on Android they follow the media volume. Needs `expo-av` (see Peer Dependencies).
+- **Human touches** (`botReactions`, `celebrations`, `stallNudges`, `allowChangeAnswer`; all on unless turned off): the bot's tapback on an answer that deserves one (a wave for a name, a party for a booking or payment, a heart, thumbs up or thank-you for a score), a second of confetti for a booking, a payment or a perfect score, sparks on a rating pick, "No rush - ..." under a question that has waited 40s with the chat on screen and nothing typed, and "Edit" under the visitor's latest answer, which takes the conversation back to that question (only while nothing irreversible, such as a booking, a payment, a file or a person joining, happened since). No confetti or sparks with reduced motion.
+- **Auto-open** (`botAutoOpen`, `botAutoOpenDelay` seconds): the floating widget opens the chat on its own once per app launch, only before the visitor has a conversation and not within 2 minutes of them closing it.
+- **Typing preview** (`visitorDraftPreview`, on unless turned off): while a person is chatting with the visitor, the agent sees what is being typed (`visitor-draft`, at most every 300ms, never for a secure field).
+- **Calendar**: slots already booked (the bot's bookings) show greyed out and cannot be picked; a day with every slot taken is not offered.
+- **Waiting for a person**: the wait card says the live estimate in the visitor's language, else the team's usual wait ("Typical wait: a few minutes"), unless the owner hides the reply time.
 
 ### Precedence - be aware of how merging works
 
