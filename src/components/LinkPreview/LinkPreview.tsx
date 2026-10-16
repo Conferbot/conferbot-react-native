@@ -12,6 +12,7 @@ import {
   ImageStyle,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import { linkPreviewService, type LinkPreviewData } from '../../services/LinkPreviewService';
 import { extractDomain, truncateUrl } from '../../utils/LinkDetector';
 import type { ConferBotTheme } from '../../theme/types';
@@ -269,7 +270,7 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
         onPress={handlePress}
         activeOpacity={0.7}
         accessibilityRole="link"
-        accessibilityLabel={`Open link: ${domain}`}
+        accessibilityLabel={t('sdk.link.openDomain', { domain })}
         testID={testID}
       >
         <FaviconImage
@@ -331,7 +332,7 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
         onPress={handlePress}
         activeOpacity={0.9}
         accessibilityRole="image"
-        accessibilityLabel={`Image from ${extractDomain(url)}`}
+        accessibilityLabel={t('sdk.link.imageFrom', { domain: extractDomain(url) })}
         testID={testID}
       >
         <Image
@@ -363,7 +364,7 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
       onPress={handlePress}
       activeOpacity={0.7}
       accessibilityRole="link"
-      accessibilityLabel={`Link preview: ${preview.title || url}`}
+      accessibilityLabel={t('sdk.link.preview', { title: preview.title || url })}
       testID={testID}
     >
       {/* Preview Image */}
