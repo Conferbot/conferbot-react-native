@@ -41,7 +41,17 @@ import { createDraftSender, draftPreviewOn, isSensitiveField } from '../core/typ
 import { handoverPhase } from '../core/handoverState';
 import { usePostChatRedirect } from './hooks/usePostChatRedirect';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { useConnection } from './hooks/useConnection';
 import { getDeviceModel, getOSVersion } from '../services/analytics/DeviceInfo';
+
+// A reconnection option as given, when it is a number at least `min`; else
+// undefined (ConferBotNetworkConfig's default), with a warning in development.
+const reconnectionOption = (value: unknown, min: number, name: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'number' && Number.isFinite(value) && value >= min) return value;
+  if (__DEV__) console.warn(`[ConferBot] config.${name} must be a number >= ${min}; using the default.`);
+  return undefined;
+};
 
 // ********** Context Creation ********** //
 const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
@@ -94,6 +104,31 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   // Shared refs that multiple hooks need — owned by the orchestrator
   const flowEngineRef = useRef<NodeFlowEngine | null>(null);
   const chatStateRef = useRef<ChatState | null>(null);
+
+  // ********** Config the provider does not act on ********** //
+  // enableNotifications: push is switched on by setPushToken (#81).
+  useEffect(() => {
+    if (__DEV__ && config?.enableNotifications !== undefined) {
+      console.warn('[ConferBot] config.enableNotifications is deprecated and has no effect: push is on once you call setPushToken(token).');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ********** Connection & offline queue ********** //
+  // Online is the socket (and NetInfo when installed); a message sent while
+  // offline waits and goes on reconnect, as on the web (#80).
+  const connection = useConnection({
+    botId,
+    socketClient,
+    setIsConnected,
+    latestRecord: (sid: string) => {
+      const state = chatStateRef.current;
+      return state && state.sessionId === sid ? state.buildResponseData() : null;
+    },
+    enabled: config?.enableOfflineMode !== false,
+    queueConfig: config?.offlineQueueConfig,
+    storage: config?.enablePersistence === false ? null : asyncStorageFor(config),
+  });
 
   // ********** Persistence Hook ********** //
   const {
@@ -453,6 +488,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       liveChatExtras.setupLiveChatListeners();
       handover.setupHandoverListeners();
       waiting.setupWaitingListeners();
+      connection.setupConnectionListeners();
     },
     handover,
     onConversationEnd,
@@ -593,6 +629,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
           userId: user?.id || persistedState?.user?.userId,
           visitorId: handshakeVisitorId || undefined,
           autoConnect: config?.autoConnect !== false,
+          // socket.io's reconnection (#81); invalid values fall back to the defaults.
+          reconnectionAttempts: reconnectionOption(config?.reconnectionAttempts, 0, 'reconnectionAttempts'),
+          reconnectionDelay: reconnectionOption(config?.reconnectionDelay, 1, 'reconnectionDelay'),
         });
 
         setupSocketListeners();
@@ -838,6 +877,13 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     hasPersistedSession,
     messageStatuses,
     readReceiptsEnabled: readReceiptsIsEnabled,
+    // Connection & offline queue (#80)
+    isOnline: connection.isOnline,
+    pendingMessageCount: connection.pendingMessageCount,
+    failedMessageCount: connection.failedMessageCount,
+    retryFailedMessage: connection.retryFailedMessage,
+    retryAllFailedMessages: connection.retryAllFailedMessages,
+    clearFailedMessages: connection.clearFailedMessages,
     openChat,
     closeChat,
     sendMessage: sendAndRemember,
