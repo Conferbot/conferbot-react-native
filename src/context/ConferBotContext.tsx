@@ -172,6 +172,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     handoverWait: () => {
       return { data: flowEngineRef.current?.handoverNodeData(), workspaceId: workspaceIdRef.current || '' };
     },
+    // "Email me this chat" (core/emailTranscript.ts).
+    postTranscriptEmail: (sessionId: string, email: string) =>
+      apiClient.current ? apiClient.current.sendTranscriptEmail(sessionId, email) : Promise.resolve({ ok: false }),
   });
 
   // ********** Handover Lifecycle Hook ********** //
@@ -406,10 +409,18 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
         apiClient.current = new ConferBotAPI(apiKey, botId);
 
+        // The visitor as the records name it (useFlowEngine): the server
+        // refuses a blocked one at the handshake.
+        const handshakeVisitorId =
+          user?.id ||
+          persistedState?.user?.userId ||
+          (storageService.current?.isReady() ? await storageService.current.getOrCreateVisitorId().catch(() => undefined) : undefined);
+
         socketClient.current = new ConferBotSocket({
           apiKey,
           botId,
           userId: user?.id || persistedState?.user?.userId,
+          visitorId: handshakeVisitorId || undefined,
           autoConnect: config?.autoConnect !== false,
         });
 
@@ -659,6 +670,12 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     skipLeaveMessage: liveChatExtras.skipLeaveMessage,
     dismissCsat: liveChatExtras.dismissCsat,
     dismissFileRequest: liveChatExtras.dismissFileRequest,
+    visitorBlocked: liveChatExtras.blocked,
+    emailTranscriptOpen: liveChatExtras.mailOpen,
+    emailTranscriptSentTo: liveChatExtras.mailSentTo,
+    openEmailTranscript: liveChatExtras.openEmailTranscript,
+    closeEmailTranscript: liveChatExtras.closeEmailTranscript,
+    emailTranscript: liveChatExtras.emailTranscript,
     // Handover lifecycle
     leaveQueue: handover.leaveQueue,
     onWidgetSignal: handover.onWidgetSignal,
