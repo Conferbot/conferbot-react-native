@@ -321,7 +321,19 @@ export interface RunResult {
   problems: string[];
 }
 
-export const runFixture = async (fx: Fixture): Promise<RunResult> => {
+/**
+ * A visitor action answered by something other than the driver - the SDK's
+ * own step views (FlowStepViews.test.tsx): the answer the view sent, or
+ * `local` for an action that stays in the view. Null: the driver answers.
+ */
+export type ViewAnswer = (
+  a: any,
+  ui: any,
+  memo: Record<string, any>,
+  nodeId: string
+) => { response?: any; local?: boolean } | null;
+
+export const runFixture = async (fx: Fixture, opts: { answer?: ViewAnswer } = {}): Promise<RunResult> => {
   errors.length = 0;
   clock.now = 0;
   clock.seq = 0;
@@ -372,7 +384,7 @@ export const runFixture = async (fx: Fixture): Promise<RunResult> => {
       try {
         if (a.do === 'serverEvent') socket.fire(a.event, a.payload);
         else {
-          const { response, local } = answerFor(a, s.currentUIState, memo, String(at));
+          const { response, local } = opts.answer?.(a, s.currentUIState, memo, String(at)) ?? answerFor(a, s.currentUIState, memo, String(at));
           if (!local) engine.submitResponse(response).catch((e) => problems.push(`input ${i}: ${e?.message || e}`));
         }
       } catch (e: any) {
