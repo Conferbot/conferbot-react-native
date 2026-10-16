@@ -56,6 +56,8 @@ import { resolveCustomizations } from '../../core/customizations';
 import { resolveChatBackground } from '../../core/chatBackground';
 import { ChatBackgroundView } from '../ChatBackground';
 import { ArticleDetail } from '../KnowledgeBase/ArticleDetail';
+import { RequestsPortal } from '../Requests/RequestsPortal';
+import { REQUESTS_TEXT } from '../../core/requests';
 
 // Maximum file size for attachments (5MB)
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
@@ -252,6 +254,12 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     openedArticle,
     closeArticle,
     rateKBArticle,
+    // Your requests (core/requests.ts): from the menu, over the chat
+    requests,
+    requestsUnread,
+    openRequests,
+    requestsOpen,
+    requestsPortal,
     // Actions
     resetConversation,
   } = useConferBot();
@@ -408,6 +416,11 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     // The conversation to the visitor's inbox (web chat menu, emailTranscript.ts).
     ...(chatSessionId && !visitorBlocked
       ? [{ id: 'email-transcript', label: MAILCHAT_TEXT.menu, icon: '✉', onPress: () => openEmailTranscript?.() }]
+      : []),
+    // The visitor's requests to the team, once they have one (web home
+    // screen's card, ts/home/requests/card.ts; RN has no home screen yet).
+    ...(requests && requests.length
+      ? [{ id: 'requests', label: REQUESTS_TEXT.menu(requestsUnread || 0), icon: '☰', onPress: () => openRequests?.() }]
       : []),
   ];
 
@@ -942,7 +955,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       visible={isVisible}
       animationType="slide"
       transparent={false}
-      onRequestClose={handleClose}
+      // Android's back inside the modal: the requests portal steps back first.
+      onRequestClose={() => (requestsOpen && requestsPortal ? requestsPortal.back() : handleClose())}
       statusBarTranslucent={false}
       accessible={true}
       accessibilityLabel="Chat modal"
@@ -1051,6 +1065,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
             />
           </View>
         ) : null}
+
+        {/* "Your requests" opened from the menu, over the conversation */}
+        <RequestsPortal testID={`${testID}-requests`} />
       </KeyboardAvoidingView>
       </ThemeProvider>
     </Modal>
