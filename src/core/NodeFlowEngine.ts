@@ -30,6 +30,7 @@ import { BaseNode, NodeEdge, FlowDefinition, requiresUserInteraction } from './n
 import { getApiOrigin } from '../config/constants';
 import { FlowContext, postBotApi, uploadBotMedia } from './flow/context';
 import { visitorTimeZone } from './flow/calendar';
+import { MAX_QUESTION_POINTS, waitsForAnswer } from './delight';
 import {
   bubbleText,
   plainText,
@@ -88,6 +89,8 @@ export interface NodeFlowEngineConfig {
   customizations?: Record<string, any>;
   /** The page the chat runs on, when the host app has one (hidden-fields) */
   page?: { url?: string; referrer?: string };
+  /** The bot's bookings (the bot data's calendarBookings): a calendar's taken slots */
+  calendarBookings?: any[];
   /** The visitor's IANA time zone (default: the device's) */
   visitorTimeZone?: string;
   /** The random source (random-flow) */
@@ -106,6 +109,24 @@ export interface NodeFlowEngineConfig {
   onTrace?: (event: FlowTraceEvent) => void;
   /** Socket client for emitting events */
   socketClient?: any;
+}
+
+/**
+ * A question the visitor may go back to (web index.ts _noteQuestionPoint):
+ * kept each time a step that waits for an answer is entered, before it is
+ * drawn, with a copy of the conversation's state as it was.
+ */
+export interface QuestionPoint {
+  /** Unique per point (a step asked twice has two). */
+  id: number;
+  nodeId: string;
+  type: string;
+  /** Steps entered before this question. */
+  stepsLen: number;
+  /** The record's length before the question. */
+  recordLen: number;
+  snap: Record<string, any>;
+  flowControl: any;
 }
 
 /** Engine state */
@@ -217,8 +238,8 @@ const FLOW_CONTROL = new Set([LOOP_TYPE, SUBFLOW_TYPE, RUN_SUBFLOW_TYPE, SUBFLOW
 export class NodeFlowEngine {
   private chatState: ChatState;
   private registry: NodeHandlerRegistry;
-  private config: Required<Omit<NodeFlowEngineConfig, 'typingDelay' | 'page' | 'random' | 'apiOrigin' | 'visitorTimeZone'>> &
-    Pick<NodeFlowEngineConfig, 'typingDelay' | 'page' | 'random' | 'apiOrigin' | 'visitorTimeZone'>;
+  private config: Required<Omit<NodeFlowEngineConfig, 'typingDelay' | 'page' | 'random' | 'apiOrigin' | 'visitorTimeZone' | 'calendarBookings'>> &
+    Pick<NodeFlowEngineConfig, 'typingDelay' | 'page' | 'random' | 'apiOrigin' | 'visitorTimeZone' | 'calendarBookings'>;
 
   // Flow definition
   private nodes: Map<string, BaseNode> = new Map();
@@ -243,6 +264,9 @@ export class NodeFlowEngine {
   /** Media that finished loading: the step moves on before the cap. */
   private mediaWaiters: Map<string, () => void> = new Map();
   private flowControl: FlowControlState = emptyFlowControl();
+  /** Questions asked, newest last, for "Edit" (only the recent past). */
+  private points: QuestionPoint[] = [];
+  private pointSeq: number = 0;
 
   // Listeners
   private stateListeners: Set<(state: EngineState) => void> = new Set();
@@ -261,6 +285,7 @@ export class NodeFlowEngine {
       apiOrigin: config?.apiOrigin,
       customizations: config?.customizations ?? {},
       page: config?.page,
+      calendarBookings: config?.calendarBookings,
       visitorTimeZone: config?.visitorTimeZone,
       random: config?.random,
       onUIStateChange: config?.onUIStateChange ?? (() => {}),
@@ -278,6 +303,11 @@ export class NodeFlowEngine {
 
     // Set fallback handler
     this.registry.setFallbackHandler(new FallbackNodeHandler());
+  }
+
+  /** The bot's bookings, from the bot data (a calendar greys out taken slots). */
+  setCalendarBookings(bookings: any[] | null | undefined): void {
+    this.config.calendarBookings = Array.isArray(bookings) ? bookings : [];
   }
 
   /** The bot's customizations (redactSensitive, chatLeaveMessage...). */
@@ -354,6 +384,7 @@ export class NodeFlowEngine {
    */
   public resetFlow(): void {
     this.steps = [];
+    this.points = [];
     this._ended = false;
     this.nodesProcessedInCycle = 0;
     this.flowControl = emptyFlowControl();
@@ -386,6 +417,9 @@ export class NodeFlowEngine {
       this.handleError(new Error(`Max nodes per cycle exceeded (${this.config.maxNodesPerCycle})`), node.id);
       return;
     }
+
+    // A question: what "Edit" goes back to, before it is drawn.
+    if (waitsForAnswer(node.type)) this.notePoint(node);
 
     const token = ++this.moveToken;
     this._currentNodeId = node.id;
@@ -460,6 +494,62 @@ export class NodeFlowEngine {
     await this.handleNodeResult(result, node, token);
   }
 
+  private notePoint(node: BaseNode): void {
+    this.points.push({
+      id: ++this.pointSeq,
+      nodeId: String(node.id),
+      type: node.type,
+      stepsLen: this.steps.length,
+      recordLen: this.chatState.getRecord().length,
+      snap: JSON.parse(JSON.stringify(this.chatState.toJSON())),
+      flowControl: JSON.parse(JSON.stringify(this.flowControl)),
+    });
+    if (this.points.length > MAX_QUESTION_POINTS) this.points = this.points.slice(-MAX_QUESTION_POINTS);
+  }
+
+  /** The questions asked so far that can still be gone back to, oldest first. */
+  questionPoints(): readonly QuestionPoint[] {
+    return this.points;
+  }
+
+  /**
+   * The step types run since a question (it excluded); "agent" when a
+   * person or the AI agent has been in the conversation since (what they
+   * saw stays). Web index.ts typesSince.
+   */
+  typesSince(point: QuestionPoint): string[] {
+    const types = this.steps.slice(point.stepsLen + 1).map((n) => n?.type || '');
+    const agent = this.chatState
+      .getRecord()
+      .slice(point.recordLen)
+      .some((r: any) => /^agent/.test(String(r?.type || r?.shape || '')));
+    return agent ? [...types, 'agent'] : types;
+  }
+
+  /**
+   * "Edit": the conversation as it was when the question was asked, and the
+   * question asked again exactly as the forward path asks it (web index.ts
+   * _rewindToQuestion). False when the point is gone or the chat ended.
+   */
+  async rewindTo(pointId: number): Promise<boolean> {
+    const i = this.points.findIndex((p) => p.id === pointId);
+    const point = this.points[i];
+    const node = point ? this.nodes.get(point.nodeId) : undefined;
+    if (!point || !node || this.chatState.isFlowComplete) return false;
+    this.moveToken++;
+    this.chatState.restore(point.snap);
+    this.steps.length = Math.min(this.steps.length, point.stepsLen);
+    this.flowControl = point.flowControl;
+    this.points = this.points.slice(0, i);
+    this.mediaWaiters.clear();
+    this._ended = false;
+    this._isWaitingForInput = false;
+    this.nodesProcessedInCycle = 0;
+    this.sendResponseToServer();
+    await this.enter(node, 'rewind');
+    return true;
+  }
+
   /** A question step registers {nodeId, key, value: null} when shown. */
   private registerAnswerVariables(node: BaseNode): void {
     const d: any = node.data || {};
@@ -528,6 +618,7 @@ export class NodeFlowEngine {
       now: () => new Date(),
       customizations: this.config.customizations || {},
       page: this.config.page,
+      calendarBookings: this.config.calendarBookings || [],
       visitorTimeZone: this.config.visitorTimeZone || visitorTimeZone(),
       respond: (response) => {
         if (this._currentNodeId === node.id && this._isWaitingForInput) void this.submitResponse(response);
