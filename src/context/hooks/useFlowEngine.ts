@@ -16,6 +16,30 @@ import type { ConferBotUser } from '../../types';
 import { stripHtml, deduplicateMessages, trimMessages } from '../types';
 import { Linking } from 'react-native';
 import { redactText } from '../../core/privacy/redact';
+import { scoreText } from '../../core/delight';
+
+/** Steps whose own card takes the answer and leaves no bubble of the visitor's (the web shows one). */
+const ECHOED_STEPS = new Set([
+  'calendar-node',
+  'rating-choice-node',
+  'opinion-scale-choice-node',
+  'user-rating-node',
+  'slider-node',
+  'datetime-node',
+  'image-choice-node',
+]);
+
+/**
+ * What an answer row says it answered (core/delight.ts reads it): the
+ * question's step and type, and its text as a score where it is one
+ * ("4/5"), so the bot's tapback reads it as the web reads its bubble.
+ */
+const answerOfFor = (ui: any, response: any, text: string) => {
+  if (!ui?.nodeId || !ui?.stepType) return undefined;
+  const value = Number(typeof response === 'object' && response !== null ? response.value ?? response.rating : response);
+  const max = ui.type === 'rating' ? Number(ui.maxRating) : ui.type === 'opinionScale' ? Number(ui.max) : 0;
+  return { nodeId: String(ui.nodeId), type: ui.stepType, text: scoreText(ui.stepType, value, max) || text };
+};
 
 interface UseFlowEngineParams {
   botId: string;
@@ -48,6 +72,10 @@ export function useFlowEngine({
   // that just echo ${selection} back. The transcript listener skips bot messages
   // matching this value.
   const lastUserChoiceRef = useRef<string | null>(null);
+  // An answer the step's own card took (a date, a rating, a slider...):
+  // its text, as the step wrote it, is the visitor's bubble (web: every
+  // answer shows as the visitor's message).
+  const pendingEchoRef = useRef<{ nodeId: string; answerOf: any } | null>(null);
 
   // ********** Node Flow Engine Initialization ********** //
   const initializeFlowEngine = useCallback(
@@ -109,6 +137,8 @@ export function useFlowEngine({
       let shownTranscript = chatStateRef.current.getTranscript().length;
       chatStateRef.current.addListener((state) => {
         const transcript = state.getTranscript();
+        // Gone back to an earlier question ("Edit"): the conversation from there.
+        if (transcript.length < shownTranscript) shownTranscript = transcript.length;
         if (transcript.length <= shownTranscript) return;
         const newEntries = transcript.slice(shownTranscript);
         shownTranscript = transcript.length;
@@ -120,6 +150,19 @@ export function useFlowEngine({
               type: 'bot-message',
               shape: 'bot-text-message',
               text: entry.text,
+              // The step that said it ("Edit" folds a question's rows away).
+              ...(entry.nodeId ? { nodeId: entry.nodeId } : {}),
+              time: entry.timestamp || new Date().toISOString(),
+            } as any);
+          }
+          const echo = pendingEchoRef.current;
+          if (entry.type === 'user' && entry.text && echo && entry.nodeId === echo.nodeId) {
+            pendingEchoRef.current = null;
+            items.push({
+              _id: `user_answer_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: 'user-message',
+              text: state.redactSensitive === false ? entry.text : redactText(entry.text).text,
+              answerOf: echo.answerOf,
               time: entry.timestamp || new Date().toISOString(),
             } as any);
           }
@@ -206,6 +249,7 @@ export function useFlowEngine({
     const pressed = ui?.type === 'buttons' ? (ui.buttons || []).find((b: any) => b.id === response?.buttonId) : null;
     const link = typeof pressed?.value === 'string' && /^https?:\/\//i.test(pressed.value) ? pressed.value : null;
     if (link) Linking.openURL(link).catch(() => undefined);
+    pendingEchoRef.current = null;
     if (ui?.type === 'buttons' && ui.awaitInput) {
       // Steps that stay on screen until they finish (navigate, consent,
       // payment, ranking): no frozen copy, the step answers for itself.
@@ -219,6 +263,7 @@ export function useFlowEngine({
           _id: `choice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           type: 'bot-message',
           shape: 'bot-choice-buttons',
+          ...(choiceUI.nodeId ? { nodeId: String(choiceUI.nodeId) } : {}),
           choiceUI: {
             ...choiceUI,
             isSubmitted: true,
@@ -232,6 +277,7 @@ export function useFlowEngine({
           _id: `user_choice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           type: 'user-message',
           text: selectedLabel,
+          answerOf: answerOfFor(ui, response, String(selectedLabel)),
           time: new Date().toISOString(),
         } as any,
       ]);
@@ -255,9 +301,14 @@ export function useFlowEngine({
           // Card numbers, ids and passwords hidden in the bubble too (web
           // privacy startBubbleMasking), unless the owner turned it off.
           text: chatStateRef.current?.redactSensitive === false ? answerText : redactText(answerText).text,
+          answerOf: answerOfFor(ui, response, answerText),
           time: new Date().toISOString(),
         } as any,
       ]);
+    } else if (ui && ui.type !== 'buttons' && ui.type !== 'textInput' && ui.nodeId && ECHOED_STEPS.has(ui.stepType)) {
+      // The step's card answered (a date, a rating, a scale...): the step's
+      // own words for it become the visitor's bubble.
+      pendingEchoRef.current = { nodeId: String(ui.nodeId), answerOf: answerOfFor(ui, response, '') };
     }
 
     setIsNodeProcessing(true);
