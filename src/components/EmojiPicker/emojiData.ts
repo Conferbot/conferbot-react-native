@@ -1,3 +1,5 @@
+import { t, I18nKey } from '../../core/i18n';
+
 // Emoji data organized by categories
 export interface EmojiCategory {
   id: string;
@@ -306,3 +308,33 @@ export const searchEmojis = (query: string): string[] => {
 // Storage key for recently used emojis
 export const RECENT_EMOJIS_STORAGE_KEY = '@conferbot/recent_emojis';
 export const MAX_RECENT_EMOJIS = 30;
+
+/**
+ * A category's or skin tone's name in the visitor's language (the web's
+ * picker words: emoji-picker-element i18n/{nl,fr,de,es}, as the widget
+ * loads them in index.ts EMOJI_PICKER_I18N).
+ */
+const CATEGORY_KEYS: Record<string, I18nKey> = {
+  recent: 'sdk.emoji.cat.recent',
+  smileys: 'sdk.emoji.cat.smileys',
+  people: 'sdk.emoji.cat.people',
+  animals: 'sdk.emoji.cat.animals',
+  food: 'sdk.emoji.cat.food',
+  activities: 'sdk.emoji.cat.activities',
+  travel: 'sdk.emoji.cat.travel',
+  objects: 'sdk.emoji.cat.objects',
+  symbols: 'sdk.emoji.cat.symbols',
+};
+export const emojiCategoryName = (c: { id: string; name: string }): string =>
+  CATEGORY_KEYS[c.id] ? t(CATEGORY_KEYS[c.id]) : c.name;
+
+const SKIN_TONE_KEYS: Record<string, I18nKey> = {
+  default: 'sdk.emoji.tone.default',
+  light: 'sdk.emoji.tone.light',
+  'medium-light': 'sdk.emoji.tone.mediumLight',
+  medium: 'sdk.emoji.tone.medium',
+  'medium-dark': 'sdk.emoji.tone.mediumDark',
+  dark: 'sdk.emoji.tone.dark',
+};
+export const skinToneName = (s: { id: string; name: string }): string =>
+  SKIN_TONE_KEYS[s.id] ? t(SKIN_TONE_KEYS[s.id]) : s.name;
