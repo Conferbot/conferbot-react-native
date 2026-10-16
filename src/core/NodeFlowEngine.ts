@@ -581,7 +581,14 @@ export class NodeFlowEngine {
     return uiState?.awaitInput === true || requiresUserInteraction(node.type);
   }
 
+  /** The state with its step's type and data, for the step's own view (NodeRenderer). */
+  private stamp(uiState: NodeUIState, node: BaseNode | undefined): NodeUIState {
+    if (!uiState || !node) return uiState;
+    return { ...uiState, stepType: node.type, stepData: (node as any).data || {} };
+  }
+
   private handleDisplayUI = async (uiState: NodeUIState, node: BaseNode, token: number): Promise<void> => {
+    uiState = this.stamp(uiState, node);
     this._currentUIState = uiState;
     this._isProcessing = false;
     if (this.shownToken !== token && DISPLAY_NODE_TYPES.has(node.type)) {
@@ -873,7 +880,7 @@ export class NodeFlowEngine {
       this.chatState.addBotMessage(bubbleText(message), node.id, 'validation-error');
     }
     this.config.onValidationError?.(node.id, message);
-    const ui = uiState || this._currentUIState;
+    const ui = uiState ? this.stamp(uiState, node) : this._currentUIState;
     if (ui) {
       this._currentUIState = { ...(ui as any), errorMessage: plainText(message) };
       this.config.onUIStateChange?.(this._currentUIState);
@@ -993,6 +1000,7 @@ export class NodeFlowEngine {
     this._currentNodeId = nodeId;
     this._isProcessing = false;
     this._isWaitingForInput = true;
+    uiState = this.stamp(uiState, this.nodes.get(nodeId));
     this._currentUIState = uiState;
     this.chatState.setCurrentNode(nodeId);
     this.config.onUIStateChange?.(uiState);
