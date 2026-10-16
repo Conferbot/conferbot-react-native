@@ -235,7 +235,7 @@ describe('NodeRenderer', () => {
       expect(getByTestId('card-grid')).toBeTruthy();
     });
 
-    it('renders CarouselView for carousel states', () => {
+    it('renders the cards step for carousel states (#52)', () => {
       const uiState: NodeUIState = {
         type: 'carousel',
         nodeId: 'n9',
@@ -245,10 +245,10 @@ describe('NodeRenderer', () => {
         <NodeRenderer uiState={uiState} onSubmit={onSubmit} />
       );
 
-      expect(getByTestId('carousel-view')).toBeTruthy();
+      expect(getByTestId('step-cards')).toBeTruthy();
     });
 
-    it('renders PictureChoiceGrid for pictureChoice states', () => {
+    it('renders the pictures step for single pictureChoice states (#52)', () => {
       const uiState: NodeUIState = {
         type: 'pictureChoice',
         nodeId: 'n10',
@@ -259,7 +259,23 @@ describe('NodeRenderer', () => {
         <NodeRenderer uiState={uiState} onSubmit={onSubmit} />
       );
 
-      expect(getByTestId('picture-choice-grid')).toBeTruthy();
+      expect(getByTestId('step-images')).toBeTruthy();
+    });
+
+    it.each([
+      ['consent-node', 'buttons', 'step-consent'],
+      ['payment-node', 'buttons', 'step-payment'],
+      ['ranking-node', 'buttons', 'step-ranking'],
+      ['matrix-node', 'multipleQuestions', 'step-matrix'],
+      ['otp-node', 'textInput', 'step-otp'],
+      ['signature-node', 'textInput', 'step-signature'],
+      ['address-node', 'locationPicker', 'step-address'],
+      ['slider-node', 'slider', 'step-slider'],
+      ['datetime-node', 'calendar', 'step-datetime'],
+    ])('renders the %s card for its %s state (#52)', (stepType, type, testID) => {
+      const uiState: any = { type, nodeId: 's1', question: '', buttons: [], questions: [], stepType, stepData: {} };
+      const { getByTestId } = render(<NodeRenderer uiState={uiState} onSubmit={onSubmit} />);
+      expect(getByTestId(testID)).toBeTruthy();
     });
 
     it('renders DropdownPicker for dropdown states', () => {
