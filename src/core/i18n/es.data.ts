@@ -831,6 +831,10 @@ export const es: Partial<Record<I18nKey, string>> = {
   "games.reaction.ms": "{ms} milisegundos",
   "launcher.openThe": "Abrir el chat",
   "screenshare.canSee": "{name} puede verlo",
+  "redirect.countdown": "Te llevamos a {host} en {n} s",
+  "redirect.cancel": "Cancelar la redirección a {host}",
+  "redirect.going": "Te llevamos a {host}…",
+  "redirect.continue": "Continuar a {host}",
   // SDK only (sdk-strings.json)
   "sdk.action.confirmed": "Confirmado",
   "sdk.action.notThroughAsk": "No se pudo completar. Vuelve a pedirlo.",
