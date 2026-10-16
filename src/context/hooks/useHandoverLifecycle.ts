@@ -35,13 +35,17 @@ import {
   WAITING_FOR_HUMAN_EVENT,
   WAIT_OVER_EVENT,
   createConnectingSignal,
+  createEscalationNudge,
   createSignalBus,
+  escalationHandoverData,
+  startsEscalationWait,
   waitingDetail,
   type WaitOverDetail,
   type WidgetSignalDetail,
   type WidgetSignalName,
 } from '../../core/handoverWaiting';
-import { requeuedEntry, transferEntry } from '../../core/liveEvents';
+import { inactiveCloseEntry, inactiveClosePlan, requeuedEntry, transferEntry } from '../../core/liveEvents';
+import { buildHandoverTimeoutPayload } from '../../core/handoverPayload';
 import { WAIT_TEXT } from '../../core/waitArticles';
 
 interface Params {
@@ -62,6 +66,12 @@ interface Params {
    * comes 6s in (useWaitingExtras; web special.ts waitForPerson).
    */
   waitHooks?: { start: () => void; end: () => void };
+  /** The chat is an AI agent bot's (no flow): an inactivity close only pauses it. */
+  isAgentBot?: () => boolean;
+  /** The bot's workspace, for the escalation's handover-timeout. */
+  workspaceId?: () => string;
+  /** A restored wait for a person: the server's seconds left of its max wait (useLiveChatExtras' countdown). */
+  onRestoredWait?: (remainingSeconds: number | null) => void;
 }
 
 const now = () => new Date().toISOString();
@@ -81,6 +91,9 @@ export function useHandoverLifecycle({
   setIsNodeProcessing,
   waitingForPerson,
   waitHooks,
+  isAgentBot,
+  workspaceId,
+  onRestoredWait,
 }: Params) {
   // The listeners are set up once: they read the latest record and state here.
   const recordRef = useRef(record);
@@ -103,6 +116,24 @@ export function useHandoverLifecycle({
 
   const sid = () => socketClient.current?.chatSessionId || chatStateRef.current?.sessionId || '';
   const own = (data: any) => !data?.chatSessionId || !sid() || data.chatSessionId === sid();
+
+  const workspaceIdRef = useRef(workspaceId);
+  workspaceIdRef.current = workspaceId;
+  const isAgentBotRef = useRef(isAgentBot);
+  isAgentBotRef.current = isAgentBot;
+
+  // The handover step an AI escalation waits on: the flow's, else the agent
+  // bot's silent one in the record.
+  const escalationStep = () => escalationHandoverData(flowEngine.current?.handoverNodeData?.(), chatStateRef.current?.getRecord?.());
+  // After an AI escalates: its step's max wait plus 30s, then the server is
+  // nudged to decide (handover-timeout). Nothing is drawn (web special.ts
+  // _handleAIEscalationWait, handoverWaiting.ts armAIEscalationNudge).
+  const nudge = useRef(
+    createEscalationNudge(() => {
+      const id = sid();
+      if (id) socketClient.current?.emitToServer?.('handover-timeout', buildHandoverTimeoutPayload(id, escalationStep(), workspaceIdRef.current?.() || ''));
+    })
+  ).current;
 
   /** Add an entry to the screen and (with `server`) to the conversation's record. */
   const add = useCallback(
@@ -131,6 +162,7 @@ export function useHandoverLifecycle({
   /** The wait ended without a person: no waiting signal, and cb:wait-over. */
   const waitOver = useCallback((reason: WaitOverDetail['reason']) => {
     connecting.end();
+    nudge.clear();
     waitEnd();
     bus.emit(WAIT_OVER_EVENT, { reason });
   }, []);
@@ -162,6 +194,8 @@ export function useHandoverLifecycle({
       const name = data?.agentDetails?.name || '';
       const handover = kind === 'handover';
       if (handover) {
+        // The AI passed the visitor on: the wait for a person starts again.
+        if (startsEscalationWait(data)) nudge.arm(escalationStep()?.maxWaitTime);
         connecting.start();
         // Passed on to a person: what may help while they wait (web special.ts agent-left).
         waitStart();
@@ -191,6 +225,7 @@ export function useHandoverLifecycle({
     (data: any) => {
       const plan = acceptedPlan(recordRef.current, data);
       connecting.end();
+      nudge.clear();
       waitEnd();
       settle(plan.outcome);
       if (plan.humanJoined) bus.emit(HUMAN_JOINED_EVENT, { name: data?.agentDetails?.name || null });
@@ -269,6 +304,7 @@ export function useHandoverLifecycle({
     socket.on('handover-waiting', (data: any) => {
       if (!own(data)) return;
       connecting.end();
+      nudge.clear();
       waitEnd();
       settle('unavailable');
       bus.emit(WAITING_FOR_HUMAN_EVENT, waitingDetail(data));
@@ -279,17 +315,32 @@ export function useHandoverLifecycle({
     });
     socket.on('chat-ended', (data: any) => {
       if (!own(data)) return;
+      nudge.clear();
       waitEnd();
       const waiting = inWait();
       settle('ended');
       if (waiting) waitOver('ended');
     });
+    // The AI let an idle visitor go (web agentListeners.ts, server
+    // aiInactivityHandler.js): "Chat paused" (a message picks it back up)
+    // or, for continue_flow on a flow bot, "Chat ended" and the flow carries
+    // on from its handover step (core/liveEvents.ts inactiveClosePlan).
     socket.on('ai-agent-inactive-close', (data: any) => {
       if (!own(data)) return;
+      nudge.clear();
       waitEnd();
       const waiting = inWait();
       settle('ended');
       if (waiting) waitOver('ended');
+      const agentBot = !!isAgentBotRef.current?.();
+      const entry = inactiveCloseEntry(data, agentBot);
+      const { _id, shape, ...server } = entry;
+      add({ ...entry }, server);
+      if (!inactiveClosePlan(data, agentBot).continueFlow) return;
+      setCurrentAgent(undefined);
+      setIsLiveChatMode(false);
+      const engine = flowEngine.current;
+      if (engine?.isAtHandover() && engine.getState().isWaitingForInput) engine.submitResponse({ action: 'continue' }).catch?.(() => {});
     });
     // The agent left and nobody else owns the chat: back in the queue
     // (web liveTakeover.ts). "Connecting you to another agent..." (or the
@@ -320,6 +371,7 @@ export function useHandoverLifecycle({
     socket.on('visitor-blocked', (data: any) => {
       if (!own(data)) return;
       connecting.end();
+      nudge.clear();
       waitEnd();
       settle('ended');
       flowEngine.current?.reset();
@@ -380,6 +432,8 @@ export function useHandoverLifecycle({
         setCurrentUIState(null);
         setIsNodeProcessing(false);
       } else if (step === 'wait' && engine && waitUI) {
+        // The countdown and the max wait go on from where the server is.
+        onRestoredWait?.(r.remainingSeconds);
         engine.waitAt(handoverNode.id, waitUI);
         connecting.start();
         if (!(Array.isArray(handoverNode?.data?.assignedAIAgents) && handoverNode.data.assignedAIAgents.length)) waitStart();
@@ -406,10 +460,17 @@ export function useHandoverLifecycle({
 
   const resetHandover = useCallback(() => {
     connecting.end();
+    nudge.clear();
     restoredSessionRef.current = null;
   }, []);
 
-  useEffect(() => () => connecting.end(), []);
+  useEffect(
+    () => () => {
+      connecting.end();
+      nudge.clear();
+    },
+    []
+  );
 
   return {
     recordRef,
