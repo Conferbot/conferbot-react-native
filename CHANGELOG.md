@@ -7,13 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!--
-  Proposed next version: 2.0.0. Six handler classes left the package root
-  (see "Breaking changes & migration"), and several defaults changed: under
-  semver a removed export is a major bump. If those classes count as
-  internal, 1.2.0 fits instead. The version in package.json is unchanged:
-  the owner picks it at release.
--->
+## [2.0.0] - 2026-10-16
 
 Everything since 1.1.0. The SDK now matches the web widget: the same flows, live chat, customisation, launcher, languages and help, checked against the widget's own code (see [docs/PARITY.md](docs/PARITY.md)).
 
