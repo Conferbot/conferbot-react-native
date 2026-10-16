@@ -14,6 +14,10 @@ export interface QueueStatus {
   ahead: number | null;
   agentsOnline: number | null;
   estimateLabel: string | null;
+  /** The server's estimate bucket (under_minute, about_1 ... longer), worded here. */
+  estimateBucket: string | null;
+  /** The routed team's usual first reply (embed-server replyTimeService). */
+  typical: { bucket?: string | null; phrase?: string | null; wait?: string | null } | null;
 }
 
 export interface HandoverWaiting {
@@ -45,7 +49,37 @@ export const queueStatusOf = (raw: any): QueueStatus | null => {
   const status = raw.status === 'waiting' || raw.status === 'busy' ? raw.status : 'none';
   if (status === 'none') return null;
   const label = typeof raw.estimate?.label === 'string' && raw.estimate.label.trim() ? raw.estimate.label.trim() : null;
-  return { status, position: num(raw.position), ahead: num(raw.ahead), agentsOnline: num(raw.agentsOnline), estimateLabel: label };
+  const bucket = typeof raw.estimate?.bucket === 'string' ? raw.estimate.bucket : null;
+  const typical = raw.typical && typeof raw.typical === 'object' ? raw.typical : null;
+  return { status, position: num(raw.position), ahead: num(raw.ahead), agentsOnline: num(raw.agentsOnline), estimateLabel: label, estimateBucket: bucket, typical };
+};
+
+// The server's estimate buckets (embed-server liveChat/queueService), worded here (web queueCard.ts ESTIMATE_WORDS).
+const ESTIMATE_WORDS: Record<string, I18nKey> = {
+  under_minute: 'queue.estimate.underMinute',
+  about_1: 'queue.estimate.about1',
+  about_2: 'queue.estimate.about2',
+  about_3: 'queue.estimate.about3',
+  few: 'queue.estimate.few',
+  longer: 'queue.estimate.longer',
+};
+
+/**
+ * The wait card's lines under the headline (web queueCard.ts estimateText
+ * and the card's third line): the live estimate in the visitor's language,
+ * else the usual wait ("Typical wait: a few minutes", core/replyTime.ts
+ * typicalWait), else a calm promise; then the usual wait again under a
+ * live estimate, when it says something else.
+ */
+export const waitCardLines = (q: QueueStatus | null | undefined, typical: string | null): { estimate: string; typical: string } => {
+  let estimate: string;
+  if (q && q.status === 'waiting' && q.estimateLabel) {
+    const key = q.estimateBucket ? ESTIMATE_WORDS[q.estimateBucket] : undefined;
+    estimate = key ? t(key) : q.estimateLabel;
+  } else {
+    estimate = typical || t('queue.soon');
+  }
+  return { estimate, typical: typical && estimate !== typical ? typical : '' };
 };
 
 /** "1st", "2nd", "3rd", "11th" */
