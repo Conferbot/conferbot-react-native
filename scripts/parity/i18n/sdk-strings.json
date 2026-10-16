@@ -1,4 +1,39 @@
 {
+  "sdk.action.confirmed": {
+    "en": "Confirmed",
+    "nl": "Bevestigd",
+    "fr": "Confirmé",
+    "de": "Bestätigt",
+    "es": "Confirmado"
+  },
+  "sdk.action.notThroughAsk": {
+    "en": "That did not go through. Please ask again.",
+    "nl": "Dat is niet gelukt. Vraag het nog eens.",
+    "fr": "Cela n'a pas abouti. Veuillez redemander.",
+    "de": "Das hat nicht geklappt. Bitte frag noch einmal.",
+    "es": "No se pudo completar. Vuelve a pedirlo."
+  },
+  "sdk.address.save": {
+    "en": "Save",
+    "nl": "Opslaan",
+    "fr": "Enregistrer",
+    "de": "Speichern",
+    "es": "Guardar"
+  },
+  "sdk.address.search": {
+    "en": "Search",
+    "nl": "Zoeken",
+    "fr": "Rechercher",
+    "de": "Suchen",
+    "es": "Buscar"
+  },
+  "sdk.address.searchInstead": {
+    "en": "Search instead",
+    "nl": "Liever zoeken",
+    "fr": "Rechercher plutôt",
+    "de": "Lieber suchen",
+    "es": "Buscar en su lugar"
+  },
   "sdk.agent.avatar": {
     "en": "Agent avatar",
     "nl": "Avatar van de medewerker",
@@ -104,12 +139,40 @@
     "de": "Lange drücken, um eine Reaktion hinzuzufügen",
     "es": "Mantén pulsado para añadir una reacción"
   },
+  "sdk.calendar.dayClosed": {
+    "en": "This day isn't available.",
+    "nl": "Deze dag is niet beschikbaar.",
+    "fr": "Ce jour n'est pas disponible.",
+    "de": "Dieser Tag ist nicht verfügbar.",
+    "es": "Este día no está disponible."
+  },
+  "sdk.calendar.noTimes": {
+    "en": "No times are free on this day.",
+    "nl": "Op deze dag zijn geen tijden vrij.",
+    "fr": "Aucun créneau n'est libre ce jour-là.",
+    "de": "An diesem Tag sind keine Zeiten frei.",
+    "es": "No hay horas libres este día."
+  },
+  "sdk.card.learnMore": {
+    "en": "Learn more",
+    "nl": "Meer informatie",
+    "fr": "En savoir plus",
+    "de": "Mehr erfahren",
+    "es": "Más información"
+  },
   "sdk.chat.loadingOlder": {
     "en": "Loading older messages...",
     "nl": "Oudere berichten laden...",
     "fr": "Chargement des messages précédents...",
     "de": "Ältere Nachrichten werden geladen...",
     "es": "Cargando mensajes anteriores..."
+  },
+  "sdk.chat.menu": {
+    "en": "Chat menu",
+    "nl": "Chatmenu",
+    "fr": "Menu du chat",
+    "de": "Chat-Menü",
+    "es": "Menú del chat"
   },
   "sdk.chat.modal": {
     "en": "Chat modal",
@@ -461,12 +524,33 @@
     "de": "Noch keine Nachrichten",
     "es": "Aún no hay mensajes"
   },
+  "sdk.file.browseDocuments": {
+    "en": "Browse documents",
+    "nl": "Door documenten bladeren",
+    "fr": "Parcourir les documents",
+    "de": "Dokumente durchsuchen",
+    "es": "Explorar documentos"
+  },
+  "sdk.file.cameraUnavailable": {
+    "en": "Camera not available",
+    "nl": "Camera niet beschikbaar",
+    "fr": "Appareil photo indisponible",
+    "de": "Kamera nicht verfügbar",
+    "es": "Cámara no disponible"
+  },
   "sdk.file.choose": {
     "en": "Choose a file",
     "nl": "Kies een bestand",
     "fr": "Choisir un fichier",
     "de": "Datei auswählen",
     "es": "Elegir un archivo"
+  },
+  "sdk.file.chooseAnother": {
+    "en": "Choose another",
+    "nl": "Kies een ander bestand",
+    "fr": "Choisir un autre fichier",
+    "de": "Andere Datei wählen",
+    "es": "Elegir otro"
   },
   "sdk.file.chooseMany": {
     "en": "Choose Files",
@@ -489,6 +573,13 @@
     "de": "Dokument wählen",
     "es": "Elegir un documento"
   },
+  "sdk.file.fromPhotos": {
+    "en": "Select from photos",
+    "nl": "Kies uit je foto's",
+    "fr": "Choisir parmi vos photos",
+    "de": "Aus deinen Fotos wählen",
+    "es": "Elegir de tus fotos"
+  },
   "sdk.file.gallery": {
     "en": "Choose from Gallery",
     "nl": "Kiezen uit galerij",
@@ -510,6 +601,13 @@
     "de": "Max. {mb} MB",
     "es": "Máx. {mb} MB"
   },
+  "sdk.file.photoLibrary": {
+    "en": "Photo Library",
+    "nl": "Fotobibliotheek",
+    "fr": "Photothèque",
+    "de": "Fotomediathek",
+    "es": "Fototeca"
+  },
   "sdk.file.pickerMissing": {
     "en": "Sending files isn't available here",
     "nl": "Bestanden sturen kan hier niet",
@@ -517,12 +615,26 @@
     "de": "Dateien senden ist hier nicht möglich",
     "es": "Aquí no se pueden enviar archivos"
   },
+  "sdk.file.processFailed": {
+    "en": "Could not process image",
+    "nl": "Afbeelding kon niet worden verwerkt",
+    "fr": "Impossible de traiter l'image",
+    "de": "Bild konnte nicht verarbeitet werden",
+    "es": "No se pudo procesar la imagen"
+  },
   "sdk.file.remove": {
     "en": "Remove {name}",
     "nl": "{name} verwijderen",
     "fr": "Retirer {name}",
     "de": "{name} entfernen",
     "es": "Quitar {name}"
+  },
+  "sdk.file.secondsLeft": {
+    "en": "~{n}s remaining",
+    "nl": "nog ~{n} s",
+    "fr": "~{n} s restantes",
+    "de": "noch ~{n} s",
+    "es": "quedan ~{n} s"
   },
   "sdk.file.selectMany": {
     "en": "Select Files",
@@ -545,6 +657,13 @@
     "de": "Datei auswählen",
     "es": "Elegir archivo"
   },
+  "sdk.file.sendingName": {
+    "en": "Sending {name}...",
+    "nl": "{name} wordt verstuurd...",
+    "fr": "Envoi de {name}...",
+    "de": "{name} wird gesendet...",
+    "es": "Enviando {name}..."
+  },
   "sdk.file.takePhoto": {
     "en": "Take Photo",
     "nl": "Foto maken",
@@ -565,6 +684,20 @@
     "fr": "Fichier trop volumineux",
     "de": "Datei zu groß",
     "es": "Archivo demasiado grande"
+  },
+  "sdk.file.unsupported": {
+    "en": "Unsupported file type",
+    "nl": "Bestandstype niet ondersteund",
+    "fr": "Type de fichier non pris en charge",
+    "de": "Dateityp nicht unterstützt",
+    "es": "Tipo de archivo no compatible"
+  },
+  "sdk.file.upTo": {
+    "en": "Up to {size}",
+    "nl": "Tot {size}",
+    "fr": "Jusqu'à {size}",
+    "de": "Bis zu {size}",
+    "es": "Hasta {size}"
   },
   "sdk.file.upload": {
     "en": "Upload",
@@ -593,6 +726,13 @@
     "fr": "Envoi en cours...",
     "de": "Wird hochgeladen...",
     "es": "Subiendo..."
+  },
+  "sdk.file.useCamera": {
+    "en": "Use camera",
+    "nl": "Camera gebruiken",
+    "fr": "Utiliser l'appareil photo",
+    "de": "Kamera verwenden",
+    "es": "Usar la cámara"
   },
   "sdk.flow.aiExtractPrompt": {
     "en": "How can we help?",
@@ -635,6 +775,13 @@
     "fr": "Saisissez le code à {n} chiffres que nous vous avons envoyé",
     "de": "Gib den {n}-stelligen Code ein, den wir dir geschickt haben",
     "es": "Introduce el código de {n} dígitos que te hemos enviado"
+  },
+  "sdk.flow.questionPlaceholder": {
+    "en": "Type your question...",
+    "nl": "Typ je vraag...",
+    "fr": "Écrivez votre question...",
+    "de": "Schreib deine Frage...",
+    "es": "Escribe tu pregunta..."
   },
   "sdk.flow.rateConversation": {
     "en": "Please rate your conversation",
@@ -972,6 +1119,13 @@
     "de": "Alle",
     "es": "Todas"
   },
+  "sdk.kb.allCategories": {
+    "en": "All categories",
+    "nl": "Alle categorieën",
+    "fr": "Toutes les catégories",
+    "de": "Alle Kategorien",
+    "es": "Todas las categorías"
+  },
   "sdk.kb.article": {
     "en": "Article: {title}",
     "nl": "Artikel: {title}",
@@ -993,6 +1147,13 @@
     "de": "Artikel in der Kategorie {name}",
     "es": "Artículos de la categoría {name}"
   },
+  "sdk.kb.articlesInCategories": {
+    "en": "{articles} in {categories}",
+    "nl": "{articles} in {categories}",
+    "fr": "{articles} dans {categories}",
+    "de": "{articles} in {categories}",
+    "es": "{articles} en {categories}"
+  },
   "sdk.kb.author": {
     "en": "Author: {name}",
     "nl": "Auteur: {name}",
@@ -1000,12 +1161,47 @@
     "de": "Autor: {name}",
     "es": "Autor: {name}"
   },
+  "sdk.kb.browseBeforeChat": {
+    "en": "Browse help articles before chatting",
+    "nl": "Bekijk hulpartikelen voordat je gaat chatten",
+    "fr": "Parcourez les articles d'aide avant de discuter",
+    "de": "Hilfeartikel ansehen, bevor du chattest",
+    "es": "Consulta los artículos de ayuda antes de chatear"
+  },
   "sdk.kb.browseCategories": {
     "en": "Browse by Category",
     "nl": "Bladeren per categorie",
     "fr": "Parcourir par catégorie",
     "de": "Nach Kategorie durchsuchen",
     "es": "Explorar por categoría"
+  },
+  "sdk.kb.browseSub": {
+    "en": "Find answers to your questions by browsing our help categories",
+    "nl": "Vind antwoorden op je vragen in onze helpcategorieën",
+    "fr": "Trouvez des réponses à vos questions en parcourant nos catégories d'aide",
+    "de": "Finde Antworten auf deine Fragen in unseren Hilfekategorien",
+    "es": "Encuentra respuestas a tus preguntas explorando nuestras categorías de ayuda"
+  },
+  "sdk.kb.browseTitle": {
+    "en": "Browse help articles",
+    "nl": "Blader door de helpartikelen",
+    "fr": "Parcourir les articles d'aide",
+    "de": "Hilfeartikel durchstöbern",
+    "es": "Explorar los artículos de ayuda"
+  },
+  "sdk.kb.categories.one": {
+    "en": "{n} category",
+    "nl": "{n} categorie",
+    "fr": "{n} catégorie",
+    "de": "{n} Kategorie",
+    "es": "{n} categoría"
+  },
+  "sdk.kb.categories.other": {
+    "en": "{n} categories",
+    "nl": "{n} categorieën",
+    "fr": "{n} catégories",
+    "de": "{n} Kategorien",
+    "es": "{n} categorías"
   },
   "sdk.kb.collapse": {
     "en": "Collapse",
@@ -1028,6 +1224,13 @@
     "de": "In dieser Kategorie gibt es noch keine Artikel.",
     "es": "Todavía no hay artículos en esta categoría."
   },
+  "sdk.kb.featured": {
+    "en": "Featured topics",
+    "nl": "Uitgelichte onderwerpen",
+    "fr": "Sujets à la une",
+    "de": "Ausgewählte Themen",
+    "es": "Temas destacados"
+  },
   "sdk.kb.loadFailed": {
     "en": "Failed to load knowledge base",
     "nl": "Het helpcentrum kon niet worden geladen",
@@ -1048,6 +1251,13 @@
     "fr": "Ouvrir {label}",
     "de": "{label} öffnen",
     "es": "Abrir {label}"
+  },
+  "sdk.kb.popularSearches": {
+    "en": "Popular searches",
+    "nl": "Populaire zoekopdrachten",
+    "fr": "Recherches populaires",
+    "de": "Beliebte Suchen",
+    "es": "Búsquedas populares"
   },
   "sdk.kb.publishedOn": {
     "en": "Published on {date}",
@@ -1097,6 +1307,69 @@
     "fr": "Recherche : {query}",
     "de": "Suche: {query}",
     "es": "Búsqueda: {query}"
+  },
+  "sdk.kb.term.account": {
+    "en": "Account settings",
+    "nl": "Accountinstellingen",
+    "fr": "Paramètres du compte",
+    "de": "Kontoeinstellungen",
+    "es": "Ajustes de la cuenta"
+  },
+  "sdk.kb.term.billing": {
+    "en": "Billing",
+    "nl": "Facturatie",
+    "fr": "Facturation",
+    "de": "Abrechnung",
+    "es": "Facturación"
+  },
+  "sdk.kb.term.gettingStarted": {
+    "en": "Getting started",
+    "nl": "Aan de slag",
+    "fr": "Premiers pas",
+    "de": "Erste Schritte",
+    "es": "Primeros pasos"
+  },
+  "sdk.kb.term.integration": {
+    "en": "Integration",
+    "nl": "Integratie",
+    "fr": "Intégration",
+    "de": "Integration",
+    "es": "Integración"
+  },
+  "sdk.kb.term.troubleshooting": {
+    "en": "Troubleshooting",
+    "nl": "Problemen oplossen",
+    "fr": "Dépannage",
+    "de": "Fehlerbehebung",
+    "es": "Solución de problemas"
+  },
+  "sdk.kb.tip.browse": {
+    "en": "Browse categories instead",
+    "nl": "Blader in plaats daarvan door de categorieën",
+    "fr": "Parcourez plutôt les catégories",
+    "de": "Stöbere stattdessen in den Kategorien",
+    "es": "Explora las categorías en su lugar"
+  },
+  "sdk.kb.tip.general": {
+    "en": "Try more general terms",
+    "nl": "Probeer algemenere woorden",
+    "fr": "Essayez des termes plus généraux",
+    "de": "Versuche allgemeinere Begriffe",
+    "es": "Prueba con términos más generales"
+  },
+  "sdk.kb.tip.spelling": {
+    "en": "Check your spelling",
+    "nl": "Controleer de spelling",
+    "fr": "Vérifiez l'orthographe",
+    "de": "Prüfe die Schreibweise",
+    "es": "Revisa la ortografía"
+  },
+  "sdk.kb.tips": {
+    "en": "Suggestions:",
+    "nl": "Suggesties:",
+    "fr": "Suggestions :",
+    "de": "Vorschläge:",
+    "es": "Sugerencias:"
   },
   "sdk.kb.unknownAuthor": {
     "en": "Unknown Author",
@@ -1167,6 +1440,13 @@
     "fr": "Aperçu du lien : {title}",
     "de": "Linkvorschau: {title}",
     "es": "Vista previa del enlace: {title}"
+  },
+  "sdk.live.chatHasEnded": {
+    "en": "Chat has ended",
+    "nl": "De chat is beëindigd",
+    "fr": "La conversation est terminée",
+    "de": "Der Chat wurde beendet",
+    "es": "El chat ha terminado"
   },
   "sdk.live.fileFailed": {
     "en": "That file can't be sent. Please try another one.",
@@ -1301,6 +1581,13 @@
     "de": "Videoplayer. Tippe zum Abspielen",
     "es": "Reproductor de vídeo. Toca para reproducir"
   },
+  "sdk.message.audio": {
+    "en": "Audio message",
+    "nl": "Audiobericht",
+    "fr": "Message audio",
+    "de": "Audionachricht",
+    "es": "Mensaje de audio"
+  },
   "sdk.message.bot": {
     "en": "Bot message: {text}",
     "nl": "Bericht van de bot: {text}",
@@ -1322,12 +1609,33 @@
     "de": "Bot",
     "es": "Bot"
   },
+  "sdk.message.deleted": {
+    "en": "This message was deleted",
+    "nl": "Dit bericht is verwijderd",
+    "fr": "Ce message a été supprimé",
+    "de": "Diese Nachricht wurde gelöscht",
+    "es": "Este mensaje se eliminó"
+  },
+  "sdk.message.editedAt": {
+    "en": "Edited · {time}",
+    "nl": "Bewerkt · {time}",
+    "fr": "Modifié · {time}",
+    "de": "Bearbeitet · {time}",
+    "es": "Editado · {time}"
+  },
   "sdk.message.failedRetry": {
     "en": "Message failed. Tap to retry",
     "nl": "Bericht niet verstuurd. Tik om het opnieuw te proberen",
     "fr": "Échec de l'envoi. Touchez pour réessayer",
     "de": "Nachricht nicht gesendet. Tippe, um es noch einmal zu versuchen",
     "es": "No se ha enviado el mensaje. Toca para reintentar"
+  },
+  "sdk.message.file": {
+    "en": "File: {name}",
+    "nl": "Bestand: {name}",
+    "fr": "Fichier : {name}",
+    "de": "Datei: {name}",
+    "es": "Archivo: {name}"
   },
   "sdk.message.list": {
     "en": "Message list",
@@ -1567,6 +1875,20 @@
     "de": "{n}-stelliger Code",
     "es": "Código de {n} dígitos"
   },
+  "sdk.otp.typeCode": {
+    "en": "Type the {n}-digit code below.",
+    "nl": "Typ hieronder de code van {n} cijfers.",
+    "fr": "Saisissez le code à {n} chiffres ci-dessous.",
+    "de": "Gib unten den {n}-stelligen Code ein.",
+    "es": "Escribe abajo el código de {n} dígitos."
+  },
+  "sdk.otp.typeEmail": {
+    "en": "Type your e-mail below to get a code.",
+    "nl": "Typ hieronder je e-mailadres om een code te krijgen.",
+    "fr": "Saisissez votre e-mail ci-dessous pour recevoir un code.",
+    "de": "Gib unten deine E-Mail-Adresse ein, um einen Code zu bekommen.",
+    "es": "Escribe abajo tu correo para recibir un código."
+  },
   "sdk.pay.timeLeft": {
     "en": "{time} left",
     "nl": "Nog {time}",
@@ -1741,6 +2063,13 @@
     "fr": "La saisie est trop courte",
     "de": "Die Eingabe ist zu kurz",
     "es": "El texto es demasiado corto"
+  },
+  "sdk.queue.leaveHint": {
+    "en": "Leave the queue",
+    "nl": "De wachtrij verlaten",
+    "fr": "Quitter la file d'attente",
+    "de": "Die Warteschlange verlassen",
+    "es": "Salir de la cola"
   },
   "sdk.quiz.submit": {
     "en": "Submit Answer",
@@ -1923,6 +2252,13 @@
     "fr": "Échec de l'envoi",
     "de": "Senden fehlgeschlagen",
     "es": "Error al enviar"
+  },
+  "sdk.signature.orType": {
+    "en": "Or type your full name below to sign.",
+    "nl": "Of typ hieronder je volledige naam om te ondertekenen.",
+    "fr": "Ou saisissez votre nom complet ci-dessous pour signer.",
+    "de": "Oder gib unten deinen vollständigen Namen ein, um zu unterschreiben.",
+    "es": "O escribe abajo tu nombre completo para firmar."
   },
   "sdk.signature.pad": {
     "en": "Signature pad: draw your signature with a finger",
