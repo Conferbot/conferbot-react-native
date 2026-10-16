@@ -8,7 +8,9 @@ import { Linking } from 'react-native';
 import ConferBotContext from '../../src/context/ConferBotContext';
 import { ThemeProvider } from '../../src/theme';
 import {
+  ClosedChatCard,
   CsatCard,
+  EmailTranscriptCard,
   FileRequestCard,
   HandoverWaitingCard,
   LeadCard,
@@ -165,5 +167,60 @@ describe('LiveChatCards', () => {
   it('shows no rating card when the chat has not ended', () => {
     const { queryByText } = withContext(<CsatCard />, { csatConfig: { ratingType: 'thumbs', titleText: 'T' }, csatOpen: false });
     expect(queryByText('T')).toBeNull();
+  });
+
+  it('Email me this chat: checks the address, sends, says where it went (#46)', async () => {
+    const emailTranscript = jest.fn().mockResolvedValue({ ok: true });
+    const value: any = {
+      emailTranscriptOpen: true,
+      emailTranscriptSentTo: null,
+      emailTranscript,
+      closeEmailTranscript: jest.fn(),
+      chatState: { getUserMetadata: () => ({ email: 'ada@example.com' }), getAnswerVariables: () => [] },
+    };
+    const { getByTestId, getByText, rerender } = withContext(<EmailTranscriptCard />, value);
+    expect(getByText("We'll send the whole conversation to your inbox.")).toBeTruthy();
+    // The known email is filled in.
+    expect(getByTestId('cb-mailchat-email').props.value).toBe('ada@example.com');
+    fireEvent.changeText(getByTestId('cb-mailchat-email'), 'nope');
+    fireEvent.press(getByTestId('cb-mailchat-send'));
+    expect(getByText('Please check the email address.')).toBeTruthy();
+    expect(emailTranscript).not.toHaveBeenCalled();
+    fireEvent.changeText(getByTestId('cb-mailchat-email'), 'sam@example.com');
+    fireEvent.press(getByTestId('cb-mailchat-send'));
+    await waitFor(() => expect(emailTranscript).toHaveBeenCalledWith('sam@example.com'));
+    fireEvent.press(getByTestId('cb-mailchat-cancel'));
+    expect(value.closeEmailTranscript).toHaveBeenCalled();
+    rerender(
+      <ThemeProvider>
+        <ConferBotContext.Provider value={{ ...value, emailTranscriptOpen: false, emailTranscriptSentTo: 'sam@example.com' }}>
+          <EmailTranscriptCard />
+        </ConferBotContext.Provider>
+      </ThemeProvider>
+    );
+    expect(getByText('Sent! Check your inbox at sam@example.com')).toBeTruthy();
+  });
+
+  it("Email me this chat: the server's reason when it did not go (#46)", async () => {
+    const emailTranscript = jest.fn().mockResolvedValue({ ok: false, message: 'Too many requests. Please try again later.' });
+    const { getByTestId, findByText } = withContext(<EmailTranscriptCard />, {
+      emailTranscriptOpen: true,
+      emailTranscript,
+      closeEmailTranscript: jest.fn(),
+    });
+    fireEvent.changeText(getByTestId('cb-mailchat-email'), 'sam@example.com');
+    fireEvent.press(getByTestId('cb-mailchat-send'));
+    expect(await findByText('Too many requests. Please try again later.')).toBeTruthy();
+  });
+
+  it('the closed chat: blocked has its line and no new chat; ended offers one (#47)', () => {
+    const blocked = withContext(<ClosedChatCard closed={{ kind: 'blocked', text: 'This conversation has been closed.', newChat: false, inputOff: true }} onNewChat={jest.fn()} />, {});
+    expect(blocked.getByText('This conversation has been closed.')).toBeTruthy();
+    expect(blocked.queryByTestId('cb-new-chat')).toBeNull();
+    const onNewChat = jest.fn();
+    const ended = withContext(<ClosedChatCard closed={{ kind: 'ended', text: 'Chat ended', newChat: true, inputOff: true }} onNewChat={onNewChat} />, {});
+    fireEvent.press(ended.getByText('Start a new chat'));
+    expect(onNewChat).toHaveBeenCalled();
+    expect(withContext(<ClosedChatCard closed={null} />, {}).toJSON()).toBeNull();
   });
 });
