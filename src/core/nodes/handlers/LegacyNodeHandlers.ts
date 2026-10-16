@@ -15,6 +15,7 @@ import { DisplayNodes } from '../NodeTypes';
 import { ctxOf } from '../../flow/context';
 import { nameGreetingHtml } from '../../flow/text';
 import { EN, isValidEmail, ownerTextOr, parseNumberInput } from '../../flow/inputs';
+import { t } from '../../i18n';
 import { botSay, pickedId, pushAnswer, savedText, shownLabel, shownText, typedText, userSay } from './flowKit';
 
 /** Numbered options (choiceText1.., option1..) as buttons, ids "1".."n". */
@@ -151,9 +152,9 @@ export class UserInputNodeHandler extends BaseNodeHandler {
     if (type === 'file') {
       let url: string | undefined = response?.url;
       if (!url && response?.file) {
-        if (Number(response.file.size) > 5000000) return NodeResult.invalid('Please upload a file smaller than 5MB', this.ui(node, state));
+        if (Number(response.file.size) > 5000000) return NodeResult.invalid(t('upload.tooBig', { mb: 5 }), this.ui(node, state));
         const up = await ctx.upload(response.file);
-        if (!up.ok) return NodeResult.invalid("Couldn't upload this file. Please try again.", this.ui(node, state));
+        if (!up.ok) return NodeResult.invalid(t('upload.failed'), this.ui(node, state));
         url = up.url;
       }
       if (!url) return NodeResult.displayUI(this.ui(node, state));
@@ -168,10 +169,10 @@ export class UserInputNodeHandler extends BaseNodeHandler {
       return NodeResult.invalid(ownerTextOr(data.incorrectEmailResponse, EN.emailInvalid, ['Please enter a valid email']), this.ui(node, state));
     }
     if (type === 'number' && (value.trim() === '' || isNaN(Number(value.trim())))) {
-      return NodeResult.invalid(ownerTextOr(data.incorrectNumberResponse, 'Please enter a valid number'), this.ui(node, state));
+      return NodeResult.invalid(ownerTextOr(data.incorrectNumberResponse, EN.numberInvalid), this.ui(node, state));
     }
     if (type === 'url' && !LEGACY_URL_RE.test(value.toLowerCase())) {
-      return NodeResult.invalid(ownerTextOr(data.incorrectUrlResponse, 'Please enter a valid url'), this.ui(node, state));
+      return NodeResult.invalid(ownerTextOr(data.incorrectUrlResponse, EN.urlInvalid), this.ui(node, state));
     }
     if (type === 'name') state.setUserName(value);
     if (type === 'email') state.setUserEmail(value);
