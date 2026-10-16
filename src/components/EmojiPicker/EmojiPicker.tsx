@@ -9,6 +9,7 @@ import {
   Animated,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import { EmojiSearchBar } from './EmojiSearchBar';
 import { EmojiCategory } from './EmojiCategory';
@@ -22,6 +23,7 @@ import {
   type EmojiCategory as EmojiCategoryType,
   type SkinToneId,
 } from './emojiData';
+import { emojiCategoryName } from './emojiData';
 
 const DEFAULT_PICKER_HEIGHT = 300;
 
@@ -253,7 +255,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
                     activeCategory === category.id && styles.categoryTabActive,
                   ]}
                   accessible={true}
-                  accessibilityLabel={category.name}
+                  accessibilityLabel={emojiCategoryName(category)}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: activeCategory === category.id }}
                   testID={`${testID}-tab-${category.id}`}
@@ -276,7 +278,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
           // Show search results
           <View style={styles.searchResults}>
             <Text style={styles.searchResultsTitle}>
-              Search results for "{searchQuery}"
+              {t('sdk.emoji.resultsFor', { query: searchQuery })}
             </Text>
             <EmojiGrid
               emojis={searchResults || []}
