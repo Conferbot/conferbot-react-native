@@ -152,3 +152,48 @@ export const closedStateOf = (
   if (!endedSinceLastLive(record)) return null;
   return { kind: 'ended', text: LIVE_TEXT.chatEnded, newChat: true, inputOff: true };
 };
+
+// ---------------------------------------------------------------------------
+// Paused or ended for inactivity (ai-agent-inactive-close)
+// ---------------------------------------------------------------------------
+
+/**
+ * The AI let an idle visitor go (web agentListeners.ts
+ * ai-agent-inactive-close; server aiInactivityHandler.js
+ * closeInactiveWebChat, which sends `action`: the agent's onCloseAction).
+ *
+ *   paused       the conversation is only paused: "Chat paused" with "Send
+ *                a message to pick up where you left off". The composer
+ *                stays open and the visitor's next message reopens it
+ *                (server resumeInactiveChat, then ai-agent-resumed). Always
+ *                for an agent bot (it has no flow), and for any action but
+ *                continue_flow.
+ *   continueFlow the AI moved on for good: "Chat ended", the live chat is
+ *                over and the flow carries on from its handover step along
+ *                the next edge (web _handoverProceedToNextStep: no survey).
+ */
+export const inactiveClosePlan = (data: any, agentBotChat: boolean): { paused: boolean; continueFlow: boolean } => {
+  const continueFlow = data?.action === 'continue_flow' && !agentBotChat;
+  return { paused: !continueFlow, continueFlow };
+};
+
+/** Its record entry: its own id (a second pause must not merge into the first), `paused` kept so a restart draws the same line. */
+export const inactiveCloseEntry = (data: any, agentBotChat: boolean, time: string = new Date().toISOString()) => {
+  const id = liveEventId('ai-agent-inactive-close');
+  const { paused } = inactiveClosePlan(data, agentBotChat);
+  return {
+    id,
+    _id: id,
+    type: 'ai-agent-inactive-close',
+    shape: 'ai-agent-inactive-close',
+    time,
+    ...(typeof data?.action === 'string' ? { action: data.action } : {}),
+    paused,
+  };
+};
+
+/** The line it draws, in the active language (web system.chatPaused + system.chatPausedNote, or system.chatEnded). An entry without `paused` (older records) is a pause. */
+export const inactiveCloseLine = (entry: any): { text: string; note: string | null; paused: boolean } =>
+  entry?.paused === false
+    ? { text: t('system.chatEnded'), note: null, paused: false }
+    : { text: t('system.chatPaused'), note: t('system.chatPausedNote'), paused: true };
