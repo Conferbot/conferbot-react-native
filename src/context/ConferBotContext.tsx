@@ -83,6 +83,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   // Late-bound: the conversation's end reaches the redirect, set up below.
   const conversationEndRef = useRef<() => void>(() => {});
   const onConversationEnd = useCallback(() => conversationEndRef.current(), []);
+  // Late-bound too: the flow's end reaches the post-chat rating (#76).
+  const flowEndRef = useRef<() => void>(() => {});
+  const onFlowEnd = useCallback(() => flowEndRef.current(), []);
 
   // ********** Service References ********** //
   const apiClient = useRef<ConferBotAPI | null>(null);
@@ -120,6 +123,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     persistAnswerVariables,
     persistFlowState,
     onConversationEnd,
+    onFlowEnd,
   });
 
   // ********** Reactions Hook ********** //
@@ -197,7 +201,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       apiClient.current ? apiClient.current.sendTranscriptEmail(sessionId, email) : Promise.resolve({ ok: false }),
     // The server's help pick rides on queue-status (useWaitingExtras).
     onQueueStatus: (data: any) => waitingRef.current?.onQueueStatus(data),
+    // A conversation asked for its rating is remembered across restarts (#76).
+    store: config?.enablePersistence === false ? null : asyncStorageFor(config),
   });
+  // The flow's end: the post-chat rating 1.5 s later, when the owner has it on.
+  flowEndRef.current = () => liveChatExtras.flowEnded();
 
   // ********** Handover Lifecycle Hook ********** //
   // The Connecting line and its outcome, the 20s waiting signal, leaving
@@ -461,7 +469,8 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     chatVisible: isOpen && home.view === 'chat',
     blocked: !!liveChatExtras.blocked,
     live: isLiveChatMode || handoverPhase(record) !== 'none',
-    ratingPending: !!liveChatExtras.csatConfig && liveChatExtras.csatOpen && !liveChatExtras.csatSent,
+    // Up, or due 1.5 s after the flow's end, and not answered yet (#76).
+    ratingPending: liveChatExtras.ratingPending,
     disabled: config?.disablePostChatRedirect === true,
     onPostChatRedirect: config?.onPostChatRedirect,
     store: config?.enablePersistence === false ? null : asyncStorageFor(config),
