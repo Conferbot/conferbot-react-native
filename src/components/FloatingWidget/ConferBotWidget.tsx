@@ -178,7 +178,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   widgetConfig = {},
   ...chatWidgetProps
 }) => {
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  // Outside a provider the widget keeps its own open state.
+  const [localOpen, setLocalOpen] = useState(false);
   const [showCta, setShowCta] = useState(widgetConfig.showCta ?? false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -192,8 +193,17 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   let showChat: ((text?: string) => void) | null = null;
   let botId = '';
   let chatStarted = false;
+  // The provider's open state: openChat() / closeChat() (a push tap included) open and close it (#79).
+  let providerOpen: boolean | undefined;
+  let providerOpenChat: (() => unknown) | null = null;
+  let providerCloseChat: (() => unknown) | null = null;
   try {
     const ctx = useConferBot();
+    if (typeof (ctx as any).isOpen === 'boolean' && typeof (ctx as any).openChat === 'function' && typeof (ctx as any).closeChat === 'function') {
+      providerOpen = (ctx as any).isOpen;
+      providerOpenChat = (ctx as any).openChat;
+      providerCloseChat = (ctx as any).closeChat;
+    }
     serverCustomizations = (ctx as any).serverCustomizations;
     unreadCount = (ctx as any).unreadCount || 0;
     agentBot = (ctx as any).agentBot || null;
@@ -205,6 +215,21 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   } catch {
     // Context not available — widget used outside provider, that's fine
   }
+
+  const followsProvider = providerOpen !== undefined;
+  const isChatOpen = followsProvider ? !!providerOpen : localOpen;
+  const openChatRef = useRef(providerOpenChat);
+  openChatRef.current = providerOpenChat;
+  const closeChatRef = useRef(providerCloseChat);
+  closeChatRef.current = providerCloseChat;
+  const setIsChatOpen = useCallback(
+    (open: boolean) => {
+      if (!followsProvider) return setLocalOpen(open);
+      const fn = open ? openChatRef.current : closeChatRef.current;
+      void Promise.resolve(fn?.()).catch(() => {});
+    },
+    [followsProvider]
+  );
 
   const sc = serverCustomizations || {};
   // The launcher as the web draws it on a phone (core/launcher); props win.
@@ -341,15 +366,20 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }).start();
   }, []);
 
-  // Toggle chat with rotation animation
-  const toggleChat = useCallback(() => {
-    const opening = !isChatOpen;
-    if (opening) noteLauncherOpened();
-    setIsChatOpen(opening);
-    setShowCta(false);
-
+  // Toggle chat; the icon turns as the open state changes, from here or from openChat().
+  const toggleChat = useCallback(() => setIsChatOpen(!isChatOpen), [isChatOpen, setIsChatOpen]);
+  const firstOpenState = useRef(true);
+  useEffect(() => {
+    if (firstOpenState.current) {
+      firstOpenState.current = false;
+      if (!isChatOpen) return;
+    }
+    if (isChatOpen) {
+      noteLauncherOpened();
+      setShowCta(false);
+    }
     Animated.spring(rotateAnim, {
-      toValue: opening ? 1 : 0,
+      toValue: isChatOpen ? 1 : 0,
       useNativeDriver: true,
       friction: 6,
     }).start();
@@ -385,13 +415,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
 
   const handleChatClose = useCallback(() => {
     setIsChatOpen(false);
-    Animated.spring(rotateAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      friction: 6,
-    }).start();
     chatWidgetProps.onClose?.();
-  }, [chatWidgetProps.onClose]);
+  }, [chatWidgetProps.onClose, setIsChatOpen]);
 
   const openIconOpacity = rotateAnim.interpolate({
     inputRange: [0, 0.5, 1],
