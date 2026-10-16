@@ -24,6 +24,7 @@ import {
   type AgentBot,
 } from '../../core/agentBot';
 import { buildHandoverPayload } from '../../core/handoverPayload';
+import { withFeedback } from '../../core/answerFeedback';
 import { handoverPhase } from '../../core/handoverState';
 import { deduplicateMessages, trimMessages } from '../types';
 import { htmlToMarkdown } from '../../utils/chatMarkdown';
@@ -218,6 +219,14 @@ export function useAgentBot({
   const sendAnswerFeedback = useCallback(
     (agentMessageId: string, feedback: { helpful: boolean; reason?: string; comment?: string }) => {
       setRecord((prev) => prev.map((r: any) => (String(r._id) === String(agentMessageId) ? { ...r, feedback } : r)));
+      // Kept on the answer's record entry too, as the web does, so the
+      // conversation's record says how it was rated.
+      const state = chatStateRef.current;
+      if (state) {
+        const before = state.getRecord();
+        const after = withFeedback(before, agentMessageId, feedback);
+        if (after !== before) state.setRecord(after);
+      }
       const sid = socketClient.current?.chatSessionId || chatStateRef.current?.sessionId;
       socketClient.current?.emitWithAck('ai-answer-feedback', { chatSessionId: sid, agentMessageId, ...feedback }, 10000);
     },
