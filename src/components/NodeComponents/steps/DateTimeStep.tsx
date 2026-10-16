@@ -12,6 +12,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { closedDaysNote, dateMode, disabledWeekdaysOf, resolveDateBound, submitLabel, ymd } from '../../../core/flow/rich';
+import { t, monthNames, weekdayNames } from '../../../core/i18n';
 import { StepButton, StepCard, StepLook, StepStatus, StepViewProps, useStepLook } from './stepKit';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -53,11 +54,11 @@ const Stepper: React.FC<{ look: StepLook; label: string; value: string; onStep: 
     accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
     onAccessibilityAction={(e) => onStep(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
   >
-    <TouchableOpacity onPress={() => onStep(1)} disabled={disabled} accessibilityLabel={`${label} up`} testID={`${testID}-up`} style={{ padding: 4 }}>
+    <TouchableOpacity onPress={() => onStep(1)} disabled={disabled} accessibilityLabel={t('sdk.stepper.up', { label })} testID={`${testID}-up`} style={{ padding: 4 }}>
       <Text style={{ color: look.accent, fontSize: 14 }}>▲</Text>
     </TouchableOpacity>
     <Text style={{ color: look.text, fontSize: look.fontSize + 8, fontWeight: '600', minWidth: 40, textAlign: 'center' }}>{value}</Text>
-    <TouchableOpacity onPress={() => onStep(-1)} disabled={disabled} accessibilityLabel={`${label} down`} testID={`${testID}-down`} style={{ padding: 4 }}>
+    <TouchableOpacity onPress={() => onStep(-1)} disabled={disabled} accessibilityLabel={t('sdk.stepper.down', { label })} testID={`${testID}-down`} style={{ padding: 4 }}>
       <Text style={{ color: look.accent, fontSize: 14 }}>▼</Text>
     </TouchableOpacity>
   </View>
@@ -93,18 +94,18 @@ export const DateTimeStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, test
       {mode !== 'time' ? (
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <TouchableOpacity onPress={() => canBack && shift(-1)} disabled={!canBack} accessibilityLabel="Previous month" testID={`${testID}-prev`} style={{ padding: 6, opacity: canBack ? 1 : 0.3 }}>
+            <TouchableOpacity onPress={() => canBack && shift(-1)} disabled={!canBack} accessibilityLabel={t('calendar.prevMonth')} testID={`${testID}-prev`} style={{ padding: 6, opacity: canBack ? 1 : 0.3 }}>
               <Text style={{ color: look.accent, fontSize: 16 }}>‹</Text>
             </TouchableOpacity>
             <Text style={{ color: look.text, fontSize: look.fontSize, fontWeight: '600' }} testID={`${testID}-month`}>
-              {`${MONTHS[month.m]} ${month.y}`}
+              {`${monthNames('long', MONTHS)[month.m]} ${month.y}`}
             </Text>
-            <TouchableOpacity onPress={() => canNext && shift(1)} disabled={!canNext} accessibilityLabel="Next month" testID={`${testID}-next`} style={{ padding: 6, opacity: canNext ? 1 : 0.3 }}>
+            <TouchableOpacity onPress={() => canNext && shift(1)} disabled={!canNext} accessibilityLabel={t('calendar.nextMonth')} testID={`${testID}-next`} style={{ padding: 6, opacity: canNext ? 1 : 0.3 }}>
               <Text style={{ color: look.accent, fontSize: 16 }}>›</Text>
             </TouchableOpacity>
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {DAYS.map((d, i) => (
+            {weekdayNames('narrow', DAYS).map((d, i) => (
               <Text key={`h${i}`} style={{ width: `${100 / 7}%`, textAlign: 'center', color: look.muted, fontSize: look.fontSize - 3 }}>
                 {d}
               </Text>
@@ -147,9 +148,9 @@ export const DateTimeStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, test
       ) : null}
       {mode !== 'date' ? (
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-          <Stepper look={look} label="Hours" value={hhmm(minutes).slice(0, 2)} onStep={(d) => setMinutes((m) => m + d * 60)} testID={`${testID}-hour`} disabled={busy} />
+          <Stepper look={look} label={t('sdk.datetime.hours')} value={hhmm(minutes).slice(0, 2)} onStep={(d) => setMinutes((m) => m + d * 60)} testID={`${testID}-hour`} disabled={busy} />
           <Text style={{ color: look.text, fontSize: look.fontSize + 8, fontWeight: '600' }}>:</Text>
-          <Stepper look={look} label="Minutes" value={hhmm(minutes).slice(3)} onStep={(d) => setMinutes((m) => m + d * step)} testID={`${testID}-minute`} disabled={busy} />
+          <Stepper look={look} label={t('sdk.datetime.minutes')} value={hhmm(minutes).slice(3)} onStep={(d) => setMinutes((m) => m + d * step)} testID={`${testID}-minute`} disabled={busy} />
         </View>
       ) : null}
       <StepStatus look={look} error={ui.errorMessage} hint={closedDaysNote(data)} testID={`${testID}-status`} />
