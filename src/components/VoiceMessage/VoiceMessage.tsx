@@ -28,6 +28,7 @@ import {
 } from 'react-native';
 
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import {
   AudioRecorder,
   AudioRecorderError,
@@ -210,7 +211,7 @@ const PlayButton: React.FC<PlayButtonProps> = ({
       onPress={onPress}
       disabled={state === 'loading'}
       accessibilityRole="button"
-      accessibilityLabel={state === 'playing' ? 'Pause' : 'Play'}
+      accessibilityLabel={state === 'playing' ? t('audio.pause') : t('audio.play')}
     >
       {state === 'loading' ? (
         <ActivityIndicator size="small" color={iconColor} />
@@ -331,9 +332,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       setPlaybackState('playing');
     } catch (err) {
       isThisPlaying.current = false;
-      const errorMessage = err instanceof AudioRecorderError
-        ? err.message
-        : 'Failed to play audio';
+      const errorMessage = t('audio.unavailable');
       setError(errorMessage);
       setPlaybackState('error');
     }
@@ -393,7 +392,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
     } else {
       // Default behavior: open URL
       Linking.openURL(url).catch(() => {
-        Alert.alert('Error', 'Failed to download audio file.');
+        Alert.alert(t('sdk.common.error'), t('sdk.voice.downloadFailed'));
       });
     }
   }, [url, onDownload]);
@@ -409,7 +408,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
     return (
       <View style={[stylesWithTheme.container, stylesWithTheme.loadingContainer]}>
         <ActivityIndicator size="small" color={theme.colors.primary} />
-        <Text style={stylesWithTheme.loadingText}>Loading voice message...</Text>
+        <Text style={stylesWithTheme.loadingText}>{t('sdk.voice.loading')}</Text>
       </View>
     );
   }
@@ -421,7 +420,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
         error && stylesWithTheme.errorContainer,
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`Voice message, ${formatDuration(totalDuration)}`}
+      accessibilityLabel={t('sdk.voice.label', { duration: formatDuration(totalDuration) })}
       testID={testID}
     >
       {/* Play/Pause Button */}
@@ -466,7 +465,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
           style={stylesWithTheme.downloadButton}
           onPress={handleDownload}
           accessibilityRole="button"
-          accessibilityLabel="Download voice message"
+          accessibilityLabel={t('sdk.voice.download')}
         >
           <Text style={stylesWithTheme.downloadIcon}>{'\u2B07'}</Text>
         </TouchableOpacity>
@@ -479,7 +478,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
             {error}
           </Text>
           <TouchableOpacity onPress={() => { setError(null); play(); }}>
-            <Text style={stylesWithTheme.retryText}>Tap to retry</Text>
+            <Text style={stylesWithTheme.retryText}>{t('sdk.voice.retry')}</Text>
           </TouchableOpacity>
         </View>
       )}
