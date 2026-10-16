@@ -159,6 +159,22 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
    * 'cb:wait-over'. Returns the unsubscribe.
    */
   onWidgetSignal: (name: WidgetSignalName, fn: (detail: WidgetSignalDetail) => void) => () => void;
+  // ---- While you wait (core/waitArticles.ts, core/waitingGames.ts, core/gamesCard.ts) ----
+  /** The help card: the articles for their question, or the server's queue-help pick. */
+  waitHelp: import('../core/waitArticles').HelpCardState | null;
+  /** A help card row: an article opens in the app (a page in the browser, from the view). */
+  openHelpItem: (item: import('../core/waitArticles').HelpItem) => void;
+  /** "That solved it": queue-self-resolve; true when the visitor left the queue. */
+  solveWait: () => Promise<boolean>;
+  /** The waiting games card on screen, or null. Its own state: `subscribe` / `getState`. */
+  gamesCard: import('../core/gamesCard').GamesCard | null;
+  /** A help article open in the app, or null. */
+  openedArticle: any | null;
+  /** Open a help article by id in the app. */
+  openArticle: (articleId: string) => void;
+  closeArticle: () => void;
+  /** The visitor's words while waiting: true when "play" opened the games instead (do not send). */
+  interceptPlay: (text: string) => boolean;
 }
 
 // ********** Extended Config Types ********** //
