@@ -42,6 +42,7 @@ import {
   type WidgetSignalName,
 } from '../../core/handoverWaiting';
 import { requeuedEntry, transferEntry } from '../../core/liveEvents';
+import { WAIT_TEXT } from '../../core/waitArticles';
 
 interface Params {
   socketClient: React.MutableRefObject<ConferBotSocket | null>;
@@ -56,6 +57,11 @@ interface Params {
   setIsNodeProcessing: (on: boolean) => void;
   /** A flow's handover step is waiting for a person (no AI takes it first). */
   waitingForPerson: boolean;
+  /**
+   * Where a wait for a person begins and ends, for the help card that
+   * comes 6s in (useWaitingExtras; web special.ts waitForPerson).
+   */
+  waitHooks?: { start: () => void; end: () => void };
 }
 
 const now = () => new Date().toISOString();
@@ -74,6 +80,7 @@ export function useHandoverLifecycle({
   setCurrentUIState,
   setIsNodeProcessing,
   waitingForPerson,
+  waitHooks,
 }: Params) {
   // The listeners are set up once: they read the latest record and state here.
   const recordRef = useRef(record);
@@ -85,6 +92,8 @@ export function useHandoverLifecycle({
   const restoredSessionRef = useRef<string | null>(null);
 
   const bus = useRef(createSignalBus()).current;
+  const waitStart = () => waitHooks?.start();
+  const waitEnd = () => waitHooks?.end();
   const connecting = useRef(
     createConnectingSignal(
       () => bus.emit(WAITING_FOR_HUMAN_EVENT, waitingDetail({ offline: false, reason: 'busy' })),
@@ -122,6 +131,7 @@ export function useHandoverLifecycle({
   /** The wait ended without a person: no waiting signal, and cb:wait-over. */
   const waitOver = useCallback((reason: WaitOverDetail['reason']) => {
     connecting.end();
+    waitEnd();
     bus.emit(WAIT_OVER_EVENT, { reason });
   }, []);
 
@@ -134,7 +144,10 @@ export function useHandoverLifecycle({
   useEffect(() => {
     if (!waitingForPerson) return;
     const data: any = flowEngine.current?.handoverNodeData?.();
-    if (!(Array.isArray(data?.assignedAIAgents) && data.assignedAIAgents.length)) connecting.start();
+    if (!(Array.isArray(data?.assignedAIAgents) && data.assignedAIAgents.length)) {
+      connecting.start();
+      waitStart();
+    }
   }, [waitingForPerson]);
 
   /**
@@ -150,6 +163,10 @@ export function useHandoverLifecycle({
       const handover = kind === 'handover';
       if (handover) {
         connecting.start();
+        // Passed on to a person: what may help while they wait (web special.ts agent-left).
+        waitStart();
+        // A new wait: it can be left again.
+        leftRef.current = false;
         // The same escalation again: one line is enough.
         if (hasPendingHandoverLine(recordRef.current)) return kind;
       }
@@ -174,6 +191,7 @@ export function useHandoverLifecycle({
     (data: any) => {
       const plan = acceptedPlan(recordRef.current, data);
       connecting.end();
+      waitEnd();
       settle(plan.outcome);
       if (plan.humanJoined) bus.emit(HUMAN_JOINED_EVENT, { name: data?.agentDetails?.name || null });
       return plan;
@@ -204,15 +222,23 @@ export function useHandoverLifecycle({
     if (waitingForPerson) leftRef.current = false;
   }, [waitingForPerson]);
 
-  /** Out of the queue: the line, the record, the signal, the flow moves on (once per wait). */
-  const leftQueue = useCallback(() => {
+  /**
+   * Out of the queue: the line, the record, the signal, the flow moves on
+   * (once per wait). `helped`: a help article solved it ("That solved it",
+   * web special.ts _wireQueue leave()): "You left the queue. Glad that
+   * helped.", recorded as "Resolved while waiting".
+   */
+  const leftQueue = useCallback((helped = false) => {
     if (leftRef.current) return;
     leftRef.current = true;
     waitOver('cancelled');
     settle('cancelled');
     const id = entryId('queue-self-resolved');
     const time = now();
-    add({ _id: id, type: 'queue-self-resolved', text: HANDOVER_TEXT.cancelled, time }, { id, type: 'queue-self-resolved', time, text: HANDOVER_TEXT.cancelled });
+    add(
+      { _id: id, type: 'queue-self-resolved', text: helped ? WAIT_TEXT.leftHelped : HANDOVER_TEXT.cancelled, time },
+      { id, type: 'queue-self-resolved', time, text: helped ? WAIT_TEXT.recordText : HANDOVER_TEXT.cancelled }
+    );
     const engine = flowEngine.current;
     if (engine?.isAtHandover()) engine.submitResponse({ action: 'cancel', queueLeft: true });
   }, [add, settle, waitOver]);
@@ -232,6 +258,9 @@ export function useHandoverLifecycle({
     return true;
   }, [leftQueue]);
 
+  /** The server let them go because an article helped (queue-self-resolve answered ok). */
+  const leftQueueHelped = useCallback(() => leftQueue(true), [leftQueue]);
+
   const setupHandoverListeners = useCallback(() => {
     const socket = socketClient.current;
     if (!socket) return;
@@ -240,6 +269,7 @@ export function useHandoverLifecycle({
     socket.on('handover-waiting', (data: any) => {
       if (!own(data)) return;
       connecting.end();
+      waitEnd();
       settle('unavailable');
       bus.emit(WAITING_FOR_HUMAN_EVENT, waitingDetail(data));
     });
@@ -249,12 +279,14 @@ export function useHandoverLifecycle({
     });
     socket.on('chat-ended', (data: any) => {
       if (!own(data)) return;
+      waitEnd();
       const waiting = inWait();
       settle('ended');
       if (waiting) waitOver('ended');
     });
     socket.on('ai-agent-inactive-close', (data: any) => {
       if (!own(data)) return;
+      waitEnd();
       const waiting = inWait();
       settle('ended');
       if (waiting) waitOver('ended');
@@ -288,6 +320,7 @@ export function useHandoverLifecycle({
     socket.on('visitor-blocked', (data: any) => {
       if (!own(data)) return;
       connecting.end();
+      waitEnd();
       settle('ended');
       flowEngine.current?.reset();
       setIsLiveChatMode(false);
@@ -349,6 +382,7 @@ export function useHandoverLifecycle({
       } else if (step === 'wait' && engine && waitUI) {
         engine.waitAt(handoverNode.id, waitUI);
         connecting.start();
+        if (!(Array.isArray(handoverNode?.data?.assignedAIAgents) && handoverNode.data.assignedAIAgents.length)) waitStart();
       } else if (step === 'continue' && engine && waitUI) {
         // Ended while the app was closed: say so, as the live event would.
         if (r.status === 'ended') {
@@ -385,6 +419,7 @@ export function useHandoverLifecycle({
     onAccepted,
     addJoin,
     leaveQueue,
+    leftQueueHelped,
     setupHandoverListeners,
     resumeRestored,
     onWidgetSignal,
