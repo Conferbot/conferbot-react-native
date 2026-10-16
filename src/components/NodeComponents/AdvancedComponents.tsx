@@ -300,6 +300,8 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
     const dateStr = formatDate(selectedDate);
     const slot = availableSlots?.find(s => s.date === dateStr);
     const times = slot?.times || ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+    // Already booked: shown greyed out, not pickable (web displayStep.ts calendar-node).
+    const booked = new Set(slot?.booked || []);
 
     return (
       <View style={styles.timeSlotsContainer}>
@@ -307,7 +309,9 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
           {tr('booking.selectTime')}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {times.map(time => (
+          {times.map(time => {
+            const taken = booked.has(time);
+            return (
             <TouchableOpacity
               key={time}
               style={[
@@ -315,6 +319,8 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
                 {
                   backgroundColor: selectedTime === time
                     ? theme.colors.primary
+                    : taken
+                    ? 'rgba(0, 0, 0, 0.02)'
                     : theme.colors.surface,
                   borderColor: selectedTime === time
                     ? theme.colors.primary
@@ -323,9 +329,11 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
                 },
               ]}
               onPress={() => handleTimeSelect(time)}
+              disabled={taken}
               accessibilityRole="radio"
-              accessibilityState={{ checked: selectedTime === time }}
-              accessibilityLabel={time}
+              accessibilityState={{ checked: selectedTime === time, disabled: taken }}
+              accessibilityLabel={taken ? tr('sdk.calendar.slotBooked', { time }) : time}
+              testID={`cb-calendar-slot-${time}`}
             >
               <Text
                 style={[
@@ -333,6 +341,8 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
                   {
                     color: selectedTime === time
                       ? theme.colors.textInverse
+                      : taken
+                      ? '#9ca3af'
                       : theme.colors.text,
                     fontSize: theme.typography.fontSize.sm,
                   },
@@ -341,7 +351,8 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
                 {time}
               </Text>
             </TouchableOpacity>
-          ))}
+            );
+          })}
         </ScrollView>
       </View>
     );
