@@ -17,6 +17,8 @@ import { Avatar } from '../Avatar';
 import { EmptyState } from '../EmptyState';
 import { NodeRenderer } from '../NodeComponents';
 import { AgentReplyExtras, RichAgentMessage, SuggestionChips } from '../AgentReply';
+import { WaitHelpCard } from '../LiveChat/WaitHelpCard';
+import { GamesCard } from '../LiveChat/GamesCard';
 import ConferBotContext from '../../context/ConferBotContext';
 import { htmlToMarkdown } from '../../utils/chatMarkdown';
 import { isAIAgentDetails } from '../../core/agentBot';
@@ -339,6 +341,11 @@ export const MessageList: React.FC<MessageListProps> = ({
   // Render individual message
   const renderMessage = useCallback(
     ({ item }: { item: RecordItem }) => {
+      // While you wait: the help card and the games, at their place in the
+      // conversation (screen-only entries, context/hooks/useWaitingExtras.ts).
+      if ((item as any).type === 'cb-wait-help') return <WaitHelpCard testID={`${testID}-wait-help`} />;
+      if ((item as any).type === 'cb-games') return <GamesCard testID={`${testID}-games`} />;
+
       // Handle frozen choice buttons (submitted choice nodes)
       if ((item as any).shape === 'bot-choice-buttons') {
         return renderFrozenChoiceButtons(item);
