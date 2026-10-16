@@ -41,6 +41,7 @@ import {
   type WidgetSignalDetail,
   type WidgetSignalName,
 } from '../../core/handoverWaiting';
+import { requeuedEntry, transferEntry } from '../../core/liveEvents';
 
 interface Params {
   socketClient: React.MutableRefObject<ConferBotSocket | null>;
@@ -257,6 +258,41 @@ export function useHandoverLifecycle({
       const waiting = inWait();
       settle('ended');
       if (waiting) waitOver('ended');
+    });
+    // The agent left and nobody else owns the chat: back in the queue
+    // (web liveTakeover.ts). "Connecting you to another agent..." (or the
+    // team it went to), and a flow at its handover step waits again.
+    socket.on('live-chat-requeued', (data: any) => {
+      if (!own(data)) return;
+      const entry = requeuedEntry(data);
+      add({ _id: entry.id, type: entry.type, text: entry.text, time: entry.time }, entry);
+      setCurrentAgent(undefined);
+      const engine = flowEngine.current;
+      const nodeId = chatStateRef.current?.currentNodeId;
+      if (engine?.isAtHandover() && nodeId) {
+        setIsLiveChatMode(false);
+        engine.waitAt(nodeId, { type: 'humanHandover', nodeId, stage: 'waiting' } as any);
+      }
+      connecting.start();
+    });
+    // A transfer the server wrote into the record: kept in this copy too,
+    // so the next write keeps it. Not drawn (as on the web): the requeued
+    // line or the next agent's join tells the visitor.
+    socket.on('live-chat-transferred', (data: any) => {
+      if (!own(data)) return;
+      const entry = transferEntry(data);
+      if (entry) chatStateRef.current?.addRecord(entry as any);
+    });
+    // Blocked by the workspace (web closedState.ts): a Connecting line
+    // stops its dots, the wait and the flow are over.
+    socket.on('visitor-blocked', (data: any) => {
+      if (!own(data)) return;
+      connecting.end();
+      settle('ended');
+      flowEngine.current?.reset();
+      setIsLiveChatMode(false);
+      setCurrentUIState(null);
+      setIsNodeProcessing(false);
     });
     // Left the queue from another device of this chat.
     socket.on('queue-left', (data: any) => {
