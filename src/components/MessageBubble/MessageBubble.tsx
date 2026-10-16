@@ -176,7 +176,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Determine message type
   const isUser = message.type === 'user-message' || message.type === 'user-input-response';
   const isAgent = message.type === 'agent-message' || message.type === 'agent-message-file' || message.type === 'agent-message-audio';
-  const isSystem = message.type === 'system-message' || message.type === 'agent-joined-message' || message.type === 'agent-left-chat' || message.type === 'agent-chat-ended' || message.type === 'queue-self-resolved';
+  const isSystem =
+    message.type === 'system-message' ||
+    message.type === 'agent-joined-message' ||
+    message.type === 'agent-left-chat' ||
+    message.type === 'agent-chat-ended' ||
+    message.type === 'queue-self-resolved' ||
+    // Back in the queue: "Connecting you to another agent..." (core/liveEvents.ts).
+    (message.type as string) === 'live-chat-requeued';
   // "Connecting you with the team…" while an AI hands the visitor on, then
   // how the wait ended (core/handoverState.ts); dots only while pending.
   const isHandoverLine = message.type === 'agent-left-chat' && (message as any).handover === true;
@@ -454,6 +461,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {messageText && formatted ? (
             <ChatText
               text={messageText}
+              // The server answering because the AI failed: the same bubble,
+              // muted and italic (web _markAgentFallbackBubble).
+              muted={(message as any).isFallback === true}
               color={textColor}
               fontSize={theme.typography.fontSize.md}
               lineHeight={theme.typography.fontSize.md * theme.typography.lineHeight.normal}
