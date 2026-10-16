@@ -55,6 +55,7 @@ import type { SocketEvents, RecordItem } from '../../types';
 import { resolveCustomizations } from '../../core/customizations';
 import { resolveChatBackground } from '../../core/chatBackground';
 import { ChatBackgroundView } from '../ChatBackground';
+import { ArticleDetail } from '../KnowledgeBase/ArticleDetail';
 
 // Maximum file size for attachments (5MB)
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
@@ -246,6 +247,11 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     emailTranscriptOpen,
     emailTranscriptSentTo,
     openEmailTranscript,
+    // While you wait: "play" opens the games, a help article opens here
+    interceptPlay,
+    openedArticle,
+    closeArticle,
+    rateKBArticle,
     // Actions
     resetConversation,
   } = useConferBot();
@@ -426,6 +432,10 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   };
 
   const handleSendMessage = async (text: string) => {
+    // Waiting for a person: "play" or "games" opens the games menu instead
+    // of being sent (core/waitingGames.ts, web games/wire.ts).
+    if (interceptPlay?.(text)) return;
+
     // Text questions are answered through the unified bottom bar (web widget
     // parity) - route to the flow engine instead of a free-form message
     if (!isLiveChatMode && currentUIState?.type === 'textInput') {
@@ -1029,6 +1039,18 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
         {/* Attachment Preview Modal */}
         {renderAttachmentPreview()}
+
+        {/* A help article opened from the chat (the while-you-wait card), over the conversation */}
+        {openedArticle ? (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background }]} testID={`${testID}-article`}>
+            <ArticleDetail
+              article={openedArticle}
+              onBack={closeArticle}
+              onRatingSubmit={(articleId, helpful) => rateKBArticle(articleId, helpful, helpful ? 5 : 1)}
+              testID={`${testID}-article-detail`}
+            />
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
       </ThemeProvider>
     </Modal>
