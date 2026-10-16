@@ -4,7 +4,7 @@
  * on the conversation like any email they leave.
  *
  * Sent by the embed server, only ever to the address typed here and
- * rate-limited (5 per 15 minutes per address). The web posts to
+ * rate-limited (5 per 15 minutes per IP, shared with the web route). The web posts to
  * /api/v1/chat/transcript-email with the botId in the body; an app posts
  * to the mobile base path, /api/v1/mobile/chat/transcript-email, and the
  * bot comes from its X-Bot-ID header (embed-server #193).
