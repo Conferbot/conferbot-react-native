@@ -1,7 +1,7 @@
 /**
  * The rich steps' rules, the pure half - ported from the web widget
- * (conferbot-widget/src/ts/chat/richNodes.ts) with its English texts.
- * Only the i18n import differs; keep it in step with the web file.
+ * (conferbot-widget/src/ts/chat/richNodes.ts). Only the i18n import path
+ * differs; keep it in step with the web file.
  */
 /* eslint-disable no-control-regex, no-misleading-character-class */
 /**
@@ -17,11 +17,7 @@
  * (client builder/utils/richNodes.ts). Keep them in step.
  */
 
-import { t } from "./i18nEn";
-
-type I18nKey = string;
-const widgetLanguage = (): string => "en";
-const widgetLocale = (): string => "en-US";
+import { t, I18nKey, widgetLanguage, widgetLocale } from "../i18n";
 export const RICH_NODE_TYPES = [
   "dynamic-choices-node",
   "hidden-fields-node",
