@@ -178,6 +178,16 @@ export { registerAllHandlers } from './core/nodes/handlers';
 export { WAITING_FOR_HUMAN_EVENT, HUMAN_JOINED_EVENT, WAIT_OVER_EVENT } from './core/handoverWaiting';
 export type { WidgetSignalName, WidgetSignalDetail, WaitingForHumanDetail, HumanJoinedDetail, WaitOverDetail } from './core/handoverWaiting';
 
+// While you wait (web waitArticles.ts, games/*): the help card's and the games' rules, and their cards
+export { WAIT_BEFORE_MS, createWaitHelp, waitArticlesFor, helpItemsOf } from './core/waitArticles';
+export type { HelpItem, HelpCardState } from './core/waitArticles';
+export { GAMES, OFFER_DELAY_MS, PLAY_RE, createGamesOffer, waitingGamesOf } from './core/waitingGames';
+export type { GameId, WaitingGamesSettings } from './core/waitingGames';
+export { createGamesCard } from './core/gamesCard';
+export type { GamesCard as GamesCardController, GamesCardState, GameInput } from './core/gamesCard';
+export { WaitHelpCard } from './components/LiveChat/WaitHelpCard';
+export { GamesCard, GamesCardView } from './components/LiveChat/GamesCard';
+
 // ========== Theme System ========== //
 export { ThemeProvider, useTheme, defaultTheme, darkTheme } from './theme';
 export type { ConferBotTheme, ConferBotThemeOverride } from './theme';
