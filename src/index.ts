@@ -237,6 +237,17 @@ export type { HomeScreenProps, ViewSwitchProps } from './components/Home';
 export { useHome } from './hooks/useHome';
 export type { UseHomeReturn } from './hooks/useHome';
 
+// ========== Push notifications (core/push.ts; embed-server docs/mobile-push.md) ========== //
+export {
+  parseConferbotPush,
+  isConferbotPush,
+  pushTokenTypeOf,
+  PUSH_SOURCE,
+  PUSH_TYPE_MESSAGE,
+  PUSH_CHANNEL_ID,
+} from './core/push';
+export type { ConferbotPush, PushTokenType } from './core/push';
+
 // ========== Mascots (core/mascotArt, mascotMoods, mascotMotion; web art3d.ts, home/mascotMotion.ts) ========== //
 export {
   mascotLayers,
