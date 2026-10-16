@@ -23,24 +23,29 @@
  * per wait. Pure: the provider (context/hooks/useWaitingExtras.ts) feeds it.
  */
 
+import { localized } from './i18n';
+
 /** The articles card comes this long into a wait for a person. */
 export const WAIT_BEFORE_MS = 6000;
 /** "That solved it" waits this long for the server's answer. */
 export const SOLVE_TIMEOUT_MS = 8000;
 
-export const WAIT_TEXT = {
-  label: 'While you wait',
-  title: 'While you wait, this might help',
-  /** Once nobody is waiting any more (web handover.articlesTitle). */
-  settledTitle: 'Articles that might help',
-  read: 'Read',
-  solved: 'That solved it',
-  done: 'Glad that helped. You have left the queue.',
-  /** The line drawn for a queue left this way (web queue.leftHelped). */
-  leftHelped: 'You left the queue. Glad that helped.',
-  /** What the record keeps (web special.ts leave()). */
-  recordText: 'Resolved while waiting',
-} as const;
+/** The card's words (web wait.*, handover.articlesTitle, queue.leftHelped), in the active language. */
+export const WAIT_TEXT = Object.assign(
+  localized({
+    label: 'wait.label',
+    title: 'wait.title',
+    /** Once nobody is waiting any more (web handover.articlesTitle). */
+    settledTitle: 'handover.articlesTitle',
+    read: 'common.read',
+    solved: 'wait.solved',
+    done: 'wait.done',
+    /** The line drawn for a queue left this way (web queue.leftHelped). */
+    leftHelped: 'queue.leftHelped',
+  }),
+  /** What the record keeps (web special.ts leave()): English, for the team. */
+  { recordText: 'Resolved while waiting' as const }
+);
 
 // ------------------------------------------------------------ help centre
 
