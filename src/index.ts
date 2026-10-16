@@ -23,7 +23,6 @@ export type {
   ChatSession,
   ChatbotConfig,
   KnowledgeBaseArticle,
-  SocketEvents,
   RecordItem,
   // Persistence types
   AsyncStorageInterface,
@@ -45,6 +44,9 @@ export type {
 
 // Export reaction emojis constant
 export { REACTION_EMOJIS } from './types';
+
+// The socket's event names, as a value: on(SocketEvents.BOT_RESPONSE, ...) (#82).
+export { SocketEvents } from './types';
 
 // Export message status enum and helpers
 export {
