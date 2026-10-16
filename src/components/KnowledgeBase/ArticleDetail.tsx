@@ -17,6 +17,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t, widgetLanguage, widgetLocale } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import type { KBArticle } from './types';
 import { ArticleRating } from './ArticleRating';
@@ -183,7 +184,7 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
             onPress={onBack}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessible={true}
-            accessibilityLabel={backButtonText || 'Go back'}
+            accessibilityLabel={backButtonText || t('common.back')}
             accessibilityRole="button"
             testID={`${testID}-back`}
           >
@@ -216,7 +217,7 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
           {/* Breadcrumb */}
           <View style={styles.breadcrumb}>
             <TouchableOpacity onPress={onBack}>
-              <Text style={styles.breadcrumbLink}>Help</Text>
+              <Text style={styles.breadcrumbLink}>{t('kb.help')}</Text>
             </TouchableOpacity>
             {article.categoryName && (
               <>
@@ -259,7 +260,7 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
               style={styles.coverImage}
               resizeMode="cover"
               accessible={true}
-              accessibilityLabel={`Cover image for ${article.title}`}
+              accessibilityLabel={t('sdk.kb.cover', { title: article.title })}
             />
           )}
 
@@ -279,7 +280,7 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
             )}
             <View style={styles.authorInfo}>
               <Text style={styles.authorName}>
-                {article.author?.name || 'Unknown Author'}
+                {article.author?.name || t('sdk.kb.unknownAuthor')}
               </Text>
               <Text style={styles.publishedDate}>Published on {formattedDate}</Text>
             </View>
@@ -301,7 +302,7 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
           {/* Related Articles */}
           {relatedArticles.length > 0 && (
             <View style={styles.relatedSection}>
-              <Text style={styles.relatedTitle}>Related Articles</Text>
+              <Text style={styles.relatedTitle}>{t('kb.related')}</Text>
               {relatedArticles.map((relatedArticle, index) => (
                 <ArticleCard
                   key={relatedArticle._id ?? relatedArticle.id}
@@ -580,17 +581,17 @@ function cleanText(text: string): string {
 
 // Helper functions
 function calculateReadingTime(content: string): string {
-  if (!content) return '1 min read';
+  if (!content) return t('kb.minRead', { n: 1 });
   const text = content.replace(/<[^>]*>/g, '');
   const wordCount = text.split(/\s+/).filter((word) => word.length > 0).length;
   const minutes = Math.ceil(wordCount / 200);
-  return minutes <= 1 ? '1 min read' : `${minutes} min read`;
+  return t('kb.minRead', { n: Math.max(1, minutes) });
 }
 
 function formatDate(date?: string | Date): string {
   if (!date) return '';
   const d = new Date(date);
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(widgetLanguage() === 'en' ? 'en-US' : widgetLocale(), {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
