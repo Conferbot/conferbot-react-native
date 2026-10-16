@@ -147,7 +147,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
 
   // ********** AI Agent Bot Hook ********** //
   const {
-    agentBot, setAgentBot,
+    agentBot, agentBotRef, setAgentBot,
     agentStream, suggestions, awaitingReply,
     startAgentBotChat, engageAgent,
     onAgentAccepted, onAgentMessage, noteVisitorMessage,
@@ -214,6 +214,12 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setIsNodeProcessing,
     waitingForPerson: currentUIState?.type === 'humanHandover' && !isLiveChatMode,
     waitHooks,
+    // An agent bot's inactivity close only pauses it (no flow to go on with).
+    isAgentBot: () => !!agentBotRef.current,
+    // The escalation's handover-timeout names the bot's workspace.
+    workspaceId: () => workspaceIdRef.current || '',
+    // A restored wait's countdown goes on from the server's seconds left.
+    onRestoredWait: liveChatExtras.resumeWaitWith,
   });
 
 
@@ -810,6 +816,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     // Live chat extras
     botId,
     queue: liveChatExtras.queue,
+    waitEndsAt: liveChatExtras.waitEndsAt,
     handoverWaiting: liveChatExtras.waiting,
     noAgentsAvailable: liveChatExtras.noAgents,
     lockedBy: liveChatExtras.lockedBy,
