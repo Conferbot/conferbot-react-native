@@ -167,6 +167,13 @@
     "de": "An diesem Tag sind keine Zeiten frei.",
     "es": "No hay horas libres este día."
   },
+  "sdk.calendar.slotBooked": {
+    "en": "{time}, booked",
+    "nl": "{time}, bezet",
+    "fr": "{time}, réservé",
+    "de": "{time}, gebucht",
+    "es": "{time}, reservado"
+  },
   "sdk.card.learnMore": {
     "en": "Learn more",
     "nl": "Meer informatie",
