@@ -15,6 +15,9 @@ import {
   quickActionsOf,
   aiReplyExtrasOf,
   conversionEventOf,
+  AWAIT_REPLY_MS,
+  REPLY_TIMEOUT_TEXT,
+  replyTimeoutNotice,
 } from '../../src/core/agentBot';
 import { buildHandoverPayload } from '../../src/core/handoverPayload';
 import { ChatState } from '../../src/core/state/ChatState';
@@ -134,5 +137,13 @@ describe('agent bots', () => {
     expect(wait(3)).toBe(3);
     expect(wait(undefined)).toBe(2);
     expect(wait('soon')).toBe(2);
+  });
+});
+
+describe('the reply that took too long (#56)', () => {
+  it('waits 45s, then says so on screen, as the web', () => {
+    expect(AWAIT_REPLY_MS).toBe(45000);
+    expect(REPLY_TIMEOUT_TEXT).toBe('That took too long. Try again, or ask for a human.');
+    expect(replyTimeoutNotice(1000)).toEqual({ _id: 'reply-timeout-1000', type: 'system-message', text: REPLY_TIMEOUT_TEXT, time: new Date(1000).toISOString() });
   });
 });
