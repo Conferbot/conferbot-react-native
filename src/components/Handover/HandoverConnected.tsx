@@ -20,6 +20,7 @@ import {
 
 import { useTheme } from '../../theme';
 import type { HandoverConnectedProps, AgentInfo } from './types';
+import { t } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -103,7 +104,7 @@ const AgentAvatar: React.FC<AvatarProps> = ({
               borderColor,
             },
           ]}
-          accessibilityLabel={`${agent.name}'s avatar`}
+          accessibilityLabel={t('sdk.agent.avatarOf', { name: agent.name })}
         />
         <View style={[styles.onlineBadge, { borderColor: 'white' }]}>
           <OnlineIndicator color={borderColor} size={12} />
@@ -126,7 +127,7 @@ const AgentAvatar: React.FC<AvatarProps> = ({
             backgroundColor,
           },
         ]}
-        accessibilityLabel={`${agent.name}'s avatar`}
+        accessibilityLabel={t('sdk.agent.avatarOf', { name: agent.name })}
       >
         <Text style={[styles.avatarInitial, { color: textColor, fontSize: size * 0.4 }]}>
           {initial}
@@ -147,7 +148,7 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
   agent,
   message,
   onEndChat,
-  endChatButtonText = 'End Chat',
+  endChatButtonText = t('sdk.handover.endChat'),
   accessibilityLabel,
   testID,
 }) => {
@@ -170,7 +171,7 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
     ]).start();
   }, [fadeAnim, slideAnim]);
 
-  const defaultMessage = `You are now connected with ${agent.name || 'an agent'}`;
+  const defaultMessage = agent.name ? t('sdk.handover.connectedWithName', { name: agent.name }) : t('sdk.handover.connectedAgent');
 
   return (
     <Animated.View
@@ -185,7 +186,7 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
         theme.shadows.md,
       ]}
       accessibilityRole="alert"
-      accessibilityLabel={accessibilityLabel || `Connected to ${agent.name || 'agent'}`}
+      accessibilityLabel={accessibilityLabel || t('sdk.handover.connectedTo', { name: agent.name || t('agent.agent') })}
       testID={testID}
     >
       {/* Success Banner */}
@@ -208,7 +209,7 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
               { color: theme.colors.success, fontSize: theme.typography.fontSize.sm },
             ]}
           >
-            Connected
+            {t('sdk.status.connected')}
           </Text>
         </View>
       </View>
@@ -230,7 +231,7 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
               { color: theme.colors.text, fontSize: theme.typography.fontSize.lg },
             ]}
           >
-            {agent.name || 'Agent'}
+            {agent.name || t('agent.agent')}
           </Text>
           {agent.role && (
             <Text
@@ -277,7 +278,7 @@ export const HandoverConnected: React.FC<HandoverConnectedProps> = ({
           ]}
           onPress={onEndChat}
           accessibilityRole="button"
-          accessibilityLabel="End chat"
+          accessibilityLabel={t('sdk.handover.endChat')}
         >
           <Text
             style={[
