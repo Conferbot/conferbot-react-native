@@ -189,6 +189,24 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   closeRequests: () => void;
   /** Read the list again (at most every 15s unless forced). */
   refreshRequests: (force?: boolean) => Promise<void>;
+  /** When each request was last read on this device. */
+  requestsSeen: Record<string, number>;
+  // ---- Home screen (core/home.ts, context/hooks/useHomeScreen.ts) ----
+  /** The view the open chat shows: the home screen (only while the owner has it on), the conversation, the help centre. */
+  homeView: import('../core/home').HomeView;
+  /** Back to the home screen (nothing when the owner has none). */
+  showHome: () => void;
+  /** To the conversation; with `text`, it is asked there as the visitor. */
+  showChat: (text?: string) => void;
+  /** The help centre, on one topic or on its list. */
+  showHelp: (categoryId?: string) => void;
+  helpCategoryId: string | null;
+  /** What the device remembers for "Welcome back" (on the device only). */
+  homeMemory: import('../core/home').VisitorMemory | null;
+  /** The bot's help centre (fetched-chatbot-data's knowledgeBaseData). */
+  knowledgeBase: { categories: any[]; recentArticles: any[] };
+  /** Matches inside article text from the server (the ask box). */
+  searchArticleText: (query: string) => Promise<Array<{ _id: string; snippet: string }>>;
 }
 
 // ********** Extended Config Types ********** //
