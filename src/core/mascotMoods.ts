@@ -23,6 +23,7 @@
  */
 import { cssKeyframes, type Track } from './keyframes';
 import type { MascotArm } from './mascotArt';
+import { t } from './i18n';
 
 export type MascotMood = 'idle' | 'wave' | 'think' | 'happy';
 export const MASCOT_MOODS: readonly MascotMood[] = ['idle', 'wave', 'think', 'happy'];
@@ -151,4 +152,4 @@ export const TYPING_PENCIL = {
 
 /** "Pip is typing" when the owner named their mascot (chatChrome.ts typingBubbleHtml), else "Typing". */
 export const typingLabel = (style: string, mascotName: string): string =>
-  style === 'mascot' && mascotName ? `${mascotName} is typing` : 'Typing';
+  style === 'mascot' && mascotName ? t('typing.named', { name: mascotName }) : t('typing.typing');
