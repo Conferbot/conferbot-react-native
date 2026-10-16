@@ -31,6 +31,7 @@ import {
   AccessibilityInfo,
 } from 'react-native';
 import ConferBotContext from '../../context/ConferBotContext';
+import { useChatFont } from '../../hooks/useChatFont';
 import { mix } from '../../theme/color';
 import { useHomeOf } from '../../hooks/useHome';
 import { StateIcon } from '../Requests/RequestsPortal';
@@ -125,7 +126,8 @@ const HomeView: React.FC<HomeScreenProps> = ({ onClose, renderMascot, testID = '
   const home = useHomeOf(ctx);
   const m = home.model;
   const pal = homePalette(ctx?.widgetTheme?.tokens);
-  const font = ctx?.customizations?.fontFamily ? { fontFamily: ctx.customizations.fontFamily } : null;
+  // The chat's font (core/ownerFont.ts): the owner's, else the theme's, once loaded.
+  const font = useChatFont().body();
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [helpQuery, setHelpQuery] = useState('');
