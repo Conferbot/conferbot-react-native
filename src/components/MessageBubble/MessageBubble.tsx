@@ -21,6 +21,7 @@ import { MessageStatus as MessageStatusComponent } from '../MessageStatus';
 import { parseTextForUrls, type TextSegment } from '../../utils/LinkDetector';
 import { ChatText } from '../AgentReply/ChatText';
 import { isAIAgentDetails } from '../../core/agentBot';
+import { inactiveCloseLine } from '../../core/liveEvents';
 import { fileNameOf, fileUrlOf, isImageUrl, resolveMediaUrl, translationLabels } from '../../core/liveChat';
 import { getApiOrigin } from '../../config/constants';
 import { HANDED_OVER_NOTE, handoverLineText, isHandoverOutcome } from '../../core/handoverState';
@@ -187,13 +188,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     message.type === 'agent-chat-ended' ||
     message.type === 'queue-self-resolved' ||
     // Back in the queue: "Connecting you to another agent..." (core/liveEvents.ts).
-    (message.type as string) === 'live-chat-requeued';
+    (message.type as string) === 'live-chat-requeued' ||
+    // The AI let an idle visitor go: "Chat paused" or "Chat ended".
+    (message.type as string) === 'ai-agent-inactive-close';
+  const inactiveLine = (message.type as string) === 'ai-agent-inactive-close' ? inactiveCloseLine(message) : null;
   // "Connecting you with the team…" while an AI hands the visitor on, then
   // how the wait ended (core/handoverState.ts); dots only while pending.
   const isHandoverLine = message.type === 'agent-left-chat' && (message as any).handover === true;
   const handoverPending = isHandoverLine && !isHandoverOutcome((message as any).settled);
   // A person's join after an AI handover: "They can see your conversation so far".
-  const systemNote = isSystem
+  const systemNote = inactiveLine
+    ? inactiveLine.note
+    : isSystem
     ? (message as any).note || (message.type === 'agent-joined-message' && (message as any).afterAI === true ? HANDED_OVER_NOTE : null)
     : null;
 
@@ -295,7 +301,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const fileIsImage = !!fileUrl && !imageFailed && isImageUrl(fileUrl, (message as any).fileType || (message as any).mimeType);
 
   // Get message text
-  const messageText = isHandoverLine
+  const messageText = inactiveLine
+    ? inactiveLine.text
+    : isHandoverLine
     ? handoverLineText((message as any).settled)
     : isDeleted
     ? t('message.removed')
