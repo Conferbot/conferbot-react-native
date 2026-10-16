@@ -58,3 +58,6 @@ export {
   type UseAIGenerationOptions,
   type UseAIGenerationResult,
 } from './useAIStreaming';
+
+// "Your requests": the visitor's conversations with the team
+export { useRequests, type UseRequestsReturn } from './useRequests';
