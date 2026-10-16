@@ -1,136 +1,141 @@
-# Conferbot React Native SDK - Example App
+# Conferbot React Native SDK: example app
 
-This example app demonstrates how to integrate and use the Conferbot React Native SDK. It includes three usage patterns you can switch between using the built-in tab navigation.
+A small app that shows the three ways to use the SDK, one per tab, with the floating launcher on top:
 
-## What's Included
+| Tab | Pattern | File |
+|---|---|---|
+| **Widget** | The drop-in chat behind the floating launcher (`ConferBotWidget`) | `App.tsx` |
+| **Headless** | Your own UI on `useConferBot()` | `src/HeadlessExample.tsx` |
+| **Custom** | The SDK's `MessageList`, `ChatInput` and `ChatHeader` in your own layout | `src/CustomExample.tsx` |
 
-1. **Drop-in Widget** - Full-featured chat modal. Easiest integration (4 lines of code).
-2. **Headless SDK** - Use the SDK context to build a completely custom chat UI.
-3. **Mix & Match** - Combine pre-built SDK components with your own custom pieces.
-
-All three examples are accessible from the app's tab bar -- no code changes needed to try each one.
+Out of the box it talks to Conferbot's cloud (`https://wdt.conferbot.com`) with the public demo bot `691c970890527a0468f9b2c9`, so it runs without an account.
 
 ## Prerequisites
 
-- **Node.js** >= 18
-- **React Native CLI** (`npm install -g react-native`)
-- **Xcode** 15+ (for iOS) with CocoaPods (`gem install cocoapods`)
-- **Android Studio** with Android SDK 34 (for Android)
-- **Conferbot API Key** and **Bot ID** from your Conferbot dashboard
+- Node.js 18 or later
+- For Android: Android Studio with the Android 14 SDK (API 34) and an emulator or a device
+- For iOS (macOS only): Xcode 15 or later and CocoaPods (`gem install cocoapods`)
 
-## Setup
+The app uses React Native 0.73. It installs the SDK from the parent folder (`"@conferbot/react-native": "file:.."`), with `@react-native-async-storage/async-storage` and `react-native-svg`.
+
+## Set up
 
 ```bash
-# 1. Clone the SDK repo (if you haven't already)
-git clone <repo-url>
-cd conferbot-react-native
-
-# 2. Build the SDK
+# From the SDK repo's root: build the SDK the example installs
 npm install
 npm run build
 
-# 3. Set up the example app
+# Then the example
 cd example
-chmod +x setup.sh
 ./setup.sh
 ```
 
-The `setup.sh` script will:
-- Install npm dependencies (if `node_modules/` is missing)
-- Generate `android/` and `ios/` native directories using `react-native init` (if missing)
-- Run `pod install` for iOS (if CocoaPods is available)
+`setup.sh` does three things:
 
-### Configure API Credentials
+1. Runs `npm install` if `node_modules/` is missing.
+2. Creates the missing native folders. `android/` is in the repo; `ios/` is generated with `react-native init` (React Native 0.73.0).
+3. Runs `pod install` when CocoaPods is available.
 
-Open `App.tsx` and replace the placeholder values:
+## Run it against Conferbot's cloud
 
-```typescript
-const API_KEY = 'conf_sk_your_api_key_here';  // Your actual API key
-const BOT_ID = 'your_bot_id_here';            // Your actual bot ID
-```
-
-## Running the App
-
-### iOS
+This is the default: nothing to configure.
 
 ```bash
+npx react-native start          # Metro, in one terminal
+
+npx react-native run-android    # in another
+# or
 npx react-native run-ios
-
-# Or target a specific simulator
-npx react-native run-ios --simulator="iPhone 15 Pro"
 ```
 
-### Android
+### Use your own bot
 
-```bash
-# Start Metro bundler in one terminal
-npx react-native start
+1. In the [Conferbot dashboard](https://app.conferbot.com), open **Chatbots**. On your bot's card, open the **⋯** menu and choose **Install on your site**. Under **Mobile apps**, pick **React Native**: the snippet shows your bot ID.
+2. In `App.tsx`, set `BOT_ID` to it. `API_KEY` can stay as it is: the mobile API doesn't check it.
+3. Publish the bot in the dashboard. Metro reloads the app.
 
-# Run on Android in another terminal
-npx react-native run-android
+## Run it against a local server
+
+This is for Conferbot developers working on the embed-server.
+
+1. Start the embed-server (the `embed-server` repo) with `npm run dev`. It listens on the port in its `.env`: `PORT=8001` locally.
+2. In `App.tsx`, set `BOT_ID` to a bot in that server's database.
+3. In `App.tsx`, uncomment the `ConferBotEndpoints.configure(...)` block at the top. Point it at the server as your device reaches it:
+
+   | Running on | `socketUrl` | `apiBaseUrl` |
+   |---|---|---|
+   | Android emulator | `http://10.0.2.2:8001` | `http://10.0.2.2:8001/api/v1/mobile` |
+   | Android emulator or device, with `adb reverse tcp:8001 tcp:8001` | `http://localhost:8001` | `http://localhost:8001/api/v1/mobile` |
+   | iOS simulator | `http://localhost:8001` | `http://localhost:8001/api/v1/mobile` |
+   | A physical device on your Wi-Fi | `http://<your machine's LAN IP>:8001` | `http://<LAN IP>:8001/api/v1/mobile` |
+
+4. Reload the app.
+
+```ts
+ConferBotEndpoints.configure({
+  socketUrl: 'http://10.0.2.2:8001',
+  apiBaseUrl: 'http://10.0.2.2:8001/api/v1/mobile',
+});
 ```
+
+The configure call must run before the provider renders, which is why it sits at the top of `App.tsx`.
+
+**Plain HTTP.**
+
+- **Android**: the example's manifests already allow cleartext traffic (`android:usesCleartextTraffic="true"`).
+- **iOS**: the generated `Info.plist` allows `localhost` (`NSAllowsLocalNetworking`). A LAN IP needs an exception. Add it under `NSAppTransportSecurity` > `NSExceptionDomains` with `NSExceptionAllowsInsecureHTTPLoads`, or use `NSAllowsArbitraryLoads` in a debug build only.
+
+**Metro on a device.** Run `adb reverse tcp:8081 tcp:8081` so the app reaches Metro.
+
+**Before you commit.** Put `App.tsx` back (the `configure` block commented out, the demo `BOT_ID`), so the example keeps running against the cloud.
 
 ## Troubleshooting
 
-### Module Not Found: @conferbot/react-native
-
-The SDK is linked via `file:..` in package.json. Make sure the parent SDK is built:
+**`Module not found: @conferbot/react-native`.** The example installs the built SDK from `..`. Build it, then reinstall:
 
 ```bash
-cd ..
-npm run build
-cd example
-rm -rf node_modules
-npm install
+cd .. && npm run build && cd example
+rm -rf node_modules && npm install
 ```
 
-### iOS Build Errors
+**The chat stays empty.**
+- Check `BOT_ID`, and that the bot is published.
+- Against a local server, check both URLs and the port. `10.0.2.2` works only from the Android emulator.
+
+**An SDK change doesn't show.** Run `npm run build` in the repo root again, then restart Metro with `npx react-native start --reset-cache`.
+
+**iOS build errors.**
 
 ```bash
-cd ios
-pod deintegrate
-pod install
-cd ..
+cd ios && pod deintegrate && pod install && cd ..
 npx react-native run-ios
 ```
 
-### Android Build Errors
+**Android build errors.**
 
 ```bash
-cd android
-./gradlew clean
-cd ..
+cd android && ./gradlew clean && cd ..
 npx react-native run-android
 ```
 
-### Metro Bundler Cache Issues
-
-```bash
-npx react-native start --reset-cache
-```
-
-## Project Structure
+## Project structure
 
 ```
 example/
-  App.tsx                       # Main app with tab navigation between examples
+  App.tsx                 # Tabs, the provider, the floating launcher, BOT_ID and the endpoints block
   src/
-    HeadlessExample.tsx         # Custom UI built with SDK context
-    CustomExample.tsx           # Mix of pre-built + custom components
-  setup.sh                      # One-command setup script
+    HeadlessExample.tsx   # Your own UI on useConferBot()
+    CustomExample.tsx     # SDK components in your own layout
+  android/                # Android project (in the repo)
+  ios/                    # Generated by setup.sh
+  setup.sh                # One-command setup
   package.json
   metro.config.js
   tsconfig.json
 ```
 
-## Documentation
+## More
 
-- SDK Docs: `../docs/`
-- Component Guide: `../docs/COMPONENTS.md`
-- API Reference: `../docs/API.md`
-
-## Support
-
-- GitHub Issues: https://github.com/conferbot/react-native-sdk/issues
-- Email: support@conferbot.com
-- Docs: https://docs.conferbot.com
+- The SDK's guide: [../README.md](../README.md)
+- What changed: [../CHANGELOG.md](../CHANGELOG.md)
+- Issues: https://github.com/Conferbot/conferbot-react-native/issues
