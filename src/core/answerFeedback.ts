@@ -17,6 +17,7 @@
  * next); the caller sends it (`ai-answer-feedback`) and keeps it on the
  * answer's record entry (`withFeedback`) so a restore draws it.
  */
+import { t, localized, I18nKey } from './i18n';
 
 export type FeedbackReason = 'wrong' | 'outdated' | 'unanswered' | 'other';
 export interface AnswerFeedback {
@@ -27,32 +28,39 @@ export interface AnswerFeedback {
 
 export type HelpfulView = 'ask' | 'thanks' | 'down' | 'rated';
 
-/** The reasons and their words (web FEEDBACK_REASONS, i18n en). */
+/** A [reason, words] pair whose words are read in the active language. */
+const reasonPair = (k: FeedbackReason): readonly [FeedbackReason, string] => {
+  const pair = [k, ''] as [FeedbackReason, string];
+  Object.defineProperty(pair, 1, { enumerable: true, get: () => t(`helpful.reason.${k}` as I18nKey) });
+  return pair;
+};
+
+/** The reasons and their words (web FEEDBACK_REASONS, i18n helpful.reason.*). */
 export const FEEDBACK_REASONS: ReadonlyArray<readonly [FeedbackReason, string]> = [
-  ['wrong', 'Wrong'],
-  ['outdated', 'Outdated'],
-  ['unanswered', "Didn't answer"],
-  ['other', 'Other'],
+  reasonPair('wrong'),
+  reasonPair('outdated'),
+  reasonPair('unanswered'),
+  reasonPair('other'),
 ];
 
-/** The web's English strings (ts/i18n/en.ts helpful.*). */
-export const HELPFUL_TEXT = {
-  ask: 'Helpful?',
-  groupLabel: 'Was this answer helpful?',
-  yes: 'Yes, helpful',
-  no: 'No, not helpful',
-  ratedUp: 'Helpful',
-  ratedDown: 'Not helpful',
-  thanks: 'Thanks for letting us know!',
-  sorry: 'Sorry about that. What went wrong?',
-  whatWentWrong: 'What went wrong?',
-  comment: 'Add a comment (optional)',
-  sendFeedback: 'Send feedback',
-  retry: 'Ask another way',
-  thanksComment: 'Thanks, that helps us improve.',
-  talkToPerson: 'Talk to a person',
-  talkToPersonAsk: "I'd like to talk to a person, please.",
-} as const;
+/** The web's strings (ts/i18n helpful.*, chat.talkToPerson*), in the active language. */
+export const HELPFUL_TEXT = localized({
+  ask: 'helpful.ask',
+  groupLabel: 'helpful.groupLabel',
+  yes: 'helpful.yes',
+  no: 'helpful.no',
+  ratedUp: 'helpful.rated.up',
+  ratedDown: 'helpful.rated.down',
+  thanks: 'helpful.thanks',
+  sorry: 'helpful.sorry',
+  whatWentWrong: 'helpful.whatWentWrong',
+  comment: 'helpful.comment',
+  sendFeedback: 'helpful.sendFeedback',
+  retry: 'helpful.retry',
+  thanksComment: 'helpful.thanksComment',
+  talkToPerson: 'chat.talkToPerson',
+  talkToPersonAsk: 'chat.talkToPersonAsk',
+});
 
 /** How long "Thanks for letting us know!" shows before the rated line (web: 1800 + 350 ms fade). */
 export const THANKS_MS = 1800;
