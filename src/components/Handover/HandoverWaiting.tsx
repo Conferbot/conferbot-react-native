@@ -20,6 +20,7 @@ import {
 
 import { useTheme } from '../../theme';
 import type { HandoverWaitingProps, QueueInfo } from './types';
+import { t, tPlural } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -197,7 +198,7 @@ const QueuePosition: React.FC<QueuePositionProps> = ({
     <View style={styles.queueContainer}>
       <View style={styles.queuePositionRow}>
         <Text style={[styles.queueLabel, { color: secondaryTextColor, fontSize: fontSize.sm }]}>
-          Your position in queue:
+          {t('sdk.wait.position')}
         </Text>
         <View
           style={[
@@ -213,13 +214,13 @@ const QueuePosition: React.FC<QueuePositionProps> = ({
 
       {queueInfo.totalInQueue && queueInfo.totalInQueue > 1 && (
         <Text style={[styles.queueTotal, { color: secondaryTextColor, fontSize: fontSize.xs }]}>
-          {queueInfo.totalInQueue} {queueInfo.totalInQueue === 1 ? 'person' : 'people'} in queue
+          {tPlural('sdk.wait.inQueue', queueInfo.totalInQueue)}
         </Text>
       )}
 
       {queueInfo.department && (
         <Text style={[styles.queueDepartment, { color: secondaryTextColor, fontSize: fontSize.xs }]}>
-          Department: {queueInfo.department}
+          {t('sdk.wait.department', { name: queueInfo.department })}
         </Text>
       )}
     </View>
@@ -248,33 +249,25 @@ const EstimatedTime: React.FC<EstimatedTimeProps> = ({
 }) => {
   const formatTime = useCallback((totalSeconds: number): string => {
     if (totalSeconds < 60) {
-      return 'Less than a minute';
+      return t('sdk.wait.underMinute');
     }
 
     const minutes = Math.ceil(totalSeconds / 60);
-    if (minutes === 1) {
-      return 'About 1 minute';
-    }
     if (minutes < 60) {
-      return `About ${minutes} minutes`;
+      return tPlural('sdk.wait.aboutMinutes', minutes);
     }
 
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    if (hours === 1) {
-      return remainingMinutes > 0
-        ? `About 1 hour ${remainingMinutes} minutes`
-        : 'About 1 hour';
-    }
     return remainingMinutes > 0
-      ? `About ${hours} hours ${remainingMinutes} minutes`
-      : `About ${hours} hours`;
+      ? t('sdk.wait.aboutHoursMinutes', { hours: tPlural('sdk.wait.hours', hours), minutes: tPlural('sdk.wait.minutes', remainingMinutes) })
+      : tPlural('sdk.wait.aboutHours', hours);
   }, []);
 
   return (
     <View style={styles.estimatedTimeContainer}>
       <Text style={[styles.estimatedTimeLabel, { color: secondaryTextColor, fontSize: fontSize.sm }]}>
-        Estimated wait time:
+        {t('sdk.wait.estimated')}
       </Text>
       <Text style={[styles.estimatedTimeValue, { color: textColor, fontSize: fontSize.lg }]}>
         {formatTime(seconds)}
@@ -288,15 +281,15 @@ const EstimatedTime: React.FC<EstimatedTimeProps> = ({
 // ========================================
 
 export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
-  message = 'Please wait while we connect you with an agent...',
+  message = t('sdk.wait.message'),
   waitingMessage,
   queueInfo,
   onCancel,
   showQueuePosition = true,
   showEstimatedTime = true,
-  cancelButtonText = 'Cancel',
+  cancelButtonText = t('common.cancel'),
   isConnecting = false,
-  connectingMessage = 'Connecting you to an agent...',
+  connectingMessage = t('sdk.wait.connecting'),
   accessibilityLabel,
   testID,
 }) => {
@@ -328,7 +321,7 @@ export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
         theme.shadows.md,
       ]}
       accessibilityRole="alert"
-      accessibilityLabel={accessibilityLabel || 'Waiting for agent'}
+      accessibilityLabel={accessibilityLabel || t('sdk.wait.label')}
       accessibilityLiveRegion="polite"
       testID={testID}
     >
@@ -352,7 +345,7 @@ export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
           { color: theme.colors.text, fontSize: theme.typography.fontSize.xl },
         ]}
       >
-        {isConnecting ? 'Agent Found' : 'Connecting to Agent'}
+        {isConnecting ? t('sdk.wait.found') : t('sdk.wait.title')}
       </Text>
 
       {/* Message */}
@@ -408,7 +401,7 @@ export const HandoverWaiting: React.FC<HandoverWaitingProps> = ({
           ]}
           onPress={onCancel}
           accessibilityRole="button"
-          accessibilityLabel="Cancel and return to bot"
+          accessibilityLabel={t('sdk.wait.cancelLabel')}
         >
           <Text
             style={[
