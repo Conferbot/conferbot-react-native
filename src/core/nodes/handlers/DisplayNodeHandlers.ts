@@ -16,6 +16,7 @@ import { DisplayNodes } from '../NodeTypes';
 import { fillLinkVariables, fillVariables, sanitizeOwnerHtml, stripHtmlAndDecode } from '../../flow/text';
 import { botSay, pushAnswer, shownText, userSay } from './flowKit';
 import { linkHref } from '../../flow/inputs';
+import { t } from '../../i18n';
 
 export { linkHref };
 
@@ -187,7 +188,7 @@ export class NavigateHandler extends BaseNodeHandler {
   }
 
   private doneLabel(data: any): string {
-    return String(data?.doneNavigatingText || '').trim() || 'Done';
+    return String(data?.doneNavigatingText || '').trim() || t('common.done');
   }
 
   private ui(node: Record<string, any>, state: ChatState): NodeUIState.Buttons {
