@@ -21,6 +21,7 @@ import { MessageList } from '../MessageList';
 import { ChatInput } from '../ChatInput';
 import { ChatBottomBar } from '../ChatBottomBar/ChatBottomBar';
 import { NodeRenderer } from '../NodeComponents';
+import { stepViewFor } from '../NodeComponents/steps';
 import {
   FilePicker,
   FilePickerResult,
@@ -769,6 +770,11 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     // the node's loading bubble too shows a double indicator
     if (currentUIState.type === 'loading') {
       return false;
+    }
+
+    // A step with its own card shows it, a typed one too (OTP, signature).
+    if (stepViewFor(currentUIState)) {
+      return true;
     }
 
     // Non-interactive display types are shown inline in messages, not as input UI.
