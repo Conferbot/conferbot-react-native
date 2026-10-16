@@ -15,6 +15,12 @@ import {
   ConferBotEndpoints,
   ConferBotNetworkConfig,
 } from '../config/constants';
+import {
+  TRANSCRIPT_EMAIL_PATH,
+  transcriptEmailBody,
+  transcriptEmailResult,
+  type TranscriptEmailResult,
+} from '../core/emailTranscript';
 
 // Create axios instance with default config
 class ConferBotAPI {
@@ -134,6 +140,21 @@ class ConferBotAPI {
   ): Promise<ApiResponse<{ status: string; agent?: any }>> {
     const response = await this.client.get(`/handover/${chatSessionId}/status`);
     return response.data;
+  }
+
+  // ********** Transcript Email ********** //
+  // "Email me this chat": the server sends the conversation to this address
+  // only (embed-server POST /api/v1/mobile/chat/transcript-email; the bot is
+  // the X-Bot-ID header's). Never throws: a failure reads as not sent.
+  async sendTranscriptEmail(chatSessionId: string, email: string): Promise<TranscriptEmailResult> {
+    try {
+      const response = await this.client.post(TRANSCRIPT_EMAIL_PATH, transcriptEmailBody(chatSessionId, email), {
+        validateStatus: () => true,
+      });
+      return transcriptEmailResult(response.status, response.data);
+    } catch {
+      return { ok: false };
+    }
   }
 
   // ********** File Upload Methods ********** //
