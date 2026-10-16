@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../theme';
 import type { ConferBotTheme } from '../../theme/types';
+import { t } from '../../core/i18n';
 
 export interface EmptyStateProps {
   // Content
@@ -18,8 +19,8 @@ export interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  title = 'No messages yet',
-  message = 'Start a conversation by sending a message',
+  title = t('sdk.empty.title'),
+  message = t('sdk.empty.message'),
   icon,
   action,
   accessibilityLabel,
