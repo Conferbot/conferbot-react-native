@@ -21,6 +21,14 @@ import {
   transcriptEmailResult,
   type TranscriptEmailResult,
 } from '../core/emailTranscript';
+import {
+  PUSH_REGISTER_PATH,
+  PUSH_UNREGISTER_PATH,
+  pushRegisterResult,
+  pushUnregisterBody,
+  type pushRegisterBody,
+  type PushRegisterResult,
+} from '../core/push';
 
 // Create axios instance with default config
 class ConferBotAPI {
@@ -197,26 +205,27 @@ class ConferBotAPI {
   }
 
   // ********** Push Notification Methods ********** //
-  // Register push notification token
-  async registerPushToken(
-    token: string,
-    platform: 'ios' | 'android'
-  ): Promise<ApiResponse<{ success: boolean }>> {
-    const response = await this.client.post('/push/register', {
-      token,
-      platform,
-      botId: this.botId,
-    });
-    return response.data;
+  // Register the device's push token with a conversation (embed-server
+  // POST /api/v1/mobile/push/register, docs/mobile-push.md): chatSessionId
+  // is required, tokenType says FCM or APNs. Never throws: a failure reads
+  // as the server's error code.
+  async registerPushToken(body: ReturnType<typeof pushRegisterBody>): Promise<PushRegisterResult> {
+    try {
+      const response = await this.client.post(PUSH_REGISTER_PATH, body, { validateStatus: () => true });
+      return pushRegisterResult(response.status, response.data);
+    } catch {
+      return { ok: false, error: 'NETWORK' };
+    }
   }
 
-  // Unregister push notification token
-  async unregisterPushToken(token: string): Promise<ApiResponse<{ success: boolean }>> {
-    const response = await this.client.post('/push/unregister', {
-      token,
-      botId: this.botId,
-    });
-    return response.data;
+  // Unregister the token (logout, the visitor cleared). Never throws.
+  async unregisterPushToken(token: string): Promise<boolean> {
+    try {
+      const response = await this.client.post(PUSH_UNREGISTER_PATH, pushUnregisterBody(token), { validateStatus: () => true });
+      return response.status >= 200 && response.status < 300 && response.data?.success === true;
+    } catch {
+      return false;
+    }
   }
 
   // ********** Analytics Methods ********** //
