@@ -12,10 +12,22 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Linking, ActivityI
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
 import { conversionEventOf, isAIAgentDetails, quickActionsOf } from '../../core/agentBot';
-import { backAtLabel, isEmail, knownEmail, lastQuestion, queueLine, type CsatConfig } from '../../core/liveChat';
+import { backAtLabel, isEmail, knownEmail, lastQuestion, queueLine, waitCardLines, type CsatConfig } from '../../core/liveChat';
 import { MAILCHAT_TEXT, isTranscriptEmail, transcriptEmailError } from '../../core/emailTranscript';
 import { LIVE_TEXT, type ClosedState } from '../../core/liveEvents';
 import { t } from '../../core/i18n';
+import { typicalWait } from '../../core/replyTime';
+
+/** The wait card's lines: the estimate, else the usual wait, else a calm promise (web queueCard.ts). */
+const WaitLines: React.FC<{ q: any; ctx: any; s: any }> = ({ q, ctx, s }) => {
+  const lines = waitCardLines(q, typicalWait(ctx?.serverCustomizations?.replyTime, q?.typical));
+  return (
+    <>
+      <Text style={s.sub}>{lines.estimate}</Text>
+      {lines.typical ? <Text style={s.sub} testID="cb-wait-typical">{lines.typical}</Text> : null}
+    </>
+  );
+};
 
 const useStyles = () => {
   const theme = useTheme();
@@ -181,7 +193,7 @@ export const QueueCard: React.FC = () => {
         <ActivityIndicator size="small" color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={s.title}>{queueLine(q)}</Text>
-          <Text style={s.sub}>{q.estimateLabel || t('queue.soon')}</Text>
+          <WaitLines q={q} ctx={ctx} s={s} />
         </View>
       </View>
     </Card>
@@ -202,7 +214,7 @@ export const HandoverWaitCard: React.FC<{ onCancel?: () => void }> = ({ onCancel
         <ActivityIndicator size="small" color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={s.title}>{q ? queueLine(q) : t('queue.connecting')}</Text>
-          <Text style={s.sub}>{q?.estimateLabel || t('queue.soon')}</Text>
+          <WaitLines q={q} ctx={ctx} s={s} />
         </View>
         {onCancel ? (
           <TouchableOpacity onPress={onCancel} accessibilityRole="button" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
