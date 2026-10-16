@@ -10,6 +10,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Text } from 'react-native';
 import { sliderConfig, sliderLabel, snapToStep, submitLabel } from '../../../core/flow/rich';
+import { t } from '../../../core/i18n';
 import { StepButton, StepCard, StepViewProps, useStepLook } from './stepKit';
 
 const THUMB = 22;
@@ -48,7 +49,7 @@ export const SliderStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID
         onResponderMove={(e) => setValue(sliderValueAt(e.nativeEvent.locationX, width.current, cfg))}
         accessible
         accessibilityRole="adjustable"
-        accessibilityLabel={String(ui.question || '').trim() || 'Value'}
+        accessibilityLabel={String(ui.question || '').trim() || t('rich.value')}
         accessibilityValue={{ min: cfg.min, max: cfg.max, now: value, text }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => nudge(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
