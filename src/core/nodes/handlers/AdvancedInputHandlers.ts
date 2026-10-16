@@ -20,6 +20,7 @@ import {
   futureSlots,
   hhmmInZone,
   longDate,
+  visitorLocale,
   noonInZone,
   slotLabel,
   visitorTimeZone,
@@ -117,7 +118,7 @@ export class CalendarHandler extends BaseNodeHandler {
       const botDate = noonInZone(dateString, botZone);
       const visitorDate = noonInZone(dateString, visitorZone);
       const date = longDate(botDate, botZone);
-      const localDate = longDate(visitorDate, visitorZone);
+      const localDate = longDate(visitorDate, visitorZone, visitorLocale());
       record = { date: localDate || date, selectedDate: dateString, botTimeZone: botZone, visitorTimeZone: visitorZone, showTimeSelection: false };
       value = localDate || date;
       userSay(state, value, nodeId);
@@ -128,7 +129,7 @@ export class CalendarHandler extends BaseNodeHandler {
       const botDate = noonInZone(dateString, botZone);
       const visitorDate = noonInZone(dayKeyInZone(botDate, botZone), visitorZone);
       const date = longDate(botDate, botZone);
-      const localDate = longDate(visitorDate, visitorZone);
+      const localDate = longDate(visitorDate, visitorZone, visitorLocale());
       const visitorStart = hhmmInZone(wallTimeInZone(dateString, slot.start, botZone), visitorZone);
       const visitorEnd = hhmmInZone(wallTimeInZone(dateString, slot.end, botZone), visitorZone);
       const timeSlotSelected = slotLabel(slot);
