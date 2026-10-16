@@ -23,6 +23,7 @@ import {
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import { t, I18nKey } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_WIDTH = SCREEN_WIDTH - 24;
@@ -32,6 +33,18 @@ const MAX_WIDTH = SCREEN_WIDTH - 24;
 // ========================================
 
 type InputType = NodeUIState.TextInput['inputType'];
+
+/** "Enter email..." for a kind of answer the step did not word itself. */
+const PLACEHOLDER_KEYS: Record<InputType, I18nKey> = {
+  text: 'sdk.input.text',
+  email: 'sdk.input.email',
+  phone: 'sdk.input.phone',
+  number: 'sdk.input.number',
+  url: 'sdk.input.url',
+  date: 'sdk.input.date',
+  address: 'sdk.input.address',
+};
+const placeholderFor = (inputType?: InputType): string => t(PLACEHOLDER_KEYS[inputType || 'text'] || 'sdk.input.text');
 
 interface ValidationResult {
   isValid: boolean;
@@ -119,7 +132,7 @@ const validateInput = (
 ): ValidationResult => {
   // Check required
   if (validation?.required && !value.trim()) {
-    return { isValid: false, message: 'This field is required' };
+    return { isValid: false, message: t('sdk.validation.required') };
   }
 
   // If empty and not required, it's valid
@@ -131,7 +144,7 @@ const validateInput = (
   if (validation?.minLength && value.length < validation.minLength) {
     return {
       isValid: false,
-      message: `Minimum ${validation.minLength} characters required`,
+      message: t('sdk.validation.minLength', { n: validation.minLength }),
     };
   }
 
@@ -139,7 +152,7 @@ const validateInput = (
   if (validation?.maxLength && value.length > validation.maxLength) {
     return {
       isValid: false,
-      message: `Maximum ${validation.maxLength} characters allowed`,
+      message: t('sdk.validation.maxLength', { n: validation.maxLength }),
     };
   }
 
@@ -147,7 +160,7 @@ const validateInput = (
   if (validation?.pattern) {
     const regex = new RegExp(validation.pattern);
     if (!regex.test(value)) {
-      return { isValid: false, message: 'Invalid format' };
+      return { isValid: false, message: t('sdk.validation.format') };
     }
   }
 
@@ -156,7 +169,7 @@ const validateInput = (
     case 'email': {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(value)) {
-        return { isValid: false, message: 'Please enter a valid email address' };
+        return { isValid: false, message: t('validation.email') };
       }
       break;
     }
@@ -164,7 +177,7 @@ const validateInput = (
     case 'phone': {
       const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/;
       if (!phoneRegex.test(value) || value.replace(/[^0-9]/g, '').length < 7) {
-        return { isValid: false, message: 'Please enter a valid phone number' };
+        return { isValid: false, message: t('validation.phone') };
       }
       break;
     }
@@ -172,13 +185,13 @@ const validateInput = (
     case 'number': {
       const num = parseFloat(value);
       if (isNaN(num)) {
-        return { isValid: false, message: 'Please enter a valid number' };
+        return { isValid: false, message: t('validation.number') };
       }
       if (validation?.min !== undefined && num < validation.min) {
-        return { isValid: false, message: `Minimum value is ${validation.min}` };
+        return { isValid: false, message: t('sdk.validation.min', { min: validation.min }) };
       }
       if (validation?.max !== undefined && num > validation.max) {
-        return { isValid: false, message: `Maximum value is ${validation.max}` };
+        return { isValid: false, message: t('sdk.validation.max', { max: validation.max }) };
       }
       break;
     }
@@ -186,7 +199,7 @@ const validateInput = (
     case 'url': {
       const urlRegex = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i;
       if (!urlRegex.test(value)) {
-        return { isValid: false, message: 'Please enter a valid URL' };
+        return { isValid: false, message: t('validation.link') };
       }
       break;
     }
@@ -194,7 +207,7 @@ const validateInput = (
     case 'date': {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(value)) {
-        return { isValid: false, message: 'Please enter a valid date (YYYY-MM-DD)' };
+        return { isValid: false, message: t('sdk.validation.date') };
       }
       break;
     }
@@ -216,7 +229,7 @@ const validateInput = (
 export const TextInputField: React.FC<TextInputFieldProps> = ({
   value,
   onChange,
-  placeholder = 'Type your answer...',
+  placeholder,
   inputType = 'text',
   validation,
   errorMessage,
@@ -304,7 +317,7 @@ export const TextInputField: React.FC<TextInputFieldProps> = ({
         onFocus={handleFocus}
         onBlur={handleBlur}
         onSubmitEditing={handleSubmitEditing}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('composer.answer')}
         placeholderTextColor={theme.colors.textDisabled}
         keyboardType={getKeyboardType(inputType)}
         returnKeyType={getReturnKeyType(inputType)}
@@ -324,8 +337,8 @@ export const TextInputField: React.FC<TextInputFieldProps> = ({
             ? 'fullStreetAddress'
             : undefined
         }
-        accessibilityLabel={placeholder}
-        accessibilityHint={`Enter ${inputType}`}
+        accessibilityLabel={placeholder ?? t('composer.answer')}
+        accessibilityHint={placeholderFor(inputType)}
         testID={testID}
       />
       {displayError && (
@@ -412,7 +425,7 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({
         theme.shadows.sm,
       ]}
       accessibilityRole="none"
-      accessibilityLabel={`Question: ${question}`}
+      accessibilityLabel={t('sdk.input.questionLabel', { question })}
       testID={testID}
     >
       <Text
@@ -431,7 +444,7 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({
       <TextInputField
         value={value}
         onChange={setValue}
-        placeholder={placeholder || `Enter ${inputType}...`}
+        placeholder={placeholder || placeholderFor(inputType)}
         inputType={inputType}
         validation={validation}
         errorMessage={errorMessage || localError}
@@ -453,7 +466,7 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({
         onPress={handleSubmit}
         disabled={isSubmitDisabled}
         accessibilityRole="button"
-        accessibilityLabel="Submit"
+        accessibilityLabel={t('common.submit')}
         accessibilityState={{ disabled: isSubmitDisabled }}
       >
         <Text
@@ -467,7 +480,7 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({
             },
           ]}
         >
-          {isSubmitting ? 'Sending...' : 'Send'}
+          {isSubmitting ? t('common.sending') : t('common.send')}
         </Text>
       </TouchableOpacity>
     </View>
