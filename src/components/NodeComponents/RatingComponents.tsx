@@ -22,6 +22,7 @@ import {
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_WIDTH = SCREEN_WIDTH - 24;
@@ -145,7 +146,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
           disabled={isSubmitting}
           accessibilityRole="radio"
           accessibilityState={{ checked: rating === value }}
-          accessibilityLabel={`Rate ${value} out of ${maxRating}`}
+          accessibilityLabel={t('sdk.rating.rate', { n: value, max: maxRating })}
         >
           <Text
             style={[
@@ -174,7 +175,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
         disabled={isSubmitting}
         accessibilityRole="radio"
         accessibilityState={{ checked: rating === value }}
-        accessibilityLabel={`Rate ${value} out of ${maxRating}`}
+        accessibilityLabel={t('sdk.rating.rate', { n: value, max: maxRating })}
       >
         <Animated.Text
           style={[
@@ -247,7 +248,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
         onPress={handleSubmit}
         disabled={rating === 0 || isSubmitting}
         accessibilityRole="button"
-        accessibilityLabel="Submit rating"
+        accessibilityLabel={t('sdk.rating.submit')}
         accessibilityState={{ disabled: rating === 0 || isSubmitting }}
       >
         <Text
@@ -260,7 +261,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
             },
           ]}
         >
-          {isSubmitting ? 'Sending...' : 'Submit'}
+          {isSubmitting ? t('common.sending') : t('common.submit')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -433,7 +434,7 @@ export const OpinionScaleSelector: React.FC<OpinionScaleSelectorProps> = ({
         onPress={handleSubmit}
         disabled={selectedValue === null || isSubmitting}
         accessibilityRole="button"
-        accessibilityLabel="Submit"
+        accessibilityLabel={t('common.submit')}
         accessibilityState={{ disabled: selectedValue === null || isSubmitting }}
       >
         <Text
@@ -448,7 +449,7 @@ export const OpinionScaleSelector: React.FC<OpinionScaleSelectorProps> = ({
             },
           ]}
         >
-          {isSubmitting ? 'Sending...' : 'Submit'}
+          {isSubmitting ? t('common.sending') : t('common.submit')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -662,7 +663,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
         onPress={handleSubmit}
         disabled={isSubmitting}
         accessibilityRole="button"
-        accessibilityLabel="Submit"
+        accessibilityLabel={t('common.submit')}
       >
         <Text
           style={[
@@ -673,7 +674,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
             },
           ]}
         >
-          {isSubmitting ? 'Sending...' : 'Submit'}
+          {isSubmitting ? t('common.sending') : t('common.submit')}
         </Text>
       </TouchableOpacity>
     </View>
