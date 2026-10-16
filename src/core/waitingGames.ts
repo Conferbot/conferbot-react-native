@@ -24,6 +24,8 @@
  * session (the web: this page view). Nothing is stored or sent.
  */
 
+import { t, I18nKey } from './i18n';
+
 export type GameId = 'rps' | 'ttt' | 'quiz' | 'memory' | 'reaction' | 'emoji' | 'scramble';
 
 export interface GameMeta {
@@ -34,21 +36,33 @@ export interface GameMeta {
   blurb: string;
 }
 
+/** A game's entry, its name and line read in the active language (web ui.ts gameName, games.<id>.name / .blurb). */
+const game = (id: GameId, emoji: string): GameMeta => {
+  const meta = { id, emoji } as GameMeta;
+  Object.defineProperty(meta, 'name', { enumerable: true, get: () => t(`games.${id}.name` as I18nKey) });
+  Object.defineProperty(meta, 'blurb', { enumerable: true, get: () => t(`games.${id}.blurb` as I18nKey) });
+  return meta;
+};
+
 export const GAMES: readonly GameMeta[] = [
-  { id: 'rps', emoji: '✊', name: 'Rock paper scissors', blurb: 'Best of three against the bot' },
-  { id: 'ttt', emoji: '⭕', name: 'Tic-tac-toe', blurb: 'Three in a row beats the bot' },
-  { id: 'quiz', emoji: '🧠', name: 'Quick quiz', blurb: 'Three quick questions' },
-  { id: 'memory', emoji: '🃏', name: 'Memory match', blurb: 'Find the six pairs' },
-  { id: 'reaction', emoji: '⚡', name: 'Reflex test', blurb: 'Tap the moment it turns green' },
-  { id: 'emoji', emoji: '🤔', name: 'Emoji riddles', blurb: 'Guess the phrase from the emoji' },
-  { id: 'scramble', emoji: '🔤', name: 'Word scramble', blurb: 'Unscramble the letters' },
+  game('rps', '✊'),
+  game('ttt', '⭕'),
+  game('quiz', '🧠'),
+  game('memory', '🃏'),
+  game('reaction', '⚡'),
+  game('emoji', '🤔'),
+  game('scramble', '🔤'),
 ];
 
 export const GAME_IDS: readonly GameId[] = GAMES.map((g) => g.id);
 
 export const gameMeta = (id: string): GameMeta | undefined => GAMES.find((g) => g.id === id);
 
+/** The stock offer as stored (English); drawn as `offerLine` (web ui.ts: the stock line is t("games.offer")). */
 export const DEFAULT_OFFER_TEXT = 'While you wait - fancy a quick game? 🎮';
+
+/** The offer as drawn: the stock line in the active language, the owner's own as written. */
+export const offerLine = (offerText: string): string => (offerText === DEFAULT_OFFER_TEXT ? t('games.offer') : offerText);
 export const OFFER_TEXT_MAX = 140;
 
 /**
