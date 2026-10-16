@@ -531,7 +531,7 @@ export class OtpNodeHandler extends RichHandler {
     if (r.ok || r.code === 'resend_wait') {
       const wait = Number(r.code === 'resend_wait' ? r.data?.retryAfter : r.data?.resendIn) || OTP_RESEND_SECONDS;
       state.setVariable(this.key(node), { stage: 'code', email: target, sentAt: Date.now(), resendIn: wait });
-      botSay(state, `We sent a ${OTP_LENGTH}-digit code to ${String(r.data?.sentTo || target)}`, node.id, this.nodeType);
+      botSay(state, t('otp.sentTo', { n: OTP_LENGTH, email: String(r.data?.sentTo || target) }), node.id, this.nodeType);
       if (r.code === 'resend_wait') return NodeResult.invalid(otpErrorText('resend_wait', { retryAfter: r.data?.retryAfter }), this.ui(node, state, 'code'), true);
       return NodeResult.displayUI(this.ui(node, state, 'code'));
     }
@@ -638,7 +638,7 @@ export class AddressNodeHandler extends RichHandler {
     const fields =
       action === 'manual' ? response : { line1: typeof response === 'string' ? response : response?.address ?? '' };
     const value = node.data?.allowManual === false ? null : manualAddress(fields);
-    if (!value) return NodeResult.invalid('Enter the street address.', this.ui(node, state), true);
+    if (!value) return NodeResult.invalid(t('sdk.flow.streetRequired'), this.ui(node, state), true);
     return this.finish(node, state, value, 'manual');
   }
 }
@@ -739,7 +739,7 @@ export class AiExtractNodeHandler extends RichHandler {
   readonly nodeType = 'ai-extract-node';
 
   private ui(node: Record<string, any>, state: ChatState): NodeUIState.TextInput {
-    return { ...NodeUIState.textInput(node.id, this.prompt(node, state, `<p>${'How can we help?'}</p>`), node.data?.answerVariable || '', 'text'), awaitInput: true };
+    return { ...NodeUIState.textInput(node.id, this.prompt(node, state, `<p>${t('sdk.flow.aiExtractPrompt')}</p>`), node.data?.answerVariable || '', 'text'), awaitInput: true };
   }
 
   private async run(node: Record<string, any>, state: ChatState, text: string, asked: boolean): Promise<NodeResult> {
@@ -907,8 +907,8 @@ export class SignatureNodeHandler extends RichHandler {
 
   private ui(node: Record<string, any>, state: ChatState): NodeUIState.TextInput {
     return {
-      ...NodeUIState.textInput(node.id, this.prompt(node, state) || 'Type your full name to sign', node.data?.answerVariable || '', 'text', {
-        placeholder: 'Your full name',
+      ...NodeUIState.textInput(node.id, this.prompt(node, state) || t('signature.typeToSign'), node.data?.answerVariable || '', 'text', {
+        placeholder: t('signature.namePlaceholder'),
       }),
       awaitInput: true,
     };
@@ -926,15 +926,15 @@ export class SignatureNodeHandler extends RichHandler {
     const method: 'typed' | 'drawn' = typed ? 'typed' : 'drawn';
     const name = typed ? cleanSignatureName(typeof response === 'string' ? response : response.name) : '';
     const fullName = cleanSignatureName(response?.fullName ?? (cfg.requireName ? name : ''));
-    if (cfg.requireName && !isSignatureName(fullName)) return NodeResult.invalid('Enter your full name.', this.ui(node, state), true);
+    if (cfg.requireName && !isSignatureName(fullName)) return NodeResult.invalid(t('sdk.flow.signatureName'), this.ui(node, state), true);
     if (method === 'drawn' && !response?.dataUrl) {
       return NodeResult.invalid(
-        cfg.allowTyped ? 'Draw your signature in the box - or type your name instead.' : 'Draw your signature in the box.',
+        cfg.allowTyped ? t('sdk.flow.signatureDrawOrType') : t('sdk.flow.signatureDraw'),
         this.ui(node, state),
         true
       );
     }
-    if (method === 'typed' && (!cfg.allowTyped || !isSignatureName(name))) return NodeResult.invalid('Type your full name to sign.', this.ui(node, state), true);
+    if (method === 'typed' && (!cfg.allowTyped || !isSignatureName(name))) return NodeResult.invalid(t('sdk.flow.signatureType'), this.ui(node, state), true);
     const image = method === 'typed' ? typedSignatureSvg(name) : { dataUrl: response.dataUrl, width: Number(response.width) || 0, height: Number(response.height) || 0 };
     // Typed names and the native pad's strokes are SVG; an app's own pad may hand over a PNG.
     const svg = method === 'typed' || /^data:image\/svg\+xml/i.test(String(image.dataUrl));
