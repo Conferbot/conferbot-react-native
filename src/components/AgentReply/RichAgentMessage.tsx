@@ -9,6 +9,7 @@ import { View, Text, TouchableOpacity, Image, StyleSheet, Linking } from 'react-
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
 import { Avatar } from '../Avatar';
+import { t } from '../../core/i18n';
 
 export const RichAgentMessage: React.FC<{ message: any; testID?: string }> = ({ message, testID }) => {
   const theme = useTheme();
@@ -27,7 +28,7 @@ export const RichAgentMessage: React.FC<{ message: any; testID?: string }> = ({ 
 
   return (
     <View style={styles.container} testID={testID}>
-      <Avatar source={agent.avatar || ctx?.botAvatarUrl || undefined} name={agent.name || 'Agent'} size={theme.layout.avatarSize} />
+      <Avatar source={agent.avatar || ctx?.botAvatarUrl || undefined} name={agent.name || t('agent.agent')} size={theme.layout.avatarSize} />
       <View style={styles.body}>
         {rich.kind === 'quick_replies' && (
           <>
@@ -36,7 +37,7 @@ export const RichAgentMessage: React.FC<{ message: any; testID?: string }> = ({ 
                 <Text style={styles.bubbleText}>{rich.text || message.text}</Text>
               </View>
             ) : null}
-            <View style={styles.chips}>
+            <View style={styles.chips} accessibilityLabel={t('chat.quickReplies')}>
               {rich.options.map((o) => (
                 <TouchableOpacity
                   key={o}
@@ -54,10 +55,10 @@ export const RichAgentMessage: React.FC<{ message: any; testID?: string }> = ({ 
 
         {rich.kind === 'article' && (
           <TouchableOpacity style={styles.card} onPress={() => open(rich.url)} disabled={!rich.url} accessibilityRole="link">
-            <Text style={styles.kicker}>Help article</Text>
+            <Text style={styles.kicker}>{t('kb.helpArticle')}</Text>
             <Text style={styles.title}>{rich.title}</Text>
             {rich.snippet ? <Text style={styles.desc} numberOfLines={3}>{rich.snippet}</Text> : null}
-            {rich.url ? <Text style={styles.link}>Read article {'↗'}</Text> : null}
+            {rich.url ? <Text style={styles.link}>{t('common.read')} {'↗'}</Text> : null}
           </TouchableOpacity>
         )}
 
