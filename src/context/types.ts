@@ -175,6 +175,20 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   closeArticle: () => void;
   /** The visitor's words while waiting: true when "play" opened the games instead (do not send). */
   interceptPlay: (text: string) => boolean;
+  // ---- Your requests (core/requests.ts, core/requestsPortal.ts) ----
+  /** The portal's screens: `getState` / `subscribe` and the actions (null until the socket is made). */
+  requestsPortal: import('../core/requestsPortal').RequestsPortal | null;
+  /** The portal is up. */
+  requestsOpen: boolean;
+  /** The visitor's requests, newest replies first; null until read (nothing is asked for a first-time visitor). */
+  requests: import('../core/requests').RequestSummary[] | null;
+  /** Requests with a team reply not read on this device: for a badge. */
+  requestsUnread: number;
+  /** Open the portal on the list, or on one request. */
+  openRequests: (requestId?: string) => void;
+  closeRequests: () => void;
+  /** Read the list again (at most every 15s unless forced). */
+  refreshRequests: (force?: boolean) => Promise<void>;
 }
 
 // ********** Extended Config Types ********** //
