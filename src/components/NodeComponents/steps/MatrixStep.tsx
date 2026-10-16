@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import { matrixColumns, matrixMode, matrixRows, matrixToggle, MatrixSelection } from '../../../core/flow/rich';
-import { t } from '../../../core/flow/i18nEn';
+import { t } from '../../../core/i18n';
 import { StepButton, StepCard, StepStatus, StepViewProps, useStepLook } from './stepKit';
 
 /** A tap on a cell: single picks that column for the row, multiple ticks / unticks it. */
@@ -38,7 +38,7 @@ export const MatrixStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID
   return (
     <StepCard look={look} testID={testID}>
       <Text style={{ color: look.muted, fontSize: look.fontSize - 2 }}>
-        {mode === 'multiple' ? 'Pick any that apply in each row' : 'Rate each row'}
+        {mode === 'multiple' ? t('sdk.matrix.pickAny') : t('matrix.rateEach')}
       </Text>
       {rows.map((r) => (
         <View key={r.id} style={{ gap: 6 }} accessibilityRole={mode === 'multiple' ? undefined : 'radiogroup'} accessibilityLabel={r.text}>
@@ -68,7 +68,7 @@ export const MatrixStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID
       <StepButton
         look={look}
         primary
-        title={String(data.submitLabel || '').trim() || 'Submit'}
+        title={String(data.submitLabel || '').trim() || t('common.submit')}
         disabled={busy}
         onPress={() => onSubmit({ cells: matrixCells(sel, mode) })}
         testID={`${testID}-submit`}
