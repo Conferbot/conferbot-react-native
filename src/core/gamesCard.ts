@@ -15,7 +15,8 @@
  * Nothing here is sent anywhere or stored: the games are the visitor's own
  * and leave no trace in the transcript.
  */
-import { GAMES, GameId, GameMeta, gameMeta, gamesForLanguage, waitingGamesOf, DEFAULT_OFFER_TEXT } from './waitingGames';
+import { GAMES, GameId, GameMeta, gameMeta, gamesForLanguage, waitingGamesOf, offerLine } from './waitingGames';
+import { t as tr, localized, I18nKey, widgetLanguage } from './i18n';
 import {
   Rng,
   Hand,
@@ -43,28 +44,29 @@ import {
   scrambleSolved,
   riddleOptions,
   shuffle,
-  VERDICT,
-  TRIVIA,
+  triviaFor,
+  wordsFor,
   RIDDLES,
-  WORDS,
   MEMORY_FACES,
 } from './gamesLogic';
 
 type Timer = unknown;
 
-/** The card's words (web i18n/en.ts "games.*"). */
-export const GAMES_TEXT = {
-  card: 'Games while you wait',
-  close: 'Close games',
-  pick: 'Pick a game',
-  again: 'Play again',
-  another: 'Another game',
-  notNow: 'Not now',
-  pausedNamed: (name: string) => `${name}'s here!`,
-  pausedSomeone: "Someone's here!",
-  pausedSaved: 'Your game is saved - finish it later?',
-  resume: 'Finish my game',
-} as const;
+/** The card's words (web ui.ts, "games.*"), in the active language. */
+export const GAMES_TEXT = Object.assign(
+  localized({
+    card: 'games.card',
+    close: 'games.close',
+    pick: 'games.pick',
+    again: 'games.again',
+    another: 'games.another',
+    notNow: 'common.notNow',
+    pausedSomeone: 'games.paused.someone',
+    pausedSaved: 'games.paused.saved',
+    resume: 'games.paused.resume',
+  }),
+  { pausedNamed: (name: string): string => tr('games.paused.named', { name }) }
+);
 
 export interface FootButton {
   key: 'notNow' | 'again' | 'another' | 'action' | 'resume';
@@ -179,6 +181,8 @@ interface Ctx {
   recent: any[];
   c: any;
   plays: number;
+  /** The language the quiz and the scramble are in. */
+  lang: string;
 }
 
 interface Game {
@@ -189,7 +193,8 @@ interface Game {
 
 // ------------------------------------------------------------------ games
 
-const handLower = (h: Hand) => HAND_NAME[h].toLowerCase();
+// German nouns keep their capital (web ui.ts handLower).
+const handLower = (h: Hand) => (widgetLanguage() === 'de' ? HAND_NAME[h] : HAND_NAME[h].toLowerCase());
 
 const rps = (ctx: Ctx): Game => {
   const score = { you: 0, bot: 0 };
@@ -198,9 +203,9 @@ const rps = (ctx: Ctx): Game => {
   let outcome: RpsBoard['outcome'] = null;
   let shaking = false;
   let busy = false;
-  const show = () => ctx.meta(`You ${score.you} · ${score.bot} Bot`);
+  const show = () => ctx.meta(tr('games.rps.score', { you: score.you, bot: score.bot }));
   show();
-  ctx.status('First to two wins. Pick your hand!');
+  ctx.status(tr('games.rps.intro'));
   return {
     board: () => ({ kind: 'rps', you, bot, outcome, shaking, busy, hands: HANDS.map((hand) => ({ hand, emoji: HAND_EMOJI[hand], name: HAND_NAME[hand] })) }),
     input: (a) => {
@@ -222,10 +227,10 @@ const rps = (ctx: Ctx): Game => {
         show();
         const line =
           r === 'draw'
-            ? `${HAND_NAME[mine]} and ${handLower(theirs)} - a draw!`
+            ? tr('games.rps.draw', { a: HAND_NAME[mine], b: handLower(theirs) })
             : r === 'win'
-              ? `${HAND_NAME[mine]} beats ${handLower(theirs)} - point to you!`
-              : `${HAND_NAME[theirs]} beats ${handLower(mine)} - point to the bot.`;
+              ? tr('games.rps.youPoint', { a: HAND_NAME[mine], b: handLower(theirs) })
+              : tr('games.rps.botPoint', { a: HAND_NAME[theirs], b: handLower(mine) });
         const w = rpsWinner(score);
         if (w) {
           ctx.finish(
@@ -240,7 +245,7 @@ const rps = (ctx: Ctx): Game => {
       if (ctx.reduced) reveal();
       else {
         shaking = true;
-        ctx.status('Rock... paper... scissors...');
+        ctx.status(tr('games.rps.shake'));
         ctx.later(reveal, 900);
       }
     },
@@ -257,25 +262,25 @@ const ttt = (ctx: Ctx): Game => {
     if (!w) return false;
     over = true;
     line = w.line;
-    if (w.winner === 'X') ctx.finish('Three in a row - you beat the bot! 🎉', true);
-    else if (w.winner === 'O') ctx.finish('The bot got this one. Rematch? 🤖', false);
-    else ctx.finish('A draw - great minds think alike 🤝', false);
+    if (w.winner === 'X') ctx.finish(tr('games.ttt.win'), true);
+    else if (w.winner === 'O') ctx.finish(tr('games.ttt.lose'), false);
+    else ctx.finish(tr('games.ttt.draw'), false);
     return true;
   };
   const botTurn = () => {
     busy = true;
-    ctx.status('The bot is thinking...');
+    ctx.status(tr('games.ttt.thinking'));
     ctx.later(() => {
       const m = tttBotMove(board, ctx.rng);
       if (m >= 0) board[m] = 'O';
       busy = false;
-      if (!check()) ctx.status('Your move');
+      if (!check()) ctx.status(tr('games.ttt.yourMove'));
     }, ctx.reduced ? 250 : 550);
   };
-  ctx.meta('You ✕ · Bot ◯');
+  ctx.meta(tr('games.ttt.meta'));
   // Turns alternate between games: the bot opens every second one.
   if (ctx.plays % 2 === 1) botTurn();
-  else ctx.status('You go first - tap a square');
+  else ctx.status(tr('games.ttt.youFirst'));
   return {
     board: () => ({ kind: 'ttt', cells: board.slice(), line: line.slice(), over, thinking: busy }),
     input: (a) => {
@@ -293,10 +298,10 @@ const memory = (ctx: Ctx): Game => {
   let pop: number[] = [];
   const paint = () => {
     const pairs = s.cards.filter((c) => c.matched).length / 2;
-    ctx.meta(`Moves ${s.moves} · Pairs ${pairs}/6`);
+    ctx.meta(tr('games.memory.meta', { moves: s.moves, pairs }));
   };
   paint();
-  ctx.status('Find all six pairs');
+  ctx.status(tr('games.memory.intro'));
   return {
     board: () => ({
       kind: 'memory',
@@ -311,12 +316,12 @@ const memory = (ctx: Ctx): Game => {
       pop = [];
       paint();
       if (r.result === 'match') {
-        ctx.status('A pair! ✨');
+        ctx.status(tr('games.memory.pair'));
         // The pair just made (the card tapped and its twin).
         const face = s.cards[a.i]?.face;
         pop = s.cards.map((c, i) => (c.face === face ? i : -1)).filter((i) => i >= 0);
       } else if (r.result === 'miss') {
-        ctx.status('Not a pair');
+        ctx.status(tr('games.memory.noPair'));
         waiting = true;
         ctx.later(() => {
           s = memoryHide(s);
@@ -324,7 +329,7 @@ const memory = (ctx: Ctx): Game => {
           paint();
         }, 850);
       } else if (r.result === 'done') {
-        ctx.finish(`All pairs in ${s.moves} moves! ${'⭐'.repeat(memoryStars(s.moves))}`, true);
+        ctx.finish(`${tr('games.memory.done', { moves: s.moves })} ${'⭐'.repeat(memoryStars(s.moves))}`, true);
       }
     },
   };
@@ -338,7 +343,7 @@ interface Round {
   answer: number;
 }
 
-const RIGHT = ['Correct! 🎯', 'Spot on! ✨', 'Nailed it! 🙌', 'Yes! 🎉'];
+const RIGHT: I18nKey[] = ['games.right.1', 'games.right.2', 'games.right.3', 'games.right.4'];
 const pickLine = (xs: string[], rng: Rng) => xs[Math.floor(rng() * xs.length) % xs.length];
 
 /** Shared by the quiz and the emoji riddles: a round at a time, three in all. */
@@ -352,7 +357,7 @@ const choiceRounds = (
   let score = 0;
   let picked: number | null = null;
   let shown = 0;
-  const meta = () => ctx.meta(`${shown + 1} of ${rounds.length} · ${score} right`);
+  const meta = () => ctx.meta(tr('games.choice.meta', { n: shown + 1, total: rounds.length, score }));
   const showRound = () => {
     shown = at;
     picked = null;
@@ -373,7 +378,7 @@ const choiceRounds = (
       if (right) score += 1;
       meta();
       if (right) ctx.cheer();
-      const fb = right ? pickLine(RIGHT, ctx.rng) : `Not quite - it's ${r.options[r.answer]}`;
+      const fb = right ? pickLine(RIGHT.map((k) => tr(k)), ctx.rng) : tr('games.choice.wrong', { answer: r.options[r.answer] });
       at += 1;
       if (at >= rounds.length) {
         const s = summary(score, rounds.length);
@@ -381,31 +386,31 @@ const choiceRounds = (
         return;
       }
       ctx.status(fb);
-      ctx.action(at === rounds.length - 1 ? 'Last one →' : 'Next →', showRound);
+      ctx.action(at === rounds.length - 1 ? tr('games.choice.last') : tr('games.choice.next'), showRound);
     },
   };
 };
 
 const quiz = (ctx: Ctx): Game => {
   const kb = ctx.c?.enableKnowledgeBase === true ? quizFromArticles(ctx.categories, ctx.recent, ctx.rng) : [];
-  const qs = buildQuiz(TRIVIA, kb, ctx.rng);
-  ctx.status(kb.length ? 'Three questions - some about our help centre' : 'Three quick questions');
+  const qs = buildQuiz(triviaFor(ctx.lang), kb, ctx.rng);
+  ctx.status(kb.length ? tr('games.quiz.introKb') : tr('games.quiz.intro'));
   return choiceRounds(
     ctx,
     'quiz',
-    qs.map((q) => ({ q: q.q, options: q.options, answer: q.answer, tag: q.source === 'kb' ? 'From our help centre' : undefined })),
-    (score, total) => ({ text: `${score} out of ${total}. ${quizVerdict(score, total)}`, win: score === total })
+    qs.map((q) => ({ q: q.q, options: q.options, answer: q.answer, tag: q.source === 'kb' ? tr('games.quiz.fromKb') : undefined })),
+    (score, total) => ({ text: `${tr('games.quiz.score', { score, total })} ${quizVerdict(score, total)}`, win: score === total })
   );
 };
 
 const emoji = (ctx: Ctx): Game => {
   const picked = shuffle(RIDDLES, ctx.rng).slice(0, 3);
-  ctx.status('What phrase do the emoji spell?');
+  ctx.status(tr('games.emoji.intro'));
   return choiceRounds(
     ctx,
     'emoji',
-    picked.map((r) => ({ big: r.e, q: "What's the phrase?", ...riddleOptions(r, ctx.rng) })),
-    (score, total) => ({ text: `${score} of ${total} riddles solved. ${quizVerdict(score, total)}`, win: score === total })
+    picked.map((r) => ({ big: r.e, q: tr('games.emoji.q'), ...riddleOptions(r, ctx.rng) })),
+    (score, total) => ({ text: `${tr('games.emoji.score', { score, total })} ${quizVerdict(score, total)}`, win: score === total })
   );
 };
 
@@ -415,7 +420,7 @@ const reaction = (ctx: Ctx): Game => {
   const times: number[] = [];
   let state: ReactionBoard['state'] = 'idle';
   let big = '⚡';
-  let line = 'Tap to start';
+  let line = tr('games.reaction.start');
   let goAt = 0;
   let timer: Timer | null = null;
   const set = (s: ReactionBoard['state'], e: string, text: string) => {
@@ -423,15 +428,15 @@ const reaction = (ctx: Ctx): Game => {
     big = e;
     line = text;
   };
-  ctx.meta(`Round 1 of ${REACTION_ROUNDS}`);
-  ctx.status('When the pad turns green, tap as fast as you can');
+  ctx.meta(tr('games.reaction.round', { n: 1, total: REACTION_ROUNDS }));
+  ctx.status(tr('games.reaction.intro'));
   const start = () => {
-    set('wait', '👀', 'Wait for green...');
-    ctx.meta(`Round ${times.length + 1} of ${REACTION_ROUNDS}`);
+    set('wait', '👀', tr('games.reaction.wait'));
+    ctx.meta(tr('games.reaction.round', { n: times.length + 1, total: REACTION_ROUNDS }));
     timer = ctx.timer(() => {
       timer = null;
       goAt = ctx.now();
-      set('go', '🟢', 'Tap now!');
+      set('go', '🟢', tr('games.reaction.go'));
     }, reactionDelay(ctx.rng));
   };
   return {
@@ -443,31 +448,31 @@ const reaction = (ctx: Ctx): Game => {
       else if (state === 'wait') {
         if (timer) ctx.clear(timer);
         timer = null;
-        set('between', '🙈', 'Too soon! Tap to try again');
-        ctx.status('Too soon - wait for green');
+        set('between', '🙈', tr('games.reaction.tooSoon'));
+        ctx.status(tr('games.reaction.tooSoonHint'));
       } else if (state === 'go') {
         const ms = Math.round(ctx.now() - goAt);
         if (!reactionCounts(ms)) {
-          set('between', '🙈', 'A lucky guess! Tap to try again');
-          ctx.status('Too quick to be real - wait until you see green');
+          set('between', '🙈', tr('games.reaction.lucky'));
+          ctx.status(tr('games.reaction.luckyHint'));
           return;
         }
         times.push(ms);
         if (times.length >= REACTION_ROUNDS) {
           const avg = average(times);
-          set('done', '🏁', `${avg} ms average`);
+          set('done', '🏁', tr('sdk.games.reactionAvg', { ms: avg }));
           ctx.meta(times.map((t) => `${t}`).join(' · ') + ' ms');
-          ctx.finish(`${reactionVerdict(avg)} - ${avg} ms on average.`, avg < 350);
+          ctx.finish(`${reactionVerdict(avg)} - ${tr('games.reaction.avg', { ms: avg })}`, avg < 350);
           return;
         }
-        set('between', '⏱️', `${ms} ms - tap for the next round`);
-        ctx.status(`${ms} milliseconds`);
+        set('between', '⏱️', tr('games.reaction.next', { ms }));
+        ctx.status(tr('games.reaction.ms', { ms }));
       }
     },
     pause: () => {
       if (timer) ctx.clear(timer);
       timer = null;
-      if (state === 'wait' || state === 'go') set('between', '⏸️', 'Tap to carry on');
+      if (state === 'wait' || state === 'go') set('between', '⏸️', tr('games.reaction.resume'));
     },
   };
 };
@@ -475,7 +480,7 @@ const reaction = (ctx: Ctx): Game => {
 export const SCRAMBLE_ROUNDS = 3;
 
 const scramble = (ctx: Ctx): Game => {
-  const words = shuffle(WORDS, ctx.rng).slice(0, SCRAMBLE_ROUNDS);
+  const words = shuffle(wordsFor(ctx.lang), ctx.rng).slice(0, SCRAMBLE_ROUNDS);
   let at = 0;
   let solved = 0;
   let letters: string[] = [];
@@ -492,15 +497,16 @@ const scramble = (ctx: Ctx): Game => {
     placed = [];
     isSolved = false;
     revealed = false;
-    ctx.meta(`Word ${at + 1} of ${SCRAMBLE_ROUNDS} · ${solved} solved`);
+    ctx.meta(tr('games.scramble.meta', { n: at + 1, total: SCRAMBLE_ROUNDS, solved }));
   };
   const next = (msg: string, win: boolean) => {
     at += 1;
     if (win) solved += 1;
-    ctx.meta(`Word ${Math.min(at + 1, SCRAMBLE_ROUNDS)} of ${SCRAMBLE_ROUNDS} · ${solved} solved`);
+    ctx.meta(tr('games.scramble.meta', { n: Math.min(at + 1, SCRAMBLE_ROUNDS), total: SCRAMBLE_ROUNDS, solved }));
     if (at >= SCRAMBLE_ROUNDS) {
-      const verdict = solved === SCRAMBLE_ROUNDS ? 'Word wizard! 🧙' : solved ? VERDICT.nice : 'Tricky ones! 🙈';
-      ctx.finish(`${msg} You solved ${solved} of ${SCRAMBLE_ROUNDS}. ${verdict}`, solved === SCRAMBLE_ROUNDS);
+      const verdict =
+        solved === SCRAMBLE_ROUNDS ? tr('games.scramble.verdict.all') : solved ? tr('games.verdict.nice') : tr('games.scramble.verdict.none');
+      ctx.finish(`${msg} ${tr('games.scramble.score', { solved, total: SCRAMBLE_ROUNDS })} ${verdict}`, solved === SCRAMBLE_ROUNDS);
       return;
     }
     ctx.status(msg);
@@ -512,10 +518,10 @@ const scramble = (ctx: Ctx): Game => {
     if (scrambleSolved(guess, word)) {
       isSolved = true;
       ctx.cheer();
-      next(`${word} - got it! 🎉`, true);
+      next(tr('games.scramble.gotIt', { word }), true);
     } else {
       nope += 1;
-      ctx.status('Not quite - tap letters to take them back');
+      ctx.status(tr('games.scramble.wrong'));
     }
   };
   const put = (i: number) => {
@@ -524,7 +530,7 @@ const scramble = (ctx: Ctx): Game => {
     check();
   };
   // The web's intro says "or just type": a phone has no keys to type on.
-  ctx.status('Tap the letters in order');
+  ctx.status(tr('sdk.games.scrambleIntro'));
   round();
   return {
     board: () => ({
@@ -535,7 +541,7 @@ const scramble = (ctx: Ctx): Game => {
       solved: isSolved,
       revealed,
       nope,
-      skipLabel: at === SCRAMBLE_ROUNDS - 1 ? 'Reveal' : 'Skip',
+      skipLabel: at === SCRAMBLE_ROUNDS - 1 ? tr('games.scramble.reveal') : tr('common.skip'),
     }),
     input: (a) => {
       if (a.type === 'tile') put(a.i);
@@ -557,7 +563,7 @@ const scramble = (ctx: Ctx): Game => {
         revealed = true;
         placed = [];
         word.split('').forEach((L) => placed.push(letters.findIndex((x, j) => x === L && !placed.includes(j))));
-        next(`It was ${word}.`, false);
+        next(tr('games.scramble.itWas', { word }), false);
       }
     },
   };
@@ -574,7 +580,8 @@ const FACTORIES: Record<GameId, (ctx: Ctx) => Game> = { rps, ttt, quiz, memory, 
  */
 export const createGamesCard = (o: GamesCardOptions) => {
   const settings = waitingGamesOf(o.customizations);
-  const available = gamesForLanguage(GAMES.filter((g) => settings.games.includes(g.id)), o.lang || 'en');
+  const lang = o.lang || widgetLanguage();
+  const available = gamesForLanguage(GAMES.filter((g) => settings.games.includes(g.id)), lang);
   if (!available.length) return null;
   const rng = o.rng || Math.random;
   const setTimer = o.setTimer || ((fn: () => void, ms: number) => setTimeout(fn, ms));
@@ -634,11 +641,7 @@ export const createGamesCard = (o: GamesCardOptions) => {
       board: null,
       titleEmoji: '',
       title:
-        first && o.mode !== 'menu'
-          ? settings.offerText === DEFAULT_OFFER_TEXT
-            ? DEFAULT_OFFER_TEXT
-            : settings.offerText
-          : GAMES_TEXT.pick,
+        first && o.mode !== 'menu' ? offerLine(settings.offerText) : GAMES_TEXT.pick,
       meta: '',
       status: '',
       result: null,
@@ -664,6 +667,7 @@ export const createGamesCard = (o: GamesCardOptions) => {
       categories: o.categories || [],
       recent: o.recentArticles || [],
       plays,
+      lang,
       meta: (t) => patch({ meta: t }),
       status: (t) => patch({ status: t }),
       action: (label, fn) => {
