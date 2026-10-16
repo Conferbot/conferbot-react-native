@@ -43,6 +43,11 @@ export const FORWARDED_SERVER_EVENTS = [
   'agent-connection-restored',
   // payment-node: the server's word on a Checkout (paid / failed / expired)
   'payment-status',
+  // The chat back in the queue, a transfer written into the record, and
+  // the workspace blocking this visitor (core/liveEvents.ts).
+  'live-chat-requeued',
+  'live-chat-transferred',
+  'visitor-blocked',
 ] as const;
 
 // Socket connection options
@@ -50,6 +55,8 @@ interface SocketOptions {
   apiKey: string;
   botId: string;
   userId?: string;
+  /** The visitor, so the server can refuse one the workspace blocked (web core/socket.ts). */
+  visitorId?: string;
   socketUrl?: string;
   autoConnect?: boolean;
   reconnectionAttempts?: number;
@@ -66,6 +73,7 @@ class ConferBotSocket {
   private apiKey: string;
   private botId: string;
   private userId?: string;
+  private visitorId?: string;
   private socketUrl: string;
   private listeners: EventListenersMap = new Map();
   private isInitialized: boolean = false;
@@ -76,6 +84,7 @@ class ConferBotSocket {
     this.apiKey = options.apiKey;
     this.botId = options.botId;
     this.userId = options.userId;
+    this.visitorId = options.visitorId;
     this.socketUrl = options.socketUrl || ConferBotEndpoints.socketUrl;
   }
 
@@ -99,8 +108,9 @@ class ConferBotSocket {
           autoConnect: true,
           // The server reads botId from the handshake query/auth (headers are
           // ignored for websocket transport) - keep the headers for HTTP polling
-          query: { botId: this.botId },
-          auth: { botId: this.botId },
+          // visitorId lets the server refuse a visitor the workspace blocked.
+          query: { botId: this.botId, ...(this.visitorId ? { visitorId: this.visitorId } : {}) },
+          auth: { botId: this.botId, ...(this.visitorId ? { visitorId: this.visitorId } : {}) },
           extraHeaders: {
             [HEADER_API_KEY]: this.apiKey,
             [HEADER_BOT_ID]: this.botId,
@@ -170,6 +180,9 @@ class ConferBotSocket {
         console.error('[ConferBot Socket] Connection error:', error.message);
       }
       this.emit(SocketEvents.CONNECTION_ERROR, error);
+      // Refused at the handshake: the workspace blocked this visitor. The
+      // client does not retry; the chat shows its closed state.
+      if (error?.message === 'visitor_blocked') this.emit('visitor-blocked', { handshake: true });
       reject(error);
     });
 
