@@ -26,7 +26,8 @@ import {
 import { deduplicateMessages, trimMessages } from '../types';
 import { blockedText, endedSinceLastLive } from '../../core/liveEvents';
 import type { TranscriptEmailResult } from '../../core/emailTranscript';
-import { buildHandoverTimeoutPayload, waitMinutesOf } from '../../core/handoverPayload';
+import { buildHandoverTimeoutPayload } from '../../core/handoverPayload';
+import { waitDeadline } from '../../core/liveChat';
 
 export const QUEUE_POLL_MS = 20000;
 
@@ -58,6 +59,11 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
   const [inputEnabled, setInputEnabled] = useState(true);
   const [agentLost, setAgentLost] = useState<string | null>(null);
   const [fileRequestedBy, setFileRequestedBy] = useState<string | null>(null);
+  // When the handover's max wait runs out (the wait card's countdown), while
+  // a flow's handover waits for a person.
+  const [waitEndsAt, setWaitEndsAt] = useState<number | null>(null);
+  // A wait picked back up after a restart: the server's seconds left.
+  const restoredRemaining = useRef<number | null>(null);
   const [receiptMarks, setReceiptMarks] = useState<ReceiptMarks>({ deliveredMessageId: '', seenMessageId: '' });
   const [leadCardOpen, setLeadCardOpen] = useState(false);
   const [csatConfig, setCsatConfig] = useState<CsatConfig | null>(null);
@@ -191,16 +197,29 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
 
   // The handover step's max wait: once it passes with nobody joined, the
   // server is asked to decide (handover-timeout) and answers with
-  // no-agents-available. Once per wait.
+  // no-agents-available. Once per wait. A restored wait goes on from the
+  // server's seconds left (web special.ts _attachHandoverWait). The wait
+  // card counts down to it (waitEndsAt).
   useEffect(() => {
     if (!waitingForPerson || !handoverWait) return;
     const { data, workspaceId } = handoverWait();
+    const deadline = waitDeadline(data?.maxWaitTime, restoredRemaining.current);
+    restoredRemaining.current = null;
+    setWaitEndsAt(deadline);
     const t = setTimeout(() => {
       const id = sid();
       if (id) socketClient.current?.emitToServer('handover-timeout', buildHandoverTimeoutPayload(id, data, workspaceId));
-    }, waitMinutesOf(data?.maxWaitTime) * 60000);
-    return () => clearTimeout(t);
+    }, Math.max(0, deadline - Date.now()));
+    return () => {
+      clearTimeout(t);
+      setWaitEndsAt(null);
+    };
   }, [waitingForPerson]);
+
+  /** A restored wait for a person: its seconds left, before the wait starts again (useHandoverLifecycle). */
+  const resumeWaitWith = useCallback((remainingSeconds: number | null) => {
+    restoredRemaining.current = typeof remainingSeconds === 'number' ? remainingSeconds : null;
+  }, []);
 
   // The visitor's receipts for the agent's newest message: delivered when it
   // arrives, seen while the chat is on screen.
@@ -316,6 +335,7 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
   const dismissFileRequest = useCallback(() => setFileRequestedBy(null), []);
 
   const resetLiveChatExtras = useCallback(() => {
+    restoredRemaining.current = null;
     setQueue(null);
     setWaiting(null);
     setNoAgents(false);
@@ -337,6 +357,8 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
 
   return {
     queue,
+    waitEndsAt,
+    resumeWaitWith,
     waiting,
     noAgents,
     lockedBy,
