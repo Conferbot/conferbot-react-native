@@ -18,6 +18,7 @@ import {
 
 import { useTheme } from '../../theme';
 import type { HandoverErrorProps } from './types';
+import { t } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -31,11 +32,11 @@ const errorIcons: Record<HandoverErrorProps['errorType'], string> = {
   error: '\u26A0\uFE0F',    // Warning
 };
 
-const defaultMessages: Record<HandoverErrorProps['errorType'], string> = {
-  no_agents: 'Sorry, no agents are available at the moment. Please try again later or leave a message.',
-  timeout: 'We apologize, but we were unable to connect you with an agent. The wait time has exceeded our limit.',
-  error: 'Something went wrong while connecting you to an agent. Please try again.',
-};
+const defaultMessages = (): Record<HandoverErrorProps['errorType'], string> => ({
+  no_agents: t('sdk.handover.noAgentsMessage'),
+  timeout: t('sdk.handover.timeoutMessage'),
+  error: t('sdk.handover.errorMessage'),
+});
 
 // ========================================
 // MAIN COMPONENT
@@ -50,8 +51,8 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
   onRetry,
   onContinue,
   onCancel,
-  retryButtonText = 'Try Again',
-  cancelButtonText = 'Go Back',
+  retryButtonText = t('sdk.handover.tryAgain'),
+  cancelButtonText = t('sdk.handover.goBack'),
   accessibilityLabel,
   testID,
 }) => {
@@ -104,7 +105,7 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
       : resolvedType === 'timeout'
         ? timeoutMessage
         : errorMessage;
-  const displayMessage = typeMessage || message || defaultMessages[resolvedType];
+  const displayMessage = typeMessage || message || defaultMessages()[resolvedType];
 
   // Determine colors based on error type
   const iconBackgroundColor = resolvedType === 'no_agents'
@@ -123,7 +124,7 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
         theme.shadows.md,
       ]}
       accessibilityRole="alert"
-      accessibilityLabel={accessibilityLabel || `Error: ${displayMessage}`}
+      accessibilityLabel={accessibilityLabel || `${t('sdk.common.error')}: ${displayMessage}`}
       testID={testID}
     >
       {/* Icon */}
@@ -146,9 +147,9 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
           { color: theme.colors.text, fontSize: theme.typography.fontSize.lg },
         ]}
       >
-        {resolvedType === 'no_agents' && 'No Agents Available'}
-        {resolvedType === 'timeout' && 'Connection Timeout'}
-        {resolvedType === 'error' && 'Connection Error'}
+        {resolvedType === 'no_agents' && t('sdk.handover.noAgentsTitle')}
+        {resolvedType === 'timeout' && t('sdk.handover.timeoutTitle')}
+        {resolvedType === 'error' && t('sdk.status.error')}
       </Text>
 
       {/* Message */}
@@ -174,7 +175,7 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
             ]}
             onPress={onRetry}
             accessibilityRole="button"
-            accessibilityLabel="Try again"
+            accessibilityLabel={t('common.tryAgain')}
           >
             <Text
               style={[
@@ -198,7 +199,7 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
             ]}
             onPress={onCancel}
             accessibilityRole="button"
-            accessibilityLabel="Cancel and go back"
+            accessibilityLabel={t('sdk.handover.cancelGoBack')}
           >
             <Text
               style={[
@@ -222,7 +223,7 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
             ]}
             onPress={onContinue}
             accessibilityRole="button"
-            accessibilityLabel="Continue with bot"
+            accessibilityLabel={t('sdk.handover.continueBot')}
           >
             <Text
               style={[
@@ -230,7 +231,7 @@ export const HandoverError: React.FC<HandoverErrorProps> = ({
                 { color: theme.colors.textSecondary, fontSize: theme.typography.fontSize.sm },
               ]}
             >
-              Continue with Bot
+              {t('sdk.handover.continueBot')}
             </Text>
           </TouchableOpacity>
         )}
