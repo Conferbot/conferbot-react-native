@@ -17,6 +17,7 @@ const setup = (engine: any) => {
     setIsNodeProcessing: jest.fn(),
     setIsLiveChatMode: jest.fn(),
     persistSession: jest.fn(async () => {}),
+    onConversationEnd: jest.fn(),
   };
   const noop = jest.fn();
   const props: any = {
@@ -67,6 +68,9 @@ describe('chat-ended with a flow at its handover step (#66)', () => {
     expect(state.addRecord).toHaveBeenCalledWith(expect.objectContaining({ type: 'agent-chat-ended' }));
     expect(fns.setIsLiveChatMode).toHaveBeenCalledWith(false);
 
+    // The flow goes on: not the end of the conversation (#74).
+    expect(fns.onConversationEnd).not.toHaveBeenCalled();
+
     // The same end again: nothing more (one survey per end, #47).
     fire('chat-ended', { chatSessionId: 's1' });
     expect(engine.submitResponse).toHaveBeenCalledTimes(1);
@@ -84,6 +88,8 @@ describe('chat-ended with a flow at its handover step (#66)', () => {
     expect(engine.submitResponse).not.toHaveBeenCalled();
     expect(engine.reset).toHaveBeenCalled();
     expect(fns.setCurrentUIState).toHaveBeenCalledWith(null);
+    // The conversation is over: the post-chat redirect may follow (#74).
+    expect(fns.onConversationEnd).toHaveBeenCalledTimes(1);
   });
 
   it('another session\'s end is ignored', () => {
