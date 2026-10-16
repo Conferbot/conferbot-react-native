@@ -15,6 +15,7 @@ const fakeSocket = (ack: Record<string, any> = {}) => {
       handlers[event] = fn;
     }),
     emitWithAck: jest.fn((event: string) => Promise.resolve(ack[event] ?? null)),
+    emitToServer: jest.fn(),
     joinChatRoomVisitor: jest.fn(),
     fire(event: string, data?: any) {
       handlers[event]?.(data);
@@ -33,7 +34,7 @@ const fakeState = (initial: any[] = [], currentNodeId: string | null = null) => 
   };
 };
 
-const setup = (o: { record?: any[]; ack?: any; state?: any; engine?: any; waitingForPerson?: boolean } = {}) => {
+const setup = (o: { record?: any[]; ack?: any; state?: any; engine?: any; waitingForPerson?: boolean; props?: Record<string, any> } = {}) => {
   const socket = fakeSocket(o.ack);
   const state = o.state || fakeState(o.record);
   let screen: any[] = o.record || [];
@@ -52,6 +53,7 @@ const setup = (o: { record?: any[]; ack?: any; state?: any; engine?: any; waitin
     setCurrentUIState: jest.fn(),
     setIsNodeProcessing: jest.fn(),
     waitingForPerson: !!o.waitingForPerson,
+    ...(o.props || {}),
   };
   const hook = renderHook((p: any) => useHandoverLifecycle(p), { initialProps: props });
   act(() => hook.result.current.setupHandoverListeners());
@@ -262,5 +264,120 @@ describe('useHandoverLifecycle', () => {
     expect(engine.reset).toHaveBeenCalled();
     expect(props.setCurrentUIState).toHaveBeenCalledWith(null);
     expect(props.setIsLiveChatMode).toHaveBeenCalledWith(false);
+  });
+  // ---- AI inactivity (#39) ----
+
+  it('the AI pauses an idle visitor: "Chat paused" with its note, the live chat stays (#39)', () => {
+    const engine = { isAtHandover: () => true, getState: () => ({ isWaitingForInput: true }), submitResponse: jest.fn() };
+    const { socket, state, screen, props } = setup({ engine, props: { isAgentBot: () => false } });
+    act(() => socket.fire('ai-agent-inactive-close', { chatSessionId: 's1', action: 'end_chat' }));
+    expect(screen()).toHaveLength(1);
+    expect(screen()[0]).toMatchObject({ type: 'ai-agent-inactive-close', paused: true, action: 'end_chat' });
+    expect(state.addRecord).toHaveBeenCalledWith(expect.objectContaining({ type: 'ai-agent-inactive-close', paused: true, action: 'end_chat' }));
+    expect(state.addRecord.mock.calls[0][0]).not.toHaveProperty('shape');
+    expect(engine.submitResponse).not.toHaveBeenCalled();
+    expect(props.setIsLiveChatMode).not.toHaveBeenCalled();
+    // Another chat's close is not ours.
+    act(() => socket.fire('ai-agent-inactive-close', { chatSessionId: 'other', action: 'continue_flow' }));
+    expect(screen()).toHaveLength(1);
+  });
+
+  it('continue_flow: "Chat ended", the live chat is over and the flow goes on from its handover step (#39)', () => {
+    const engine = { isAtHandover: () => true, getState: () => ({ isWaitingForInput: true }), submitResponse: jest.fn(() => Promise.resolve()) };
+    const { socket, screen, props } = setup({ engine, props: { isAgentBot: () => false } });
+    act(() => socket.fire('ai-agent-inactive-close', { chatSessionId: 's1', action: 'continue_flow' }));
+    expect(screen()[0]).toMatchObject({ type: 'ai-agent-inactive-close', paused: false, action: 'continue_flow' });
+    expect(props.setCurrentAgent).toHaveBeenCalledWith(undefined);
+    expect(props.setIsLiveChatMode).toHaveBeenCalledWith(false);
+    expect(engine.submitResponse).toHaveBeenCalledWith({ action: 'continue' });
+  });
+
+  it('continue_flow on an agent bot only pauses: it has no flow (#39)', () => {
+    const engine = { isAtHandover: () => true, getState: () => ({ isWaitingForInput: true }), submitResponse: jest.fn() };
+    const { socket, screen, props } = setup({ engine, props: { isAgentBot: () => true } });
+    act(() => socket.fire('ai-agent-inactive-close', { chatSessionId: 's1', action: 'continue_flow' }));
+    expect(screen()[0]).toMatchObject({ paused: true });
+    expect(engine.submitResponse).not.toHaveBeenCalled();
+    expect(props.setIsLiveChatMode).not.toHaveBeenCalled();
+  });
+
+  // ---- The AI escalation's max wait (#43) ----
+
+  it('after the AI escalates: the step\'s max wait plus 30s, then handover-timeout, nothing drawn (#43)', () => {
+    const engine = { handoverNodeData: () => ({ maxWaitTime: 1, assignmentType: 'auto', agentAssignmentStrategy: 'round', assignedAgents: ['u1'] }) };
+    const { hook, socket, screen } = setup({ engine, props: { workspaceId: () => 'w1' } });
+    act(() => {
+      hook.result.current.onAgentLeft({ reason: 'escalated', agentDetails: { name: 'Ava', isAIAgent: true } });
+    });
+    act(() => jest.advanceTimersByTime(60000 + 29999));
+    expect(socket.emitToServer).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(1));
+    expect(socket.emitToServer).toHaveBeenCalledTimes(1);
+    expect(socket.emitToServer).toHaveBeenCalledWith('handover-timeout', {
+      chatSessionId: 's1',
+      assignmentData: { assignmentType: 'auto', assignmentStrategy: 'round', assignedAgents: ['u1'] },
+      workspaceId: 'w1',
+    });
+    // Only the Connecting line: the nudge draws nothing.
+    expect(screen()).toHaveLength(1);
+  });
+
+  it('an agent bot\'s escalation waits on its silent handover step in the record (#43)', () => {
+    const state = fakeState([{ id: 'agent-handover', type: 'human-handover-node', data: { maxWaitTime: 3 } }]);
+    const { hook, socket } = setup({ state });
+    act(() => {
+      hook.result.current.onAgentLeft({ agentDetails: { name: 'Ava', isAIAgent: true } });
+    });
+    act(() => jest.advanceTimersByTime(3 * 60000 + 29000));
+    expect(socket.emitToServer).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(1000));
+    expect(socket.emitToServer).toHaveBeenCalledWith('handover-timeout', expect.objectContaining({ chatSessionId: 's1', workspaceId: '' }));
+  });
+
+  it('no nudge once someone accepts, the server decides, or the chat ends (#43)', () => {
+    for (const end of ['accepted', 'handover-waiting', 'no-agents-available', 'chat-ended', 'ai-agent-inactive-close', 'visitor-blocked']) {
+      const { hook, socket } = setup({ engine: { handoverNodeData: () => ({ maxWaitTime: 1 }), isAtHandover: () => false, reset: jest.fn() } });
+      act(() => {
+        hook.result.current.onAgentLeft({ reason: 'escalated', agentDetails: { name: 'Ava', isAIAgent: true } });
+      });
+      act(() => {
+        if (end === 'accepted') hook.result.current.onAccepted({ agentDetails: { _id: 'u1', name: 'Sam' } });
+        else socket.fire(end, { chatSessionId: 's1' });
+      });
+      act(() => jest.advanceTimersByTime(10 * 60000));
+      expect([end, socket.emitToServer.mock.calls.length]).toEqual([end, 0]);
+      hook.unmount();
+    }
+  });
+
+  it('a person leaving or an idle pause is no escalation: no nudge (#43)', () => {
+    const { hook, socket } = setup({ engine: { handoverNodeData: () => ({ maxWaitTime: 1 }) } });
+    act(() => {
+      hook.result.current.onAgentLeft({ agentDetails: { name: 'Sam' } });
+      hook.result.current.onAgentLeft({ reason: 'visitor_inactive', agentDetails: { name: 'Ava', isAIAgent: true } });
+    });
+    act(() => jest.advanceTimersByTime(10 * 60000));
+    expect(socket.emitToServer).not.toHaveBeenCalled();
+  });
+
+  // ---- The countdown after a restart (#42) ----
+
+  it('a restored wait hands the server\'s seconds left to the countdown (#42)', async () => {
+    jest.setSystemTime(new Date('2026-10-16T10:00:00Z'));
+    const engine = { waitAt: jest.fn(() => true), submitResponse: jest.fn(), resumeFrom: jest.fn(), handoverNodeData: () => ({}) };
+    const state = fakeState([{ _id: 'b1', type: 'bot-message' }], 'h1');
+    const onRestoredWait = jest.fn();
+    const { hook } = setup({
+      state,
+      engine,
+      record: [{ _id: 'b1', type: 'bot-message' }],
+      ack: { 'live-chat-state': { status: 'waiting', waitEndsAt: Date.now() + 90000 } },
+      props: { onRestoredWait },
+    });
+    await act(async () => {
+      await hook.result.current.resumeRestored({ sessionId: 's1', nodes: [{ id: 'h1', type: 'human-handover-node' }], agentBot: false });
+    });
+    expect(onRestoredWait).toHaveBeenCalledWith(90);
+    expect(onRestoredWait.mock.invocationCallOrder[0]).toBeLessThan(engine.waitAt.mock.invocationCallOrder[0]);
   });
 });
