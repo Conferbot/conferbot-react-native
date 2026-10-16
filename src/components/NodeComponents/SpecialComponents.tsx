@@ -23,6 +23,7 @@ import {
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import { HandoverView } from '../Handover/HandoverView';
 import { PreChatForm } from '../Handover/PreChatForm';
 import { HandoverWaiting } from '../Handover/HandoverWaiting';
@@ -116,11 +117,11 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
   extendedStage,
   agentName,
   agentAvatar,
-  waitMessage = 'Please wait while we connect you with an agent...',
-  connectedMessage = 'You are now connected with',
-  endedMessage = 'The conversation has ended. Thank you for chatting with us!',
-  noAgentsMessage = 'Sorry, no agents are available at the moment. Please try again later.',
-  timeoutMessage = 'We apologize, but we were unable to connect you with an agent. Please try again later.',
+  waitMessage: waitMessageProp,
+  connectedMessage: connectedMessageProp,
+  endedMessage: endedMessageProp,
+  noAgentsMessage: noAgentsMessageProp,
+  timeoutMessage: timeoutMessageProp,
   errorMessage,
   showPreChatForm = false,
   preChatFields,
@@ -134,6 +135,12 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
   onSubmit,
 }) => {
   const theme = useTheme();
+  // The app's words, else the SDK's in the visitor's language.
+  const waitMessage = waitMessageProp ?? t('sdk.handover.wait');
+  const connectedMessage = connectedMessageProp ?? t('sdk.handover.connectedWith');
+  const endedMessage = endedMessageProp ?? t('sdk.handover.ended');
+  const noAgentsMessage = noAgentsMessageProp ?? t('sdk.handover.noAgents');
+  const timeoutMessage = timeoutMessageProp ?? t('sdk.handover.timeout');
   const [currentStage, setCurrentStage] = useState<HandoverStage>(
     extendedStage || mapLegacyStage(stage)
   );
@@ -169,8 +176,8 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
 
   // Build pre-chat config from legacy fields or new config
   const effectivePreChatConfig: PreChatFormConfig = preChatConfig || {
-    title: 'Before we connect you',
-    subtitle: 'Please provide the following information',
+    title: t('sdk.prechat.title'),
+    subtitle: t('sdk.prechat.subtitle'),
     fields: [
       ...(preChatFields || []).map((field) => ({
         id: field.id,
@@ -192,27 +199,27 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
     ],
     departments: departments,
     showDepartmentSelector: !!departments && departments.length > 0,
-    submitButtonText: 'Start Chat',
+    submitButtonText: t('sdk.prechat.start'),
   };
 
   // Build agent info from legacy fields or new agent object
   const effectiveAgent: AgentInfo = agent || {
     id: '',
-    name: agentName || 'Agent',
+    name: agentName || t('agent.agent'),
     avatar: agentAvatar,
   };
 
   // Default survey config
   const effectiveSurveyConfig: PostChatSurveyConfig = surveyConfig || {
     enabled: true,
-    title: 'How was your experience?',
-    ratingQuestion: 'Please rate your conversation',
+    title: t('csat.title'),
+    ratingQuestion: t('sdk.survey.rate'),
     ratingStyle: 'stars',
     maxRating: 5,
-    feedbackQuestion: 'Any additional feedback? (optional)',
-    submitButtonText: 'Submit',
-    skipButtonText: 'Skip',
-    thankYouMessage: 'Thank you for your feedback!',
+    feedbackQuestion: t('csat.placeholder'),
+    submitButtonText: t('common.submit'),
+    skipButtonText: t('common.skip'),
+    thankYouMessage: t('csat.thanks'),
   };
 
   // Handle pre-chat form submission
@@ -389,7 +396,7 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
                   { color: theme.colors.textSecondary },
                 ]}
               >
-                Continue
+                {t('common.continue')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -419,7 +426,7 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
         return (
           <HandoverError
             errorType="error"
-            message={errorMessage || 'An error occurred. Please try again.'}
+            message={errorMessage || t('common.somethingWrong')}
             onRetry={handleRetry}
             onContinue={handleContinue}
           />
@@ -434,7 +441,7 @@ export const HumanHandoverView: React.FC<HumanHandoverViewProps> = ({
     <View
       style={styles.handoverContainer}
       accessibilityRole="alert"
-      accessibilityLabel={`Human handover: ${currentStage}`}
+      accessibilityLabel={t('sdk.handover.label')}
     >
       {renderContent()}
     </View>
@@ -501,7 +508,7 @@ export const GPTResponseView: React.FC<GPTResponseViewProps> = ({
         theme.shadows.sm,
       ]}
       accessibilityRole="text"
-      accessibilityLabel={`AI response: ${displayText}`}
+      accessibilityLabel={t('sdk.ai.responseLabel', { text: displayText })}
     >
       <Text
         style={[
@@ -540,7 +547,7 @@ export const GPTResponseView: React.FC<GPTResponseViewProps> = ({
               },
             ]}
           >
-            AI is thinking...
+            {t('sdk.ai.thinking')}
           </Text>
         </View>
       )}
@@ -561,7 +568,7 @@ interface LoadingIndicatorProps extends NodeUIState.Loading {}
  */
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   nodeId,
-  message = 'Loading...',
+  message,
 }) => {
   const theme = useTheme();
   const dotAnim = useRef(new Animated.Value(0)).current;
@@ -597,7 +604,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         theme.shadows.sm,
       ]}
       accessibilityRole="progressbar"
-      accessibilityLabel={message}
+      accessibilityLabel={message ?? t('common.loading')}
     >
       <View style={styles.loadingContent}>
         <View style={styles.loadingDots}>
@@ -778,7 +785,7 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
             },
           ]}
         >
-          Quiz Question
+          {t('sdk.quiz.title')}
         </Text>
       </View>
 
@@ -926,7 +933,7 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
           onPress={handleSubmit}
           disabled={selectedId === null}
           accessibilityRole="button"
-          accessibilityLabel="Submit answer"
+          accessibilityLabel={t('sdk.quiz.submit')}
         >
           <Text
             style={[
@@ -940,7 +947,7 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
               },
             ]}
           >
-            Submit Answer
+            {t('sdk.quiz.submit')}
           </Text>
         </TouchableOpacity>
       )}
