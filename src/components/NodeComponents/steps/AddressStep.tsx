@@ -13,16 +13,17 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
+import { t, tPlural, I18nKey } from '../../../core/i18n';
 import { StepButton, StepCard, StepField, StepLink, StepRow, StepStatus, StepViewProps, useStepLook } from './stepKit';
 
 export const ADDRESS_DEBOUNCE_MS = 300;
 
-const MANUAL_FIELDS: Array<[string, string]> = [
-  ['line1', 'Street address'],
-  ['city', 'City'],
-  ['region', 'State / region'],
-  ['postal', 'Postal code'],
-  ['country', 'Country'],
+const MANUAL_FIELDS: Array<[string, I18nKey]> = [
+  ['line1', 'address.street'],
+  ['city', 'address.city'],
+  ['region', 'address.region'],
+  ['postal', 'address.postal'],
+  ['country', 'address.country'],
 ];
 
 export const AddressStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID = 'step-address' }) => {
@@ -66,7 +67,7 @@ export const AddressStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
           <StepField
             key={f}
             look={look}
-            label={f === 'line1' ? label : `${label} (optional)`}
+            label={f === 'line1' ? t(label) : `${t(label)} ${t('common.optional')}`}
             value={fields[f] || ''}
             onChangeText={(v) => setFields((cur) => ({ ...cur, [f]: v }))}
             autoComplete={f === 'line1' ? 'street-address' : f === 'postal' ? 'postal-code' : f === 'country' ? 'country' : 'off'}
@@ -75,11 +76,11 @@ export const AddressStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
         ))}
         <StepStatus look={look} error={ui.errorMessage} testID={`${testID}-status`} />
         <StepRow end>
-          <StepButton look={look} title="Back" disabled={busy} onPress={() => setPane('search')} testID={`${testID}-back`} />
+          <StepButton look={look} title={t('common.back')} disabled={busy} onPress={() => setPane('search')} testID={`${testID}-back`} />
           <StepButton
             look={look}
             primary
-            title="Confirm"
+            title={t('action.confirm')}
             disabled={busy}
             onPress={() =>
               onSubmit({
@@ -106,8 +107,8 @@ export const AddressStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
         </Text>
         <StepStatus look={look} error={ui.errorMessage} testID={`${testID}-status`} />
         <StepRow end>
-          <StepButton look={look} title="Change" disabled={busy} onPress={() => setPane('search')} testID={`${testID}-change`} />
-          <StepButton look={look} primary title="Confirm" disabled={busy} onPress={() => onSubmit({ action: 'pick', index: picked })} testID={`${testID}-confirm`} />
+          <StepButton look={look} title={t('common.change')} disabled={busy} onPress={() => setPane('search')} testID={`${testID}-change`} />
+          <StepButton look={look} primary title={t('action.confirm')} disabled={busy} onPress={() => onSubmit({ action: 'pick', index: picked })} testID={`${testID}-confirm`} />
         </StepRow>
       </StepCard>
     );
@@ -118,10 +119,10 @@ export const AddressStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
     <StepCard look={look} testID={testID}>
       <StepField
         look={look}
-        label="Address"
+        label={t('address.label')}
         value={q}
         onChangeText={typed}
-        placeholder={String(data.placeholder ?? '').trim() || 'Start typing your address'}
+        placeholder={String(data.placeholder ?? '').trim() || t('address.placeholder')}
         autoComplete="street-address"
         textContentType="fullStreetAddress"
         autoCorrect={false}
@@ -152,10 +153,10 @@ export const AddressStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
       <StepStatus
         look={look}
         error={ui.errorMessage}
-        hint={showList ? `${results.length} ${results.length === 1 ? 'suggestion' : 'suggestions'}` : undefined}
+        hint={showList ? tPlural('address.suggestions', results.length) : undefined}
         testID={`${testID}-status`}
       />
-      {allowManual ? <StepLink look={look} title="Enter it manually" onPress={() => setPane('manual')} testID={`${testID}-manual`} /> : null}
+      {allowManual ? <StepLink look={look} title={t('address.manual')} onPress={() => setPane('manual')} testID={`${testID}-manual`} /> : null}
     </StepCard>
   );
 };
