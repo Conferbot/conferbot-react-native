@@ -11,6 +11,7 @@ import {
   Animated,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t, tPlural } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import type { Reaction, ReactionEmoji, ReactionGroup } from '../../types';
 
@@ -131,8 +132,8 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
         </Text>
       </View>
       <Text style={styles.userName}>
-        {item.userName || (item.userId === currentUserId ? 'You' : 'User')}
-        {item.userId === currentUserId && item.userName ? ' (You)' : ''}
+        {item.userName || (item.userId === currentUserId ? t('transcript.you') : t('sdk.reaction.user'))}
+        {item.userId === currentUserId && item.userName ? ` (${t('transcript.you')})` : ''}
       </Text>
     </View>
   );
@@ -163,11 +164,11 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
             activeOpacity={0.7}
             delayLongPress={300}
             accessible={true}
-            accessibilityLabel={`${group.emoji} reaction, ${group.count} ${
-              group.count === 1 ? 'person' : 'people'
-            }${group.hasUserReacted ? ', you reacted' : ''}`}
+            accessibilityLabel={`${tPlural('sdk.reaction.badge', group.count, { emoji: group.emoji })}${
+              group.hasUserReacted ? `, ${t('sdk.reaction.youReacted')}` : ''
+            }`}
             accessibilityRole="button"
-            accessibilityHint="Tap to toggle reaction, long press to see who reacted"
+            accessibilityHint={t('sdk.reaction.hint')}
             testID={`${testID}-reaction-${group.emoji}`}
           >
             <Text style={styles.reactionEmoji}>{group.emoji}</Text>
@@ -198,8 +199,7 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalEmoji}>{selectedReactionGroup.emoji}</Text>
                   <Text style={styles.modalTitle}>
-                    {selectedReactionGroup.count}{' '}
-                    {selectedReactionGroup.count === 1 ? 'Reaction' : 'Reactions'}
+                    {tPlural('sdk.reaction.count', selectedReactionGroup.count)}
                   </Text>
                 </View>
                 <FlatList
