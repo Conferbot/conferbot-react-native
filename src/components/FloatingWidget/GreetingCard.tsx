@@ -15,6 +15,7 @@ import type { MascotMotion } from '../../core/mascotMotion';
 import { MascotFigure, MascotSvg, useMascotLayers } from '../Mascot/MascotFigure';
 import { useMascotMood } from '../Mascot/useMascotMood';
 import { useGreetingMotion } from '../Mascot/useGreetingMotion';
+import { t } from '../../core/i18n';
 
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
 try {
@@ -225,7 +226,7 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
       onPress={onClose}
       hitSlop={6}
       accessibilityRole="button"
-      accessibilityLabel="Dismiss"
+      accessibilityLabel={t('common.dismiss')}
       style={{ position: 'absolute', top: opts.top, right: opts.right, width: opts.size ?? 26, height: opts.size ?? 26, borderRadius: opts.circle ? (opts.size ?? 26) / 2 : 8, backgroundColor: opts.circle, alignItems: 'center', justifyContent: 'center', zIndex: 5 }}
     >
       {SvgXml ? <SvgXml xml={closeXml(opts.color, opts.glyph ?? 20)} width={opts.glyph ?? 20} height={opts.glyph ?? 20} /> : <Text style={{ color: opts.color, fontSize: 14 }}>✕</Text>}
@@ -338,7 +339,7 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
             </Animated.View>
           ) : null}
         </View>
-        <Animated.Text style={{ alignSelf: 'flex-end', marginTop: -2, marginRight: 6, fontSize: 11, fontWeight: '600', color: '#8e8e93', opacity: late }}>Delivered</Animated.Text>
+        <Animated.Text style={{ alignSelf: 'flex-end', marginTop: -2, marginRight: 6, fontSize: 11, fontWeight: '600', color: '#8e8e93', opacity: late }}>{t('receipt.delivered')}</Animated.Text>
         {chipRow(
           { backgroundColor: 'rgba(255,255,255,0.94)', borderWidth: 1, borderColor: alpha(accent, 0.35), borderRadius: 17, ...shadow(6, 16, '#0f172a', 0.25, 2) },
           { color: accent, fontFamily: cardFont },
@@ -412,7 +413,7 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
                 showAvatar: false,
                 name: { fontFamily: FONTS.serif, fontSize: 12, fontWeight: '600', letterSpacing: 1.44, color: '#8a6d4b', textTransform: 'uppercase' },
                 status: { fontFamily: FONTS.serif, fontSize: 17, fontWeight: '600', fontStyle: 'italic', color: '#2b2118', lineHeight: 21 },
-                statusText: `Greetings from ${head.name}`,
+                statusText: t('greeting.from', { name: head.name }),
                 dot: false,
               })}
               {msg({ fontFamily: FONTS.serif, fontStyle: 'italic', fontSize: 15, color: '#3b2f24', paddingRight: 40, lineHeight: 21.75 })}
@@ -468,7 +469,7 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
         box = { backgroundColor: 'rgba(246,246,248,0.97)', borderRadius: 22, paddingVertical: 12, paddingHorizontal: 14, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.08)', ...shadow(18, 40, '#000000', 0.35, 10) };
         body = (
           <>
-            {headView({ avatar: 22, avatarRadius: 6, row: true, name: { fontSize: 12, fontWeight: '600', letterSpacing: 0.24, color: '#555', textTransform: 'uppercase', fontFamily: undefined }, status: { color: '#8e8e93', fontFamily: undefined }, statusText: 'now', dot: false })}
+            {headView({ avatar: 22, avatarRadius: 6, row: true, name: { fontSize: 12, fontWeight: '600', letterSpacing: 0.24, color: '#555', textTransform: 'uppercase', fontFamily: undefined }, status: { color: '#8e8e93', fontFamily: undefined }, statusText: t('sdk.greeting.now'), dot: false })}
             {msg({ fontSize: 14.5, lineHeight: 19.6, color: '#111', fontFamily: undefined })}
             {chipRow({ backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 12 }, { color: '#111' })}
             {close({ top: 10, right: 10, color: '#94a3b8' })}
