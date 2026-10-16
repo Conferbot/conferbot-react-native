@@ -29,6 +29,13 @@ import { LauncherMascot, mascotButtonXml } from '../Mascot/LauncherMascot';
 import { WAVING_HAND } from '../../core/launcherAttention';
 import { linearBox, radialDisc, stops } from '../../core/fxPaint';
 import { t } from '../../core/i18n';
+import { autoOpenPlan } from '../../core/autoOpen';
+
+// Auto-open happens once per launch of the app per bot; a close blocks it
+// for 2 minutes (core/autoOpen.ts; web: once per page load, the
+// isChatOpen=false cookie).
+const autoOpened = new Set<string>();
+const closedAt = new Map<string, number>();
 
 // react-native-svg draws a gradient launcher when the app has it; else its first colour.
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
@@ -184,6 +191,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   // Past the home screen to the conversation, then ask (web firstImpression.ts openConversation).
   let showChat: ((text?: string) => void) | null = null;
   let botId = '';
+  let chatStarted = false;
   try {
     const ctx = useConferBot();
     serverCustomizations = (ctx as any).serverCustomizations;
@@ -192,6 +200,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     sendMessage = (ctx as any).sendMessage || null;
     showChat = (ctx as any).showChat || null;
     botId = (ctx as any).chatbotConfig?.botId || (ctx as any).botId || '';
+    // A conversation they already have is theirs to reopen (web: !chatStarted).
+    chatStarted = !!(ctx as any).hasPersistedSession || ((ctx as any).record || []).length > 0;
   } catch {
     // Context not available — widget used outside provider, that's fine
   }
@@ -343,6 +353,34 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
       useNativeDriver: true,
       friction: 6,
     }).start();
+  }, [isChatOpen]);
+
+  // The owner's auto-open (botAutoOpen, botAutoOpenDelay seconds), first visit only.
+  const toggleRef = useRef(toggleChat);
+  toggleRef.current = toggleChat;
+  const openRef = useRef(isChatOpen);
+  openRef.current = isChatOpen;
+  useEffect(() => {
+    const key = botId || 'bot';
+    const delay = autoOpenPlan(serverCustomizations, {
+      chatStarted,
+      isOpen: isChatOpen,
+      alreadyAutoOpened: autoOpened.has(key),
+      closedAt: closedAt.get(key),
+    });
+    if (delay === null) return;
+    const timer = setTimeout(() => {
+      autoOpened.add(key);
+      if (!openRef.current) toggleRef.current();
+    }, delay);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverCustomizations?.botAutoOpen, serverCustomizations?.botAutoOpenDelay, chatStarted, botId]);
+  // A close (of any open) blocks auto-open for 2 minutes.
+  const wasOpen = useRef(isChatOpen);
+  useEffect(() => {
+    if (wasOpen.current && !isChatOpen) closedAt.set(botId || 'bot', Date.now());
+    wasOpen.current = isChatOpen;
   }, [isChatOpen]);
 
   const handleChatClose = useCallback(() => {
