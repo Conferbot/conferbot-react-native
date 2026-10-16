@@ -235,7 +235,12 @@ export function useFlowEngine({
           time: new Date().toISOString(),
         } as any,
       ]);
-    } else if (currentState.currentUIState && currentState.currentUIState.type === 'textInput') {
+    } else if (
+      currentState.currentUIState &&
+      currentState.currentUIState.type === 'textInput' &&
+      // A step card's answer (OTP send / verify, a signature): the step says what the visitor did.
+      !(typeof response === 'object' && response !== null && 'action' in response)
+    ) {
       // Text answers from the bottom bar echo as a right-aligned user bubble
       // (matches web widget's _displayUserInputMessage)
       const answerText =
