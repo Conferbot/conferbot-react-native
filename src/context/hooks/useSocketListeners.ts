@@ -48,6 +48,8 @@ interface UseSocketListenersParams {
   setupAgentListeners: () => void;
   /** The handover's lines, signals and restore (useHandoverLifecycle). */
   handover: HandoverLifecycle;
+  /** An agent ended the chat and no flow goes on from it: the conversation is over (the post-chat redirect). */
+  onConversationEnd?: () => void;
 }
 
 export function useSocketListeners({
@@ -79,6 +81,7 @@ export function useSocketListeners({
   onAgentMessage,
   setupAgentListeners,
   handover,
+  onConversationEnd,
 }: UseSocketListenersParams) {
   // The session whose flow has been started: fetched-chatbot-data comes
   // again on every reconnect, and must not restart the conversation.
@@ -473,6 +476,7 @@ export function useSocketListeners({
         engine?.reset();
         setCurrentUIState(null);
         setIsNodeProcessing(false);
+        onConversationEnd?.();
       }
 
       persistSession({ isActive: false });
