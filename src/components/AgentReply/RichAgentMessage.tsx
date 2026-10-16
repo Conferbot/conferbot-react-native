@@ -10,6 +10,8 @@ import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
 import { Avatar } from '../Avatar';
 import { t } from '../../core/i18n';
+import { richArticleTarget } from '../../core/agentBot';
+import { helpCentreOn } from '../../core/waitArticles';
 
 export const RichAgentMessage: React.FC<{ message: any; testID?: string }> = ({ message, testID }) => {
   const theme = useTheme();
@@ -19,6 +21,13 @@ export const RichAgentMessage: React.FC<{ message: any; testID?: string }> = ({ 
   const [answered, setAnswered] = useState<string | null>(message.answered || null);
   const open = (url) => url && Linking.openURL(url).catch(() => {});
   const agent = message.agentDetails || {};
+  // The article card: its public page, else the article in the app's help
+  // centre when it is on (web agentRich.ts openArticle).
+  const article = richArticleTarget(rich, helpCentreOn(ctx?.serverCustomizations) && !!ctx?.openArticle);
+  const openCard = () => {
+    if (article?.kind === 'url') open(article.url);
+    else if (article?.kind === 'article') ctx.openArticle(article.id);
+  };
 
   const reply = (label: string) => {
     if (answered || !ctx?.sendMessage) return;
@@ -54,11 +63,17 @@ export const RichAgentMessage: React.FC<{ message: any; testID?: string }> = ({ 
         )}
 
         {rich.kind === 'article' && (
-          <TouchableOpacity style={styles.card} onPress={() => open(rich.url)} disabled={!rich.url} accessibilityRole="link">
+          <TouchableOpacity
+            style={styles.card}
+            onPress={openCard}
+            disabled={!article}
+            accessibilityRole={article?.kind === 'article' ? 'button' : 'link'}
+            testID={testID ? `${testID}-article` : undefined}
+          >
             <Text style={styles.kicker}>{t('kb.helpArticle')}</Text>
             <Text style={styles.title}>{rich.title}</Text>
             {rich.snippet ? <Text style={styles.desc} numberOfLines={3}>{rich.snippet}</Text> : null}
-            {rich.url ? <Text style={styles.link}>{t('common.read')} {'↗'}</Text> : null}
+            {article ? <Text style={styles.link}>{t('common.read')} {article.kind === 'url' ? '↗' : '›'}</Text> : null}
           </TouchableOpacity>
         )}
 
