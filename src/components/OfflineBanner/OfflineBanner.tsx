@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../theme';
 import type { ConferBotTheme } from '../../theme/types';
+import { t, tPlural } from '../../core/i18n';
 
 // ========================================
 // TYPES
@@ -70,8 +71,8 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
   isOffline,
   pendingCount = 0,
   onPress,
-  offlineText = 'You are offline',
-  pendingText = '{count} message{s} pending',
+  offlineText = t('sdk.offline.title'),
+  pendingText,
   animated = true,
   position = 'top',
   accessibilityLabel,
@@ -125,7 +126,12 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
       .replace('{s}', count === 1 ? '' : 's');
   }
 
-  const formattedPendingText = formatPendingText(pendingCount, pendingText);
+  const formattedPendingText =
+    pendingText !== undefined
+      ? formatPendingText(pendingCount, pendingText)
+      : pendingCount > 0
+        ? tPlural('sdk.offline.pending', pendingCount)
+        : '';
   const computedAccessibilityLabel = accessibilityLabel || `${offlineText}. ${formattedPendingText}`;
 
   const content = (
@@ -173,7 +179,7 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
         activeOpacity={0.8}
         accessible={true}
         accessibilityRole="button"
-        accessibilityHint="Tap to view pending messages"
+        accessibilityHint={t('sdk.offline.hint')}
       >
         {content}
       </TouchableOpacity>
