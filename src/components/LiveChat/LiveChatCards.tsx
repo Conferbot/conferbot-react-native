@@ -14,9 +14,8 @@ import ConferBotContext from '../../context/ConferBotContext';
 import { conversionEventOf, isAIAgentDetails, quickActionsOf } from '../../core/agentBot';
 import { backAtLabel, isEmail, knownEmail, lastQuestion, queueLine, type CsatConfig } from '../../core/liveChat';
 import { MAILCHAT_TEXT, isTranscriptEmail, transcriptEmailError } from '../../core/emailTranscript';
-import { NEW_CHAT_TEXT, type ClosedState } from '../../core/liveEvents';
-
-const TALK_TO_PERSON_ASK = "I'd like to talk to a person, please.";
+import { LIVE_TEXT, type ClosedState } from '../../core/liveEvents';
+import { t } from '../../core/i18n';
 
 const useStyles = () => {
   const theme = useTheme();
@@ -47,13 +46,13 @@ const EmailField: React.FC<{
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
-    if (!isEmail(email)) return setError('Please enter a valid email.');
-    if (extraField && !extra.trim()) return setError('Please write a short message.');
+    if (!isEmail(email)) return setError(t('sdk.form.invalidEmail'));
+    if (extraField && !extra.trim()) return setError(t('leave.writeMessage'));
     setError(null);
     setBusy(true);
     const ok = await onSubmit(email.trim(), extra.trim());
     setBusy(false);
-    if (ok === false) setError('That did not go through. Please try again.');
+    if (ok === false) setError(t('sdk.form.notThrough'));
   };
   return (
     <View style={{ gap: 8, marginTop: 8 }}>
@@ -111,7 +110,7 @@ export const QuickActionsStrip: React.FC<{ offerHuman: boolean }> = ({ offerHuma
   const human = offered && !humanRetired;
   if (!actions.length && !human) return null;
   return (
-    <View style={s.strip} accessibilityLabel="Quick actions">
+    <View style={s.strip} accessibilityLabel={t('chat.quickActions')}>
       {actions.map((a) => (
         <TouchableOpacity
           key={a.url}
@@ -132,10 +131,10 @@ export const QuickActionsStrip: React.FC<{ offerHuman: boolean }> = ({ offerHuma
           testID="cb-talk-to-person"
           onPress={() => {
             setHumanRetired(true);
-            ctx?.sendMessage?.(TALK_TO_PERSON_ASK);
+            ctx?.sendMessage?.(t('chat.talkToPersonAsk'));
           }}
         >
-          <Text style={s.stripText}>Talk to a person</Text>
+          <Text style={s.stripText}>{t('chat.talkToPerson')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -151,13 +150,13 @@ export const LeadCard: React.FC = () => {
   return (
     <Card testID="cb-lead-card">
       {done ? (
-        <Text style={s.body}>Thanks! We'll follow up at {done}</Text>
+        <Text style={s.body}>{t('lead.done', { email: done })}</Text>
       ) : (
         <>
-          <Text style={s.title}>Want us to follow up?</Text>
-          <Text style={s.sub}>Leave your email and the team will get back to you.</Text>
+          <Text style={s.title}>{t('lead.title')}</Text>
+          <Text style={s.sub}>{t('lead.sub')}</Text>
           <EmailField
-            button="Send"
+            button={t('common.send')}
             onSubmit={(email) => {
               ctx.captureLeadEmail(email);
               return true;
@@ -182,7 +181,7 @@ export const QueueCard: React.FC = () => {
         <ActivityIndicator size="small" color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={s.title}>{queueLine(q)}</Text>
-          <Text style={s.sub}>{q.estimateLabel || 'Our team will be with you soon'}</Text>
+          <Text style={s.sub}>{q.estimateLabel || t('queue.soon')}</Text>
         </View>
       </View>
     </Card>
@@ -202,12 +201,12 @@ export const HandoverWaitCard: React.FC<{ onCancel?: () => void }> = ({ onCancel
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <ActivityIndicator size="small" color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>{q ? queueLine(q) : 'Connecting you to the team'}</Text>
-          <Text style={s.sub}>{q?.estimateLabel || 'Our team will be with you soon'}</Text>
+          <Text style={s.title}>{q ? queueLine(q) : t('queue.connecting')}</Text>
+          <Text style={s.sub}>{q?.estimateLabel || t('queue.soon')}</Text>
         </View>
         {onCancel ? (
           <TouchableOpacity onPress={onCancel} accessibilityRole="button" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={[s.sub, { marginTop: 0 }]}>Cancel</Text>
+            <Text style={[s.sub, { marginTop: 0 }]}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -224,15 +223,17 @@ export const HandoverWaitingCard: React.FC = () => {
   if (!w) return null;
   const back = backAtLabel(w.backAt);
   const line = w.offline
-    ? `The team is offline right now${back ? `, back around ${back}` : ''}.`
-    : "Everyone's busy right now.";
+    ? back
+      ? t('sdk.waiting.offlineBack', { when: back })
+      : t('sdk.waiting.offline')
+    : t('sdk.waiting.busy');
   const email = sentTo || w.email;
   return (
     <Card testID="cb-handover-waiting">
-      <Text style={s.body}>{line} {email ? `They'll reply to ${email}.` : 'Leave your email and they will reply.'}</Text>
+      <Text style={s.body}>{line} {email ? t('sdk.waiting.replyTo', { email }) : t('sdk.waiting.leaveEmail')}</Text>
       {!email && w.askEmail && (
         <EmailField
-          button="Send"
+          button={t('common.send')}
           onSubmit={async (value) => {
             const ok = await ctx.shareEmailForReply(value);
             if (ok) setSentTo(value);
@@ -254,23 +255,23 @@ export const LeaveMessageCard: React.FC = () => {
     <Card testID="cb-leave-message">
       {sentTo ? (
         <>
-          <Text style={s.title}>Message sent. We'll reply to you at {sentTo}.</Text>
-          <Text style={s.sub}>Replies will reach your inbox, and show here if you come back.</Text>
+          <Text style={s.title}>{t('leave.sent', { email: sentTo })}</Text>
+          <Text style={s.sub}>{t('leave.sentSub')}</Text>
         </>
       ) : (
         <>
-          <Text style={s.title}>Leave a message</Text>
-          <Text style={s.sub}>No one is available right now. We'll reply by email.</Text>
+          <Text style={s.title}>{t('leave.title')}</Text>
+          <Text style={s.sub}>{t('leave.sub')}</Text>
           <EmailField
-            button="Send"
-            extraField={{ placeholder: 'How can we help?' }}
+            button={t('common.send')}
+            extraField={{ placeholder: t('leave.messagePlaceholder') }}
             // Their email if known, and what they last asked in their own words.
             initialEmail={knownEmail(ctx.chatState?.getUserMetadata?.()?.email, ctx.chatState?.getAnswerVariables?.())}
             initialExtra={lastQuestion(ctx.chatState?.getRecord?.())}
             onSubmit={(email, message) => ctx.leaveMessage(email, message)}
           />
           <TouchableOpacity onPress={ctx.skipLeaveMessage} accessibilityRole="button" style={{ marginTop: 8, alignSelf: 'flex-start' }}>
-            <Text style={s.sub}>Not now</Text>
+            <Text style={s.sub}>{t('common.notNow')}</Text>
           </TouchableOpacity>
         </>
       )}
@@ -364,7 +365,7 @@ export const ClosedChatCard: React.FC<{ closed: ClosedState | null; onNewChat?: 
       ) : null}
       {closed.newChat && onNewChat ? (
         <TouchableOpacity style={s.primary} onPress={onNewChat} accessibilityRole="button" testID="cb-new-chat">
-          <Text style={s.primaryText}>{NEW_CHAT_TEXT}</Text>
+          <Text style={s.primaryText}>{LIVE_TEXT.newChat}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -388,10 +389,10 @@ export const FileRequestCard: React.FC<{ onUpload?: () => void }> = ({ onUpload 
   if (!ctx?.fileRequestedBy) return null;
   return (
     <Card testID="cb-file-request">
-      <Text style={s.body}>{ctx.fileRequestedBy} asked you to send a file</Text>
+      <Text style={s.body}>{t('file.requested', { name: ctx.fileRequestedBy })}</Text>
       {onUpload ? (
         <TouchableOpacity style={[s.primary, { marginTop: 10, alignSelf: 'flex-start' }]} onPress={onUpload} accessibilityRole="button">
-          <Text style={s.primaryText}>Choose a file</Text>
+          <Text style={s.primaryText}>{t('sdk.file.choose')}</Text>
         </TouchableOpacity>
       ) : null}
     </Card>
@@ -419,7 +420,7 @@ export const CsatCard: React.FC = () => {
   const options: (number | boolean)[] =
     config.ratingType === 'thumbs' ? [true, false] : config.ratingType === 'nps' ? Array.from({ length: 11 }, (_, i) => i) : [1, 2, 3, 4, 5];
   const label = (o: number | boolean) =>
-    config.ratingType === 'thumbs' ? (o ? 'Yes' : 'No') : config.ratingType === 'emoji' ? FACES[(o as number) - 1] : config.ratingType === 'stars' ? '★' : String(o);
+    config.ratingType === 'thumbs' ? (o ? t('sdk.csat.yes') : t('sdk.csat.no')) : config.ratingType === 'emoji' ? FACES[(o as number) - 1] : config.ratingType === 'stars' ? '★' : String(o);
   const chosen = (o: number | boolean) =>
     value !== null && (config.ratingType === 'stars' ? (o as number) <= (value as number) : o === value);
   return (
@@ -432,7 +433,7 @@ export const CsatCard: React.FC = () => {
             key={String(o)}
             onPress={() => setValue(o)}
             accessibilityRole="button"
-            accessibilityLabel={config.ratingType === 'stars' ? `${o} out of 5` : String(label(o))}
+            accessibilityLabel={config.ratingType === 'stars' ? t('rating.outOf', { n: o as number, max: 5 }) : String(label(o))}
             style={[
               config.ratingType === 'stars' ? s.star : s.ratingPill,
               chosen(o) && config.ratingType !== 'stars' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
@@ -468,10 +469,10 @@ export const CsatCard: React.FC = () => {
           }}
           accessibilityRole="button"
         >
-          <Text style={s.primaryText}>Send</Text>
+          <Text style={s.primaryText}>{t('common.send')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.secondary} onPress={ctx.dismissCsat} accessibilityRole="button">
-          <Text style={s.secondaryText}>Not now</Text>
+          <Text style={s.secondaryText}>{t('common.notNow')}</Text>
         </TouchableOpacity>
       </View>
     </Card>
