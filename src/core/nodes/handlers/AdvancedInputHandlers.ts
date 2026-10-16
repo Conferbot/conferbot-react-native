@@ -14,8 +14,10 @@ import { ctxOf } from '../../flow/context';
 import { fillVariables } from '../../flow/text';
 import { EN, isValidEmail, isValidPhone, normalizePhone, ownerTextOr, phoneErrorText } from '../../flow/inputs';
 import {
+  bookedLabels,
   dayKeyInZone,
   dayNameInZone,
+  isDayFullyBooked,
   expandSlots,
   futureSlots,
   hhmmInZone,
@@ -67,6 +69,11 @@ export class CalendarHandler extends BaseNodeHandler {
     return !excludedDays.includes(dayName.toLowerCase()) && !excludedDates.includes(dayKey);
   }
 
+  /** The day's taken slots ("HH:MM - HH:MM", bot's clock): the bot's bookings and the node's own (web displayStep.ts daySlotsFor). */
+  private booked(node: Record<string, any>, state: ChatState, dayKey: string): string[] {
+    return bookedLabels(ctxOf(node, state).calendarBookings, node, dayKey, this.zone(node.data));
+  }
+
   private ui(node: Record<string, any>, state: ChatState): NodeUIState.Calendar {
     const data = node.data || {};
     const zone = this.zone(data);
@@ -79,7 +86,11 @@ export class CalendarHandler extends BaseNodeHandler {
         const key = dayKeyInZone(new Date(noonInZone(today, zone).getTime() + i * 86400000), zone);
         if (!this.dayOpen(data, key)) continue;
         const slots = this.slotsFor(data, key, now);
-        if (slots.length) availableSlots.push({ date: key, times: slots.map((s) => s.start) });
+        const booked = this.booked(node, state, key);
+        // Every slot taken: the day is not offered (web: greyed out as "fully booked").
+        if (!slots.length || isDayFullyBooked(slots, booked)) continue;
+        const taken = slots.filter((s) => booked.includes(slotLabel(s))).map((s) => s.start);
+        availableSlots.push({ date: key, times: slots.map((s) => s.start), ...(taken.length ? { booked: taken } : {}) });
       }
     }
     return {
@@ -125,7 +136,8 @@ export class CalendarHandler extends BaseNodeHandler {
     } else {
       const slots = this.slotsFor(data, dateString, new Date());
       const slot = slots.find((s) => s.start === slotStart);
-      if (!slot) return NodeResult.displayUI(this.ui(node, state));
+      // A taken slot cannot be booked again (web: its button is disabled).
+      if (!slot || this.booked(node, state, dateString).includes(slotLabel(slot))) return NodeResult.displayUI(this.ui(node, state));
       const botDate = noonInZone(dateString, botZone);
       const visitorDate = noonInZone(dayKeyInZone(botDate, botZone), visitorZone);
       const date = longDate(botDate, botZone);
