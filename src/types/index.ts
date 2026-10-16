@@ -24,6 +24,16 @@ export interface ConferBotConfig {
    * `widgetLanguage` setting, as the web's host-page customizations do.
    */
   widgetLanguage?: 'auto' | 'en' | 'nl' | 'fr' | 'de' | 'es';
+  /**
+   * The owner's post-chat redirect (Customize > Conversations), before the
+   * countdown starts: return true when the app handled the URL itself (or
+   * wants no redirect), and the SDK shows no countdown. Anything else: the
+   * SDK counts down 10 seconds with Cancel, then opens the URL in the
+   * system browser. Only http(s) URLs reach it.
+   */
+  onPostChatRedirect?: (url: string) => boolean | void;
+  /** Never follow the owner's post-chat redirect (default false). */
+  disablePostChatRedirect?: boolean;
 }
 
 // ********** Read Receipt Configuration ********** //
