@@ -99,7 +99,8 @@ describe('ConferBotSocket', () => {
       expect(registeredEvents).toContain('connect_error');
       expect(registeredEvents).toContain('disconnect');
       expect(registeredEvents).toContain('reconnect_attempt');
-      expect(registeredEvents).toContain('reconnect');
+      // socket.io v4 emits 'reconnect' on the Manager, not the Socket (#83).
+      expect(registeredEvents).not.toContain('reconnect');
       expect(registeredEvents).toContain(SocketEvents.FETCHED_CHATBOT_DATA);
       expect(registeredEvents).toContain(SocketEvents.BOT_RESPONSE);
       expect(registeredEvents).toContain(SocketEvents.AGENT_MESSAGE);
