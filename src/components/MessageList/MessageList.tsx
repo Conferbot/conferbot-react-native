@@ -27,6 +27,7 @@ import type { NodeUIState } from '../../core/nodes/NodeHandler';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Reaction, ReactionEmoji, MessageStatusEntry } from '../../types';
 import { MessageStatus } from '../../types';
+import { t } from '../../core/i18n';
 
 /**
  * MessageList Props
@@ -402,7 +403,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           <View>
             {bubble}
             <Text style={styles.receiptLine} testID={`${testID}-receipt`}>
-              {receipt === 'seen' ? 'Seen' : receipt === 'delivered' ? 'Delivered' : 'Sent'}
+              {t(receipt === 'seen' ? 'receipt.seen' : receipt === 'delivered' ? 'receipt.delivered' : 'receipt.sent')}
             </Text>
           </View>
         );
@@ -473,7 +474,7 @@ export const MessageList: React.FC<MessageListProps> = ({
               {!(conferBot?.serverCustomizations && conferBot.customizations.hideAvatar) && (
                 <Avatar
                   source={conferBot?.currentAgent ? conferBot.currentAgent.avatar : conferBot?.customizations?.avatar || conferBot?.botAvatarUrl || undefined}
-                  name={conferBot?.currentAgent?.name || conferBot?.botName || 'Bot'}
+                  name={conferBot?.currentAgent?.name || conferBot?.botName || t('sdk.message.botName')}
                   size={conferBot?.serverCustomizations ? conferBot.customizations.avatarSize : 32}
                   shape={conferBot?.serverCustomizations ? conferBot.customizations.avatarShape : undefined}
                 />
@@ -503,8 +504,8 @@ export const MessageList: React.FC<MessageListProps> = ({
     return (
       <View style={styles.centerContent}>
         <EmptyState
-          title="No messages yet"
-          message="Start a conversation by sending a message below"
+          title={t('sdk.empty.title')}
+          message={t('sdk.empty.messageBelow')}
         />
       </View>
     );
@@ -563,7 +564,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       }
       viewabilityConfig={onVisibleMessagesChange ? viewabilityConfig : undefined}
       accessible={true}
-      accessibilityLabel="Message list"
+      accessibilityLabel={t('sdk.message.list')}
       accessibilityRole="list"
       testID={testID}
     />
@@ -629,7 +630,7 @@ const BotImage: React.FC<{ url: string; theme: ConferBotTheme; onSettled?: () =>
         }}
         accessible={true}
         accessibilityRole="image"
-        accessibilityLabel="Image"
+        accessibilityLabel={t('sdk.media.image')}
       />
     </View>
   );
