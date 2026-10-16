@@ -11,6 +11,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { moveItem, rankingAnnouncement, submitLabel, RankItem } from '../../../core/flow/rich';
+import { t } from '../../../core/i18n';
 import { StepButton, StepCard, StepViewProps, useStepLook } from './stepKit';
 
 const ROW_GAP = 6;
@@ -44,7 +45,7 @@ export const RankingStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
 
   return (
     <StepCard look={look} testID={testID}>
-      <Text style={{ color: look.muted, fontSize: look.fontSize - 2 }}>Drag to reorder, or use the arrows.</Text>
+      <Text style={{ color: look.muted, fontSize: look.fontSize - 2 }}>{t('ranking.help')}</Text>
       <View style={{ gap: ROW_GAP }} accessibilityRole="list">
         {order.map((it, i) => {
           const dragging = drag?.id === it.id;
@@ -54,7 +55,7 @@ export const RankingStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
               onLayout={(e) => {
                 rowHeight.current = e.nativeEvent.layout.height + ROW_GAP;
               }}
-              accessibilityLabel={`${it.text}, position ${i + 1} of ${order.length}`}
+              accessibilityLabel={t('ranking.position', { item: it.text, n: i + 1, total: order.length })}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -86,7 +87,7 @@ export const RankingStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
                   move(it.id, dragTarget(i, dy, rowHeight.current, order.length));
                 }}
                 onResponderTerminate={() => setDrag(null)}
-                accessibilityLabel={`Drag ${it.text}`}
+                accessibilityLabel={t('sdk.ranking.drag', { item: it.text })}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 testID={`${testID}-handle-${it.id}`}
               >
@@ -108,7 +109,7 @@ export const RankingStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
               <TouchableOpacity
                 onPress={() => move(it.id, i - 1)}
                 disabled={busy || i === 0}
-                accessibilityLabel={`Move ${it.text} up`}
+                accessibilityLabel={t('ranking.moveUp', { item: it.text })}
                 testID={`${testID}-up-${it.id}`}
                 style={{ padding: 4, opacity: i === 0 ? 0.3 : 1 }}
               >
@@ -117,7 +118,7 @@ export const RankingStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testI
               <TouchableOpacity
                 onPress={() => move(it.id, i + 1)}
                 disabled={busy || i === order.length - 1}
-                accessibilityLabel={`Move ${it.text} down`}
+                accessibilityLabel={t('ranking.moveDown', { item: it.text })}
                 testID={`${testID}-down-${it.id}`}
                 style={{ padding: 4, opacity: i === order.length - 1 ? 0.3 : 1 }}
               >
