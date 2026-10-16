@@ -16,11 +16,17 @@ This file tracks how far this SDK matches the web widget: what's done, what's le
 | #27 | Greeting card, all 11 styles checked on the Android emulator | `src/core/greeting.ts`, `FloatingWidget/useGreeting.ts`, `FloatingWidget/GreetingCard.tsx` |
 | #28-#32, #58, #59 | Handover lifecycle: the Connecting line and its 4 outcomes, the 20s waiting signal, "Talk to a person" only while nobody is coming, the header's reply time, leaving the queue on the server, a live chat picked back up after a restart. Checked against the local embed-server (`live-chat-state`, `queue-self-resolve`, `agent-accepted`, `agent-left`, `chat-ended`). | `src/core/handoverState.ts`, `handoverWaiting.ts`, `replyTime.ts`, `handoverPayload.ts`; `context/hooks/useHandoverLifecycle.ts`, `MessageBubble`, `LiveChatCards` |
 | #57 | Launcher entrance, attention and idle call. `keyframes.ts` evaluates the web's Web Animations tracks; checked against Chrome in 447 cases (19,275 samples). | `src/core/keyframes.ts`, `launcherEntrance.ts`, `launcherAttention.ts`, `launcherIdleCall.ts`, `mascotArt.ts`, `fxPaint.ts`; `FloatingWidget/useLauncherEntrance.ts`, `useLauncherAttention.ts`, `useLauncherIdleCall.ts`, `FxSprites.tsx`, `IdleCallView.tsx`, `fxAnimated.ts` |
+| #51 | Device language: every response record carries `visitorInsights: { v: 1, language: { browser } }` (the phone's preferred language, BCP 47), so the AI answers short messages in it | `src/core/deviceLanguage.ts`, `core/state/ChatState.ts` `buildResponseData` |
+| #50 | "Helpful?": a No is sent at once; reasons, an optional comment, "Talk to a person" (only while nobody is coming or here), "Ask another way"; the rated line's thumbs change the vote; the vote is kept on the answer's record entry | `src/core/answerFeedback.ts`; `AgentReply/AgentReplyExtras.tsx`, `context/hooks/useAgentBot.ts` |
+| #48 | Back in the queue (`live-chat-requeued`): "Connecting you to another agent..." / "Connecting you to <team>...", and a flow at its handover step waits again. `live-chat-transferred` is kept in the record, not drawn (as the web). `isRepeatJoin` / `afterAI` on `agent-accepted` were already in the handover port (`acceptedPlan`, #28-#32) | `src/core/liveEvents.ts`; `context/hooks/useHandoverLifecycle.ts` |
+| #47 | Blocked visitor (`visitor-blocked`, or `connect_error` `visitor_blocked` at the handshake, which now carries the visitor id): "This conversation has been closed.", no input, no new chat. The same `chat-ended` again draws nothing and opens no second survey; each end has its own record id. Once a chat has ended with nothing going on: composer off and "Start a new chat". The `handover:*` emits the issue names were already gone (#58) | `src/core/liveEvents.ts`; `services/socket.ts`, `useLiveChatExtras.ts`, `useHandoverLifecycle.ts`, `useSocketListeners.ts`, `LiveChatCards.tsx` `ClosedChatCard`, `ChatWidget.tsx` |
+| #56 | Markdown as the web's `utils/agentHtml.ts`: tables (scroll sideways), h3-h6 (# and ## drawn as 4), and from a person's HTML blockquote, pre and `<s>`/`<del>`; the "That took too long..." notice when the 45s AI wait runs out; `isFallback` replies italic at 85% | `src/utils/chatMarkdown.ts`, `AgentReply/ChatText.tsx`, `src/core/agentBot.ts` (`AWAIT_REPLY_MS`, `replyTimeoutNotice`), `MessageBubble` |
+| #46 | "Email me this chat" in the chat menu: one card (email filled in when known), the server's reason when it does not go, "Sent! Check your inbox at ...", the address kept as the visitor's. Server: `POST /api/v1/mobile/chat/transcript-email` (embed-server #193) | `src/core/emailTranscript.ts`; `services/api.ts` `sendTranscriptEmail`, `useLiveChatExtras.ts`, `LiveChatCards.tsx` `EmailTranscriptCard` |
 | #33-#38, #52, #61-#63 | Flow nodes: the engine and every node handler run the shared flow-node spec. **156 of 156 fixtures pass** (`__tests__/parity/flows.test.ts`); none pending. See "Flow nodes" below. | `src/core/NodeFlowEngine.ts`, `src/core/flow/*` (text, logic, flowControl, rich, inputs, calendar, context), `src/core/privacy/redact.ts`, `src/core/nodes/handlers/*` |
 
 ## Left in this SDK
 
-In order: home screen; mascots; i18n; sounds; celebrations; the rest of the reply-time wording (the home card's `homePeople`, the wait card's `typicalWait`; the header's `headerLine` is done). The web sources are listed below.
+#66 (a live chat's end resets the flow instead of carrying on from its handover step, as the web and RN's own restore do). Then, in order: home screen; mascots; i18n; sounds; celebrations; the rest of the reply-time wording (the home card's `homePeople`, the wait card's `typicalWait`; the header's `headerLine` is done). The web sources are listed below.
 
 ## Generators (`scripts/parity/`)
 
@@ -43,7 +49,7 @@ The data files shared by the 4 SDKs are generated from the widget's own CSS and 
 
 ## How to test
 
-- **Unit tests:** `npx jest --maxWorkers=2` (2026-10-16: 74 suites, 2102 pass, 22 skipped), plus `npx tsc --noEmit -p .`.
+- **Unit tests:** `npx jest --maxWorkers=2` (2026-10-16: 80 suites, 2152 pass, 22 skipped), plus `npx tsc --noEmit -p .`.
 - **On a device:**
   - Run the example app (`example/`) against a local embed-server. Uncomment `ConferBotEndpoints.configure(...)` in `example/App.tsx` and set `BOT_ID`.
   - Run `npx react-native start --port 8081`, then `adb reverse tcp:8081 tcp:8081` and `adb reverse tcp:8001 tcp:8001`.
@@ -69,6 +75,11 @@ Every web widget feature works the same in the 4 mobile SDKs: customization, lau
 | Handover lifecycle: Connecting line + outcomes, 20s waiting signal, Talk to a person rules, leave queue on the server, restore after restart (#28-#31, #58) | done | todo | todo | todo |
 | Header: bot name + Online + reply time, Online again when a person joins (#32) | done | todo | todo | todo |
 | Flow nodes: shared spec, 156 fixtures (`scripts/parity/flows/`) | 156/156, every step card native (#52) | todo | todo | todo |
+| Device language on every response record (#51) | done | todo | todo | todo |
+| "Helpful?": a No sent at once, reasons, comment, Talk to a person, Ask another way, vote changes (#50) | done | todo | todo | todo |
+| Requeued / transfer lines, the same end once, blocked visitor, closed chat with a new chat (#47, #48) | done | todo | todo | todo |
+| Markdown tables, h3-h6, quote, pre, strikethrough; reply timeout notice; muted fallback (#56) | done | todo | todo | todo |
+| Email me this chat (#46; server embed-server #193) | done | todo | todo | todo |
 | Home screen | todo | todo | todo | todo |
 | Mascots (incl. `mascotInGreeting`) | todo | todo | todo | todo |
 | `widgetLanguage` (i18n) | todo | todo | todo | todo |
@@ -146,6 +157,25 @@ The logic is pure and tested in `src/core/`; port each file with its test (`__te
   - Before anyone joins it shows the reply time ("Typically replies in a few minutes", "Online · team back Monday 9 AM", "Online · team replies by email"). Once a person is in the chat it shows plain "Online". An AI agent bot shows no reply-time line.
   - The header never switches to the agent.
 - **`handoverPayload.ts` (#59):** `initiate-handover` carries the step's `enableHandoverEmail` (an explicit `false` is what keeps the team's email off), the sound settings, and `assignmentMethod` / `requiredSkills` when set.
+
+### Porting the live chat extras (from RN, #46-#48, #50, #51, #56)
+
+Each piece is a pure file with its test; port both, then wire it as the RN hook named.
+
+- **Device language, `src/core/deviceLanguage.ts`** (`__tests__/core/deviceLanguage.test.ts`). The web sends `navigator.language` as `visitorInsights.language.browser` (`ts/visitors/insights.ts`); the server reads `data.visitorInsights?.language?.browser` (embed-server `messageHandler.js`). Send `{ v: 1, language: { browser } }` with every response record, `browser` the device's preferred language as BCP 47 ("de-DE", not "de_DE"), cut to 16 characters, and nothing else (an app has no page or journey). Where it comes from: Android `Locale.getDefault().toLanguageTag()` (or `LocaleList.getDefault()[0]`); iOS `Locale.preferredLanguages.first`; Flutter `PlatformDispatcher.instance.locale.toLanguageTag()`. Leave `visitorInsights` out when it is unknown.
+- **"Helpful?", `src/core/answerFeedback.ts`** (`answerFeedback.test.ts`; web `ts/chat/answerFeedback.ts`).
+  - `helpfulStep(state, tap)` is the whole row: `vote` sends `{helpful}` at once (a No does not wait for a reason) and opens `down` (No) or `thanks` (Yes, then `settle` after `THANKS_MS` to `rated`); the same thumb again sends nothing; `reason` sends `{helpful:false, reason}` and opens the comment; `comment` sends `{helpful:false, reason?, comment}` (an empty one sends nothing), once; `human` returns the visitor's words to send ("I'd like to talk to a person, please."); `retry` focuses the composer. Both settle the row to `rated`, whose thumbs change the vote.
+  - Send each vote as `ai-answer-feedback {chatSessionId, agentMessageId, helpful, reason?, comment?}` and keep it on the answer's record entry (`withFeedback`, `feedback: {..., at}`); a restored answer starts `rated` (`helpfulStart(entry.feedback)`).
+  - Draw it only under an AI answer with a 24-hex id, not `isFallback`, unless `hideAnswerFeedback`; only the newest unrated answer asks. "Talk to a person" only while `talkToPersonAllowed(record)`.
+- **Live events, `src/core/liveEvents.ts`** (`liveEvents.test.ts`; web `ts/chat/liveTakeover.ts`, `utils/recordIds.ts`, `ts/chat/closedState.ts`, `index.ts` `_applyVisitorBlock`).
+  - Forward `live-chat-requeued`, `live-chat-transferred` and `visitor-blocked` from the socket. Send `visitorId` in the handshake `auth` and `query`; a `connect_error` whose message is `visitor_blocked` is a block (`isBlockedError`).
+  - `live-chat-requeued`: draw and record `requeuedEntry(data)` (`requeuedText(teamName)`), clear the agent, and when the flow is on its handover step put the wait back (RN `engine.waitAt`). `live-chat-transferred`: keep `transferEntry(data)` in the record only.
+  - `chat-ended`: when `endedSinceLastLive(record)` it is the same end again: no line, no survey. Give each end its own id (`liveEventId('agent-chat-ended')`), never the session id.
+  - `visitor-blocked`: `blockedText(data)`; settle a Connecting line `ended`, stop the flow and the wait, close the cards.
+  - `closedStateOf(record, { blocked, stepWaiting, live })` is the closed chat: `blocked` draws its line and turns input off with no new chat; `ended` (nothing waiting, nobody here, nothing live since the end) turns input off and offers "Start a new chat" (a fresh conversation, RN `resetConversation`).
+- **Markdown, `src/utils/chatMarkdown.ts`** (`__tests__/utils/chatMarkdown.test.ts`; web `utils/agentHtml.ts`). `htmlToMarkdown` turns a person's HTML into the markdown (`<h1-6>` to `#`, h1/h2 as level 4; `<table>` to a pipe table, its cells' `|` as `\|`; `<blockquote>` to `> ` lines; `<pre>` to a ``` fence; `<s>`/`<del>` to `~~`), and `parseChatMarkdown` gives the blocks (`paragraph`, `bullet`, `number`, `heading` 3-6, `quote`, `pre`, `table`) and inline runs (`bold`, `italic`, `code`, `strike`, `link`). Draw tables in a sideways scroll (cells 5/9 padding, head bold over a 2px rule, rows over a hairline at 18% of the text colour), headings bold (level 3 at 1.17x, 4-6 at 1.07x), quotes with a left bar, pre in monospace. No regex lookbehind (older JavaScriptCore). Two small differences from the web, kept on purpose: the web prints a markdown `> ` or `~~` from the AI as typed (RN draws them), and an AI "### x" is drawn at level 3 (the web always uses h4 for markdown headings).
+- **Reply timeout and fallback, `src/core/agentBot.ts`** (`agentBot.test.ts`): after `AWAIT_REPLY_MS` (45s) waiting for an AI reply with no word, drop the dots and draw `replyTimeoutNotice()` ("That took too long. Try again, or ask for a human."), on screen only. Stop the wait without a notice on any reply, the AI leaving, the chat ending or an inactivity close. An `isFallback` reply is the same bubble, italic at 85% opacity.
+- **Email me this chat, `src/core/emailTranscript.ts`** (`emailTranscript.test.ts`; web `ts/chat/emailTranscript.ts`): a chat menu item opens one card (the known email filled in). Check the address (`isTranscriptEmail`), then `POST {mobile base}/chat/transcript-email` with `{chatSessionId, email}` and the SDK's usual `X-Bot-ID` / `X-Platform` headers (embed-server #193; the bot comes from the header). `transcriptEmailResult(status, body)`: sent only on a 2xx with `success: true`. A 400 is an invalid address, a 200 with `success: false` is generic, and a 429 is the rate limit (5 per 15 minutes per IP, shared with the web route); show `transcriptEmailError(result)`. Once sent: "Sent! Check your inbox at <email>"; keep the email as the visitor's (user metadata, the `email` answer) and send the record.
 
 ### Porting the launcher entrance, attention and idle call (from RN, #57)
 
