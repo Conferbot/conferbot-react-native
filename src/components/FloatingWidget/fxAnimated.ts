@@ -59,25 +59,37 @@ export const curve = (clock: Animated.Value, times: number[], vals: number[], un
   });
 };
 
-/** The transform of a box (w x h) moved about `origin` (px in the box; default its centre): translate, rotate, scale. */
+/**
+ * The transform of a box (w x h) moved about `origin` (px in the box; default
+ * its centre): translate, rotate, scale, or a CSS transform list's own
+ * `order` (keyframes.ts transformOrder: "ts", "rts"...). `k` scales the
+ * translations (a drawing's units to px).
+ */
 export const boxTransform = (
   clock: Animated.Value,
   s: { times: number[]; values: Sampled },
   w: number,
   h: number,
   origin?: [number, number],
-  k = 1
+  k = 1,
+  order = 'trs'
 ): any[] => {
   const v = s.values;
   const ox = (origin ? origin[0] : w / 2) - w / 2;
   const oy = (origin ? origin[1] : h / 2) - h / 2;
   const out: any[] = [];
   if (ox || oy) out.push({ translateX: ox }, { translateY: oy });
-  if (v.tx) out.push({ translateX: curve(clock, s.times, k === 1 ? v.tx : v.tx.map((x) => x * k)) });
-  if (v.ty) out.push({ translateY: curve(clock, s.times, k === 1 ? v.ty : v.ty.map((x) => x * k)) });
-  if (v.r) out.push({ rotate: curve(clock, s.times, v.r, 'deg') });
-  if (v.sx) out.push({ scaleX: curve(clock, s.times, v.sx) });
-  if (v.sy) out.push({ scaleY: curve(clock, s.times, v.sy) });
+  for (const op of order) {
+    if (op === 't') {
+      if (v.tx) out.push({ translateX: curve(clock, s.times, k === 1 ? v.tx : v.tx.map((x) => x * k)) });
+      if (v.ty) out.push({ translateY: curve(clock, s.times, k === 1 ? v.ty : v.ty.map((x) => x * k)) });
+    } else if (op === 'r') {
+      if (v.r) out.push({ rotate: curve(clock, s.times, v.r, 'deg') });
+    } else if (op === 's') {
+      if (v.sx) out.push({ scaleX: curve(clock, s.times, v.sx) });
+      if (v.sy) out.push({ scaleY: curve(clock, s.times, v.sy) });
+    }
+  }
   if (ox || oy) out.push({ translateX: -ox }, { translateY: -oy });
   return out;
 };
@@ -122,6 +134,24 @@ export class FxClock {
     this.value.stopAnimation();
   }
 
+  /** A loop runs on to the end of its lap (an exhale, a syllable), then stops there. */
+  finishLap(done?: () => void) {
+    const p = this.plan;
+    if (!p || !('period' in p)) return;
+    this.value.stopAnimation((v) => {
+      if (this.plan !== p) return;
+      const end = v < p.intro ? p.intro : p.intro + p.period;
+      this.plan = { end, done };
+      this.running = true;
+      Animated.timing(this.value, { toValue: end, duration: Math.max(0, end - v), easing: Easing.linear, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) {
+          this.running = false;
+          done?.();
+        }
+      });
+    });
+  }
+
   private go(from: number) {
     const p = this.plan;
     if (!p) return;
@@ -149,8 +179,8 @@ export const useReducedMotion = (): boolean => {
   const [on, setOn] = useState(false);
   useEffect(() => {
     let alive = true;
-    AccessibilityInfo.isReduceMotionEnabled?.().then((v) => alive && setOn(!!v)).catch(() => {});
-    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (v: boolean) => setOn(!!v));
+    AccessibilityInfo?.isReduceMotionEnabled?.()?.then((v) => alive && setOn(!!v)).catch(() => {});
+    const sub = AccessibilityInfo?.addEventListener?.('reduceMotionChanged', (v: boolean) => setOn(!!v));
     return () => {
       alive = false;
       sub?.remove?.();
