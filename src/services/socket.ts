@@ -198,6 +198,10 @@ class ConferBotSocket {
 
       // Send initialization payload
       this.sendInitPayload();
+      // Every connect, the first and each reconnect: back in the chat's room.
+      // A reconnect is a new socket on the server, so the room it was in is
+      // gone, and the agent's messages to it would be missed (#83).
+      this.rejoinChatRoom();
       // Every connect, the first and each reconnect: the requests portal
       // reads its open request again (the server forgot its room).
       this.emit('connect');
@@ -233,21 +237,27 @@ class ConferBotSocket {
       }
     });
 
-    // Reconnected
-    this.socket.on('reconnect', () => {
+    // Reconnected: socket.io v4 tells this on the Manager (socket.io), not
+    // the Socket; the rejoin itself runs on 'connect' above, every time.
+    this.socket.io?.on?.('reconnect', (attempt: number) => {
       if (__DEV__) {
-        console.log('[ConferBot Socket] Reconnected');
-      }
-      this.sendInitPayload();
-
-      // Re-join chat room after reconnect (socket.io drops room memberships on disconnect)
-      if (this.chatSessionId) {
-        this.socket?.emit(SocketEvents.JOIN_CHAT_ROOM_VISITOR, { chatSessionId: this.chatSessionId });
-        if (__DEV__) {
-          console.log('[ConferBot Socket] Re-joined chat room:', this.chatSessionId);
-        }
+        console.log('[ConferBot Socket] Reconnected after', attempt, 'attempt(s)');
       }
     });
+  }
+
+  /** Join the known chat's room again (each connect; the server forgot it). */
+  private rejoinChatRoom(): void {
+    if (!this.chatSessionId || !this.socket) return;
+    this.socket.emit(SocketEvents.JOIN_CHAT_ROOM_VISITOR, this.joinPayload(this.chatSessionId));
+    if (__DEV__) {
+      console.log('[ConferBot Socket] Re-joined chat room:', this.chatSessionId);
+    }
+  }
+
+  /** The room join as the web widget sends it (the server records the visitor's reconnect). */
+  private joinPayload(chatSessionId: string): { chatSessionId: string; visitorId?: string } {
+    return { chatSessionId, ...(this.visitorId ? { visitorId: this.visitorId } : {}) };
   }
 
   // Set up message event handlers
@@ -439,15 +449,16 @@ class ConferBotSocket {
 
   // Join chat room as visitor
   joinChatRoomVisitor(chatSessionId: string): void {
+    // Remembered either way: offline, the next connect joins it (#83).
+    this.chatSessionId = chatSessionId;
     if (!this.socket || !this.isConnected()) {
       if (__DEV__) {
-        console.warn('[ConferBot Socket] Cannot join chat room: not connected');
+        console.warn('[ConferBot Socket] Not connected: joining the chat room on connect');
       }
       return;
     }
 
-    this.chatSessionId = chatSessionId;
-    this.socket.emit(SocketEvents.JOIN_CHAT_ROOM_VISITOR, { chatSessionId });
+    this.socket.emit(SocketEvents.JOIN_CHAT_ROOM_VISITOR, this.joinPayload(chatSessionId));
 
     if (__DEV__) {
       console.log('[ConferBot Socket] Joined chat room as visitor:', chatSessionId);
@@ -456,6 +467,8 @@ class ConferBotSocket {
 
   // Leave chat room
   leaveChatRoom(chatSessionId: string): void {
+    // Left: not joined again on the next reconnect.
+    if (this.chatSessionId === chatSessionId) this.chatSessionId = undefined;
     if (!this.socket || !this.isConnected()) return;
 
     this.socket.emit(SocketEvents.LEAVE_CHAT_ROOM, chatSessionId);
