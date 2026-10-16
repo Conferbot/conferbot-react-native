@@ -16,6 +16,7 @@ import { mix, readableOn } from '../../theme/color';
 import ConferBotContext from '../../context/ConferBotContext';
 import { GAMES_TEXT, type GamesCard as GamesCardController, type GamesCardState } from '../../core/gamesCard';
 import { pickAccent } from '../../core/waitingGames';
+import { t as tr } from '../../core/i18n';
 
 /** The card's state, kept in step with the controller. */
 const useCardState = (card: GamesCardController | null): GamesCardState | null => {
@@ -138,7 +139,7 @@ const RpsView = ({ b, look, act, reduced, testID }) => {
           <T look={look} style={[{ fontSize: 40, lineHeight: 46 }, big('bot')]}>{b.bot}</T>
         </Animated.View>
       </View>
-      <View style={{ flexDirection: 'row', gap: 6 }} accessibilityLabel="Pick your hand">
+      <View style={{ flexDirection: 'row', gap: 6 }} accessibilityLabel={tr('games.rps.pick')}>
         {b.hands.map((h) => (
           <Tile key={h.hand} look={look} disabled={b.busy} onPress={() => act({ type: 'rps', hand: h.hand })} style={{ flex: 1, paddingVertical: 8, paddingHorizontal: 4, gap: 3, opacity: b.busy ? 0.6 : 1 }} label={h.name} testID={`${testID}-rps-${h.hand}`}>
             <T look={look} style={{ fontSize: 22, lineHeight: 26 }}>{h.emoji}</T>
@@ -152,9 +153,9 @@ const RpsView = ({ b, look, act, reduced, testID }) => {
 
 const TttView = ({ b, look, act, testID }) => {
   const label = (i: number) =>
-    `Row ${Math.floor(i / 3) + 1}, column ${(i % 3) + 1}, ${b.cells[i] === 'X' ? 'yours' : b.cells[i] === 'O' ? "the bot's" : 'empty'}`;
+    tr('games.ttt.cell', { row: Math.floor(i / 3) + 1, col: (i % 3) + 1, state: tr(b.cells[i] === 'X' ? 'games.ttt.yours' : b.cells[i] === 'O' ? 'games.ttt.bots' : 'games.ttt.empty') });
   return (
-    <View style={{ width: '100%', maxWidth: 210, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }} accessibilityLabel="Tic-tac-toe board">
+    <View style={{ width: '100%', maxWidth: 210, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }} accessibilityLabel={tr('games.ttt.board')}>
       {b.cells.map((c, i) => {
         const inLine = b.line.includes(i);
         return (
@@ -183,14 +184,14 @@ const TttView = ({ b, look, act, testID }) => {
 };
 
 const MemoryView = ({ b, look, act, testID }) => (
-  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }} accessibilityLabel="Memory cards">
+  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }} accessibilityLabel={tr('games.memory.cards')}>
     {b.cards.map((c, i) => (
       <Tile
         key={i}
         look={look}
         disabled={c.matched}
         onPress={() => act({ type: 'memory', i })}
-        label={`Card ${i + 1}, ${c.up ? c.face : 'face down'}${c.matched ? ', matched' : ''}`}
+        label={tr(c.matched ? 'games.memory.cardMatched' : 'games.memory.card', { n: i + 1, face: c.up ? c.face : tr('games.memory.faceDown') })}
         testID={`${testID}-mem-${i}`}
         style={{
           width: '22.6%',
@@ -218,7 +219,7 @@ const ChoiceView = ({ b, look, act, testID }) => {
         </View>
       ) : null}
       {b.big ? (
-        <T look={look} style={{ fontSize: 40, lineHeight: 46, textAlign: 'center', letterSpacing: 3 }} accessibilityLabel={`Emoji: ${b.big}`}>
+        <T look={look} style={{ fontSize: 40, lineHeight: 46, textAlign: 'center', letterSpacing: 3 }} accessibilityLabel={tr('games.emoji.label', { emoji: b.big })}>
           {b.big}
         </T>
       ) : null}
@@ -300,7 +301,7 @@ const ScrambleView = ({ b, look, act, testID }) => {
   return (
     <View style={{ gap: 10 }}>
       <T look={look} style={{ fontSize: 30, lineHeight: 34, textAlign: 'center' }} accessibilityElementsHidden importantForAccessibility="no">{b.hint}</T>
-      <Animated.View style={[{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 5 }, nudge]} accessibilityLabel="Your word, tap a letter to take it back">
+      <Animated.View style={[{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 5 }, nudge]} accessibilityLabel={tr('games.scramble.slots')}>
         {b.letters.map((_, i) => {
           const t = b.placed[i];
           const filled = t !== undefined;
@@ -311,7 +312,7 @@ const ScrambleView = ({ b, look, act, testID }) => {
               onPress={() => act({ type: 'slot', i })}
               disabled={!filled || b.solved}
               accessibilityRole="button"
-              accessibilityLabel={filled ? `Space ${i + 1}, ${b.letters[t]}` : `Space ${i + 1}, empty`}
+              accessibilityLabel={filled ? tr('games.scramble.space', { n: i + 1, letter: b.letters[t] }) : tr('games.scramble.spaceEmpty', { n: i + 1 })}
               testID={`${testID}-slot-${i}`}
               style={{
                 width: 34,
@@ -329,7 +330,7 @@ const ScrambleView = ({ b, look, act, testID }) => {
           );
         })}
       </Animated.View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 5 }} accessibilityLabel="Letters">
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 5 }} accessibilityLabel={tr('games.scramble.letters')}>
         {b.letters.map((L, i) => {
           const used = b.placed.includes(i);
           return (
@@ -338,7 +339,7 @@ const ScrambleView = ({ b, look, act, testID }) => {
               onPress={() => act({ type: 'tile', i })}
               disabled={used || b.solved}
               accessibilityRole="button"
-              accessibilityLabel={`Letter ${L}`}
+              accessibilityLabel={tr('games.scramble.letter', { letter: L })}
               testID={`${testID}-tile-${i}`}
               style={{ width: 36, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: look.fill, opacity: used ? 0.2 : 1, transform: [{ scale: used ? 0.9 : 1 }] }}
             >
