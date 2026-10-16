@@ -509,6 +509,7 @@ How a handover reads in the chat:
 - Cancel on the wait card leaves the queue on the server (`queue-self-resolve`), so the team stops seeing the visitor waiting. `leaveQueue()` does the same from your own UI.
 - After an app restart the SDK asks the server where the chat stands (`live-chat-state`): a person's chat comes back live with its agent, a visitor still in the queue goes back to the same wait, and a chat that ended meanwhile says so.
 - When the agent leaves and the chat goes back to the queue, "Connecting you to another agent..." (or "Connecting you to Sales..." after a team transfer) is drawn, and a flow at its handover step waits again. A transfer is kept in the conversation's record.
+- When the agent ends a chat that a flow's handover step started, the flow carries on from that step. If the step has post-chat survey questions switched on (`enablePostChatSurveyQuestions`), they are asked one by one first, each answer kept in the conversation's record and its answer variable; then the flow follows the step's next edge.
 - The same end twice (an agent's double click) draws one "Chat ended" line and one survey. Once the chat has ended and nothing is going on, the composer turns off and "Start a new chat" starts a fresh conversation.
 - A visitor the workspace blocked sees "This conversation has been closed." (mid-chat, or at connect: the visitor id goes with the socket handshake) and can't type or start a new chat.
 
