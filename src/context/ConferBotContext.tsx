@@ -29,6 +29,8 @@ import { useAgentBot } from './hooks/useAgentBot';
 import { useLiveChatExtras } from './hooks/useLiveChatExtras';
 import { useHandoverLifecycle } from './hooks/useHandoverLifecycle';
 import { useRequestsPortal } from './hooks/useRequestsPortal';
+import { useHomeScreen } from './hooks/useHomeScreen';
+import { personalizeCustomizations, visitorVars } from '../core/personalize';
 import { asyncStorageFor } from '../utils/deviceStorage';
 import { useWaitingExtras, isScreenOnlyEntry, type WaitingExtras } from './hooks/useWaitingExtras';
 
@@ -228,6 +230,68 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     startAgentBotChat(pending.sessionId, pending.bot, pending.nodes, resumed);
   }, [isOpen, agentStartTick]);
 
+  // The app's user travels with every record, as the web widget's visitorContext.
+  useEffect(() => {
+    ChatState.visitorContext = user
+      ? {
+          ...(user.metadata || {}),
+          id: user.id,
+          ...(user.name ? { name: user.name } : {}),
+          ...(user.email ? { email: user.email } : {}),
+          ...(user.phone ? { phone: user.phone } : {}),
+          ...(user.hash ? { hash: user.hash } : {}),
+        }
+      : null;
+  }, [user?.id, user?.name, user?.email, user?.phone, user?.hash, user?.metadata]);
+
+  // ********** Theme Override Hook ********** //
+  // The widget theme (core/widgetTheme): with themeColors "theme" its palette
+  // replaces the owner's colours; "auto" follows the phone's light/dark.
+  const prefersDark = useColorScheme() === 'dark';
+  // "Hi {{first_name|there}}": the app's user and a name the chat asked
+  // for fill the owner's texts (core/personalize.ts, web ownerLayout.ts).
+  const themedCustomizations = useMemo(
+    () =>
+      personalizeCustomizations(
+        withThemePalette(serverCustomizations, prefersDark),
+        visitorVars(
+          user ? { ...(user.metadata || {}), ...(user.name ? { name: user.name } : {}) } : null,
+          chatStateRef.current?.getUserMetadata?.()?.name
+        )
+      ),
+    [serverCustomizations, prefersDark, user?.name, user?.metadata]
+  );
+  const widgetTheme = useMemo(
+    () => resolveWidgetTheme(themedCustomizations, prefersDark),
+    [themedCustomizations, prefersDark]
+  );
+  const { serverThemeOverride } = useThemeOverride(themedCustomizations, widgetTheme);
+  // The bot's settings as the web widget applies them (core/customizations).
+  const customizations = useMemo(
+    () => resolveCustomizations(themedCustomizations, '', widgetTheme),
+    [themedCustomizations, widgetTheme]
+  );
+
+
+  // ********** Home Screen Hook ********** //
+  // The home screen, the view the open chat shows, "Welcome back", the
+  // help centre's data (core/home.ts; web ts/home/).
+  const requestsRef = useRef<{ refreshRequests: (force?: boolean) => Promise<void> } | null>(null);
+  const sendRef = useRef<(text: string) => Promise<any>>(() => Promise.resolve());
+  const home = useHomeScreen({
+    botId,
+    socketClient,
+    customizations: themedCustomizations,
+    chatSessionId,
+    record,
+    visitorName: () => chatStateRef.current?.getUserMetadata?.()?.name,
+    storage: config?.enablePersistence === false ? null : asyncStorageFor(config),
+    send: (text: string) => sendRef.current(text),
+    onHomeShown: () => {
+      requestsRef.current?.refreshRequests();
+    },
+  });
+
   // ********** Read Receipts Hook ********** //
   const readReceiptConfig: ReadReceiptConfig = {
     enabled: readReceiptsEnabled,
@@ -247,41 +311,10 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     chatState: chatStateRef.current,
     chatSessionId,
     config: readReceiptConfig,
-    isChatVisible: isOpen,
+    // The home screen and the help centre are not the conversation (web
+    // index.ts: the home screen must not count agent messages as seen).
+    isChatVisible: isOpen && home.view === 'chat',
   });
-
-  // The app's user travels with every record, as the web widget's visitorContext.
-  useEffect(() => {
-    ChatState.visitorContext = user
-      ? {
-          ...(user.metadata || {}),
-          id: user.id,
-          ...(user.name ? { name: user.name } : {}),
-          ...(user.email ? { email: user.email } : {}),
-          ...(user.phone ? { phone: user.phone } : {}),
-          ...(user.hash ? { hash: user.hash } : {}),
-        }
-      : null;
-  }, [user?.id, user?.name, user?.email, user?.phone, user?.hash, user?.metadata]);
-
-  // ********** Theme Override Hook ********** //
-  // The widget theme (core/widgetTheme): with themeColors "theme" its palette
-  // replaces the owner's colours; "auto" follows the phone's light/dark.
-  const prefersDark = useColorScheme() === 'dark';
-  const themedCustomizations = useMemo(
-    () => withThemePalette(serverCustomizations, prefersDark),
-    [serverCustomizations, prefersDark]
-  );
-  const widgetTheme = useMemo(
-    () => resolveWidgetTheme(themedCustomizations, prefersDark),
-    [themedCustomizations, prefersDark]
-  );
-  const { serverThemeOverride } = useThemeOverride(themedCustomizations, widgetTheme);
-  // The bot's settings as the web widget applies them (core/customizations).
-  const customizations = useMemo(
-    () => resolveCustomizations(themedCustomizations, '', widgetTheme),
-    [themedCustomizations, widgetTheme]
-  );
 
   // ********** While You Wait Hook ********** //
   // The help card 6s into a wait (or the server's queue-help pick, "That
@@ -325,6 +358,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     onChatbotData: (chatbotData: any, knowledgeBaseData?: any) => {
       liveChatExtras.setChatbotData(chatbotData);
       waiting.setKnowledgeBase(knowledgeBaseData);
+      home.setKnowledgeBase(knowledgeBaseData);
       setChatbotConfig((prev) => ({ ...(prev || {}), id: botId, name: chatbotData?.name, csatConfig: chatbotData?.csatConfig } as any));
     },
     onAgentBotReady,
@@ -640,10 +674,24 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     // The id the records carry (useFlowEngine `_visitorId`), else the handshake's.
     visitorId: () => (chatStateRef.current?.getVariable('_visitorId') as string | undefined) || socketClient.current?.getVisitorId(),
     storage: config?.enablePersistence === false ? null : asyncStorageFor(config),
+    // A request that is the chat on screen: the conversation.
     openChat: () => {
       openChat();
+      home.showChat();
     },
   });
+  requestsRef.current = requests;
+
+  // What the visitor types in a live or agent chat is what they came for,
+  // for "Welcome back" (web special.ts _handleHumanHandoverInputSubmit).
+  const sendAndRemember = useCallback(
+    (text: string) => {
+      if (isLiveChatMode || agentBot) home.rememberText(text);
+      return sendMessage(text);
+    },
+    [isLiveChatMode, agentBot, sendMessage, home.rememberText]
+  );
+  sendRef.current = sendAndRemember;
 
   // ********** Context Value ********** //
   const contextValue: ExtendedConferBotContext = {
@@ -672,7 +720,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     readReceiptsEnabled: readReceiptsIsEnabled,
     openChat,
     closeChat,
-    sendMessage,
+    sendMessage: sendAndRemember,
     registerPushToken,
     on,
     off,
@@ -748,6 +796,16 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     openRequests: requests.openRequests,
     closeRequests: requests.closeRequests,
     refreshRequests: requests.refreshRequests,
+    requestsSeen: requests.requestsSeen,
+    // Home screen
+    homeView: home.view,
+    showHome: home.showHome,
+    showChat: home.showChat,
+    showHelp: home.showHelp,
+    helpCategoryId: home.helpCategoryId,
+    homeMemory: home.memory,
+    knowledgeBase: home.knowledgeBase,
+    searchArticleText: home.searchArticleText,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
