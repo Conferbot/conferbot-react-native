@@ -28,6 +28,7 @@ import { resolveWidgetTheme, withThemePalette } from '../core/widgetTheme';
 import { useAgentBot } from './hooks/useAgentBot';
 import { useLiveChatExtras } from './hooks/useLiveChatExtras';
 import { useHandoverLifecycle } from './hooks/useHandoverLifecycle';
+import { useWaitingExtras, isScreenOnlyEntry, type WaitingExtras } from './hooks/useWaitingExtras';
 
 // ********** Context Creation ********** //
 const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
@@ -175,12 +176,21 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     // "Email me this chat" (core/emailTranscript.ts).
     postTranscriptEmail: (sessionId: string, email: string) =>
       apiClient.current ? apiClient.current.sendTranscriptEmail(sessionId, email) : Promise.resolve({ ok: false }),
+    // The server's help pick rides on queue-status (useWaitingExtras).
+    onQueueStatus: (data: any) => waitingRef.current?.onQueueStatus(data),
   });
 
   // ********** Handover Lifecycle Hook ********** //
   // The Connecting line and its outcome, the 20s waiting signal, leaving
   // the queue, and a live chat picked back up after a restart
   // (core/handoverState.ts, core/handoverWaiting.ts).
+  // Late-bound: the waiting extras need the handover's signals, and the
+  // handover says where a wait for a person begins and ends.
+  const waitingRef = useRef<WaitingExtras | null>(null);
+  const waitHooks = useRef({
+    start: () => waitingRef.current?.waitHooks.start(),
+    end: () => waitingRef.current?.waitHooks.end(),
+  }).current;
   const handover = useHandoverLifecycle({
     socketClient,
     chatStateRef,
@@ -193,7 +203,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setCurrentUIState,
     setIsNodeProcessing,
     waitingForPerson: currentUIState?.type === 'humanHandover' && !isLiveChatMode,
+    waitHooks,
   });
+
 
   // The agent chat is greeted when the visitor opens the chat, never at
   // connect (fetched-chatbot-data arrives at every app start).
@@ -269,6 +281,21 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     [themedCustomizations, widgetTheme]
   );
 
+  // ********** While You Wait Hook ********** //
+  // The help card 6s into a wait (or the server's queue-help pick, "That
+  // solved it"), the games offer 2.5s after the waiting signal, a help
+  // article opened in the app (core/waitArticles.ts, core/waitingGames.ts).
+  const waiting = useWaitingExtras({
+    socketClient,
+    record,
+    setRecord,
+    customizations: themedCustomizations,
+    onWidgetSignal: handover.onWidgetSignal,
+    leftQueueHelped: handover.leftQueueHelped,
+    fetchArticle: (id: string) => (apiClient.current ? apiClient.current.getKBArticle(id) : Promise.resolve(null)),
+  });
+  waitingRef.current = waiting;
+
   // ********** Socket Listeners Hook ********** //
   const { setupSocketListeners } = useSocketListeners({
     socketClient,
@@ -293,8 +320,9 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     initializeFlowEngine,
     lastUserChoiceRef,
     setAgentBot,
-    onChatbotData: (chatbotData: any) => {
+    onChatbotData: (chatbotData: any, knowledgeBaseData?: any) => {
       liveChatExtras.setChatbotData(chatbotData);
+      waiting.setKnowledgeBase(knowledgeBaseData);
       setChatbotConfig((prev) => ({ ...(prev || {}), id: botId, name: chatbotData?.name, csatConfig: chatbotData?.csatConfig } as any));
     },
     onAgentBotReady,
@@ -304,6 +332,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       setupAgentListeners();
       liveChatExtras.setupLiveChatListeners();
       handover.setupHandoverListeners();
+      waiting.setupWaitingListeners();
     },
     handover,
   });
@@ -321,6 +350,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     resetAgent();
     liveChatExtras.resetLiveChatExtras();
     handover.resetHandover();
+    waiting.resetWaiting();
 
     flowEngineRef.current?.reset();
     flowEngineRef.current = null;
@@ -483,7 +513,8 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   }, [chatSessionId]);
   useEffect(() => {
     if (!chatSessionId || !record.length || !storageService.current?.isReady()) return;
-    const t = setTimeout(() => persistMessages(record), 400);
+    // The while-you-wait cards are on screen only: never kept on the device.
+    const t = setTimeout(() => persistMessages(record.filter((r) => !isScreenOnlyEntry(r))), 400);
     return () => clearTimeout(t);
   }, [record, chatSessionId]);
 
@@ -679,6 +710,15 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     // Handover lifecycle
     leaveQueue: handover.leaveQueue,
     onWidgetSignal: handover.onWidgetSignal,
+    // While you wait
+    waitHelp: waiting.helpCard,
+    openHelpItem: waiting.openHelpItem,
+    solveWait: waiting.solveWait,
+    gamesCard: waiting.gamesCard,
+    openedArticle: waiting.article,
+    openArticle: waiting.openArticle,
+    closeArticle: waiting.closeArticle,
+    interceptPlay: waiting.interceptPlay,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
