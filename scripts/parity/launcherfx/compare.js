@@ -2,13 +2,14 @@
 // the largest difference per feature and channel, and the worst cases.
 const fs = require('fs');
 const path = require('path');
-const { evaluate } = require('./js/keyframes');
+const { evaluate, transformMatrix, transformOrder } = require('./js/keyframes');
 const { spriteFrame } = require('./js/launcherEntrance');
 
 const g = JSON.parse(fs.readFileSync(path.join(__dirname, 'golden.json'), 'utf8'));
 const CH = ['tx', 'ty', 'txp', 'typ', 'sx', 'sy', 'r', 'rx', 'ry', 'o', 'od', 'dash', 'clip', 'left'];
 const inf = (tr) => tr.map((t) => ({ ...t, options: { ...t.options, iterations: t.options.iterations === -1 ? Infinity : t.options.iterations } }));
-const REST = { tx: 0, ty: 0, txp: 0, typ: 0, sx: 1, sy: 1, r: 0, rx: 0, ry: 0, o: 1, od: 0, dash: 0, clip: 0, left: 0 };
+const REST = { tx: 0, ty: 0, txp: 0, typ: 0, sx: 1, sy: 1, r: 0, rx: 0, ry: 0, o: 1, od: 0, dash: 0, clip: 0, left: 0, ma: 1, mb: 0, mc: 0, md: 1, me: 0, mf: 0 };
+const M = ['ma', 'mb', 'mc', 'md', 'me', 'mf'];
 const max = {};
 const worst = [];
 for (const c of g.cases) {
@@ -17,7 +18,17 @@ for (const c of g.cases) {
   for (const s0 of c.samples) {
     const s = { t: s0.t, v: { ...REST, ...s0.v } };
     const v = evaluate(tracks, s.t, c.base);
-    for (const ch of CH) {
+    // A transform list: its matrix (and the opacity, the dash) against Chrome's.
+    if (c.matrix) {
+      const m = transformMatrix(v, transformOrder(tracks[0]));
+      M.forEach((ch, i) => {
+        const e = Math.abs(m[i] - s.v[ch]);
+        const k = `${feature} ${ch}`;
+        if (!(max[k] >= e)) max[k] = e;
+        if (e > 0.01) worst.push({ src: c.src, t: s.t, ch, ours: +m[i].toFixed(4), chrome: s.v[ch] });
+      });
+    }
+    for (const ch of c.matrix ? ['o', 'dash'] : CH) {
       const e = Math.abs(v[ch] - s.v[ch]);
       const k = `${feature} ${ch}`;
       if (!(max[k] >= e)) max[k] = e;
