@@ -60,6 +60,8 @@ export interface FlowContext {
   customizations: Record<string, any>;
   /** The visitor's IANA time zone (the device's unless configured). */
   visitorTimeZone: string;
+  /** The bot's bookings (the bot data's calendarBookings), for a calendar's taken slots. */
+  calendarBookings?: any[];
   /** The page the chat runs on, when the host app supplies one (hidden-fields). */
   page?: { url?: string; referrer?: string };
   /** Give the waiting step an answer from outside (a socket event). */
