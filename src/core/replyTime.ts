@@ -117,3 +117,86 @@ export const headerStatus = (
   if (personInChat) return { text: STRINGS.statusOnline, tone: 'online' };
   return headerLine(rt, { agent: agentBot, now, locale }) || { text: STRINGS.statusOnline, tone: 'online' };
 };
+
+// ------------------------------------------------------------ the home card (web homeLine, homePeople)
+
+/** The home card's words (web ts/i18n/en.ts reply.*). */
+export const HOME_STRINGS = {
+  typically: (phrase: string) => `The team typically replies ${phrase}`,
+  teamReplies: (phrase: string) => `team replies ${phrase}`,
+  answersInstantly: 'Answers instantly',
+  answersAlways: 'Answers instantly, day or night',
+  away: "We're away right now",
+  back: (when: string) => `back ${when}`,
+  offline: 'The team is offline',
+  byEmail: "we'll reply by email",
+  offlineNow: 'The team is offline right now',
+  usually: (phrase: string) => `Usually replies ${phrase}`,
+  usuallyInstantly: 'Usually replies instantly',
+  teamBackAt: (when: string) => `Team back ${when}`,
+  teamRepliesByEmail: 'Team replies by email',
+  teamAwayRightNow: 'Team away right now',
+};
+
+/**
+ * The "Talk to us" card's line (web replyTime.ts homeLine). `hide: true`
+ * means take the line away (the owner chose Hide); null keeps the old line.
+ */
+export const homeLine = (
+  rt: ReplyTime | null | undefined,
+  { agent = false, now = new Date(), locale = 'en-US' }: { agent?: boolean; now?: Date; locale?: string } = {}
+): (ReplyLine & { hide?: false }) | { hide: true } | null => {
+  if (rt && rt.mode === 'hide') return agent ? null : { hide: true };
+  if (!live(rt) || !rt.handover) return null;
+  const when = backWhen(rt.backAt, now, locale);
+  const words = fixedOf(rt) || phraseOf(rt);
+  const H = HOME_STRINGS;
+  if (agent) {
+    // The AI answers whatever the hour; say when people are around.
+    if (rt.state === 'away') return { text: H.answersInstantly + (when ? STRINGS.sep + STRINGS.teamBack(when) : ''), tone: 'away' };
+    if (rt.state === 'offline' || !words) return null;
+    return { text: H.answersInstantly + STRINGS.sep + (fixedOf(rt) || H.teamReplies(words)), tone: 'online' };
+  }
+  if (rt.state === 'away') return { text: H.away + (when ? STRINGS.sep + H.back(when) : ''), tone: 'away' };
+  if (rt.state === 'offline') return { text: rt.leaveMessage !== false ? H.offline + STRINGS.sep + H.byEmail : H.offlineNow, tone: 'away' };
+  if (fixedOf(rt)) return { text: fixedOf(rt), tone: 'online' };
+  return words ? { text: H.typically(words), tone: 'online' } : null;
+};
+
+/** Who answers and how fast; "" for none (the owner chose Hide). */
+export interface PeopleLine {
+  text: string;
+  tone: Tone;
+}
+
+/**
+ * The home card's promise (web replyTime.ts homePeople), read after
+ * "Online" under the bot's name:
+ *
+ * - an AI agent answers whatever the hour: "Answers instantly, day or
+ *   night" (or with when the team replies / is back, from homeLine);
+ * - a bot that never hands over (or no data, an older server): "Answers
+ *   instantly, day or night";
+ * - a team that is online: "Usually replies in a few minutes" (or the
+ *   owner's Fixed words);
+ * - a team that is away or offline: "Team back tomorrow 9 AM", else "Team
+ *   replies by email" (or "Team away right now" with leave-a-message off);
+ * - Hide: no words.
+ */
+export const homePeople = (
+  rt: ReplyTime | null | undefined,
+  { agent = false, now = new Date(), locale = 'en-US' }: { agent?: boolean; now?: Date; locale?: string } = {}
+): PeopleLine => {
+  const H = HOME_STRINGS;
+  const line = homeLine(rt, { agent, now, locale });
+  if (agent) return line && 'text' in line ? { text: line.text, tone: line.tone } : { text: H.answersAlways, tone: 'online' };
+  if (line && 'hide' in line && line.hide) return { text: '', tone: 'online' };
+  if (!live(rt) || !rt.handover) return { text: H.answersAlways, tone: 'online' };
+  if (rt.state === 'away' || rt.state === 'offline') {
+    const when = backWhen(rt.backAt, now, locale);
+    const text = when ? H.teamBackAt(when) : rt.leaveMessage === false ? H.teamAwayRightNow : H.teamRepliesByEmail;
+    return { text, tone: 'away' };
+  }
+  const words = phraseOf(rt);
+  return { text: fixedOf(rt) || (words ? H.usually(words) : H.usuallyInstantly), tone: 'online' };
+};
