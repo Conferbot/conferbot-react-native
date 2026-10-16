@@ -6,6 +6,8 @@
  */
 import { ownsChatBackground } from './widgetTheme';
 import type { ResolvedWidgetTheme } from './widgetTheme';
+import { mascotLookOf, mascotScaleOf, type MascotLook } from './mascotArt';
+import { normalizeMascotMotion, type MascotMotion } from './mascotMotion';
 
 export interface Corners {
   topLeft: number;
@@ -52,6 +54,16 @@ export interface ResolvedCustomizations {
   /** Ink on the accent: the theme palette's, else null (picked for contrast). */
   accentInk: string | null;
   typingStyle: 'dots' | 'wave' | 'shimmer' | 'pencil' | 'mascot';
+  /** The owner's mascot (art3d mascotLookOf): the idle call, the mascot typing and launcher styles, the greeting card. */
+  mascot: MascotLook;
+  /** The colour it is drawn in when the owner chose none: the launcher's (widgetIconBgColor, else the header's). */
+  mascotAccent: string;
+  /** The mascot greets on the greeting card, by its name, in place of the avatar. */
+  mascotInGreeting: boolean;
+  /** How the greeting card's figure moves: lively (absent), subtle or off. */
+  mascotMotion: MascotMotion;
+  /** The mascot's size in the launcher, % of the button (70-150, default 112). */
+  mascotLauncherScale: number;
 }
 
 const num = (v: unknown): number | null => {
@@ -130,5 +142,10 @@ export function resolveCustomizations(
     accent: str(c.themeAccent) || str(c.headerBgColor) || '#0b4eb8',
     accentInk: str(c.themeOnAccent) || null,
     typingStyle: TYPING.has(c.typingStyle) ? c.typingStyle : 'dots',
+    mascot: mascotLookOf(c),
+    mascotAccent: str(c.widgetIconBgColor) || str(c.headerBgColor) || '#4f46e5',
+    mascotInGreeting: c.mascotInGreeting === true,
+    mascotMotion: normalizeMascotMotion(c.mascotMotion),
+    mascotLauncherScale: mascotScaleOf(c),
   };
 }
