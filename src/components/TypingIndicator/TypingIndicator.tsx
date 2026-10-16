@@ -7,6 +7,7 @@ import { typingLabel } from '../../core/mascotMoods';
 import { useReducedMotion } from '../FloatingWidget/fxAnimated';
 import { MascotSvg } from '../Mascot/MascotFigure';
 import { TypingMascot, TypingPencil, canDrawPencil } from '../Mascot/TypingMascot';
+import { t } from '../../core/i18n';
 
 export interface TypingIndicatorProps {
   // Visibility. isTyping takes precedence when provided; `visible` is the
@@ -152,7 +153,7 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   const resolvedTextColor = textColor || theme.colors.textSecondary;
 
   // "Pip is typing" when the owner named their mascot (chatChrome.ts typingBubbleHtml).
-  const label = accessibilityLabel ?? (variant === 'mascot' && mascot?.look?.name ? typingLabel('mascot', mascot.look.name) : 'Agent is typing');
+  const label = accessibilityLabel ?? (variant === 'mascot' && mascot?.look?.name ? typingLabel('mascot', mascot.look.name) : t('typing.named', { name: t('agent.agent') }));
   const penAccent = accent || mascot?.accent || theme.colors.primary;
 
   const containerStyle = [
@@ -191,7 +192,7 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
       {drawPencil ? <TypingPencil accent={penAccent} ink={color} reduced={reduced || !animated} Svg={MascotSvg!} /> : null}
 
       {shimmer && (
-        <Animated.Text style={[styles.shimmer, { color, opacity: animated ? dotOpacities[0] : 0.8 }]}>Typing...</Animated.Text>
+        <Animated.Text style={[styles.shimmer, { color, opacity: animated ? dotOpacities[0] : 0.8 }]}>{`${t('typing.typing')}...`}</Animated.Text>
       )}
 
       {style !== 'text' && !shimmer && !drawMascot && !drawPencil &&
