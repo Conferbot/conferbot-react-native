@@ -20,6 +20,7 @@ import {
   ratedLabel,
   type HelpfulTap,
 } from '../../core/answerFeedback';
+import { t } from '../../core/i18n';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -60,7 +61,7 @@ export const AgentReplyExtras: React.FC<AgentReplyExtrasProps> = ({ message, tes
   return (
     <View style={styles.wrap} testID={testID}>
       {sources.length > 0 && (
-        <View style={styles.sources} accessibilityLabel="Sources">
+        <View style={styles.sources} accessibilityLabel={t('sources.count', { n: sources.length })}>
           {sources.map((s, i) => (
             <TouchableOpacity
               key={i}
@@ -68,7 +69,7 @@ export const AgentReplyExtras: React.FC<AgentReplyExtrasProps> = ({ message, tes
               onPress={() => open(s.url)}
               disabled={!s.url}
               accessibilityRole="link"
-              accessibilityLabel={`Source: ${s.title}`}
+              accessibilityLabel={`${t('sources.one')}: ${s.title}`}
             >
               <Text style={styles.sourceTitle} numberOfLines={1}>{s.title}</Text>
               {s.url ? <Text style={styles.sourceHost}>{sourceHost(s.url)} ↗</Text> : null}
@@ -124,7 +125,7 @@ const FactsCard = ({ card, styles, open }) => (
     {card.note ? <Text style={styles.cardNote}>{card.note}</Text> : null}
     {card.url ? (
       <TouchableOpacity onPress={() => open(card.url)} accessibilityRole="link">
-        <Text style={styles.cardLink}>Learn more {'↗'}</Text>
+        <Text style={styles.cardLink}>{t('result.seeDetails')} {'↗'}</Text>
       </TouchableOpacity>
     ) : null}
   </View>
@@ -176,15 +177,15 @@ const ActionCard = ({ request, styles, theme, decide }) => {
       {state === 'ask' || state === 'busy' ? (
         <View style={styles.decide}>
           <TouchableOpacity style={styles.confirm} onPress={() => answer(true)} disabled={state === 'busy'} accessibilityRole="button">
-            {state === 'busy' ? <ActivityIndicator size="small" color={theme.colors.textInverse} /> : <Text style={styles.confirmText}>Confirm</Text>}
+            {state === 'busy' ? <ActivityIndicator size="small" color={theme.colors.textInverse} /> : <Text style={styles.confirmText}>{t('action.confirm')}</Text>}
           </TouchableOpacity>
           <TouchableOpacity style={styles.decline} onPress={() => answer(false)} disabled={state === 'busy'} accessibilityRole="button">
-            <Text style={styles.declineText}>Not now</Text>
+            <Text style={styles.declineText}>{t('common.notNow')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <Text style={styles.settled}>
-          {state === 'done' ? 'Confirmed' : state === 'declined' ? 'Not now' : 'That did not go through. Please ask again.'}
+          {state === 'done' ? t('action.done') : state === 'declined' ? t('action.cancelled') : t('action.failedRetry')}
         </Text>
       )}
     </View>
