@@ -10,6 +10,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, View, AccessibilityInfo } from 'react-native';
 import type { GreetingStyle } from '../../core/greeting';
+import type { MascotLook } from '../../core/mascotArt';
+import type { MascotMotion } from '../../core/mascotMotion';
+import { MascotFigure, MascotSvg, useMascotLayers } from '../Mascot/MascotFigure';
+import { useMascotMood } from '../Mascot/useMascotMood';
+import { useGreetingMotion } from '../Mascot/useGreetingMotion';
 
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
 try {
@@ -34,7 +39,24 @@ export interface GreetingCardProps {
   onPress: () => void;
   onClose: () => void;
   onStarter: (text: string) => void;
+  /** The owner's mascot greets in place of the avatar (mascotInGreeting), in the launcher's colour. */
+  mascot?: { look: MascotLook; accent: string } | null;
+  /** How the card and its figure move (mascotMotion): lively (default), subtle or off. */
+  motion?: MascotMotion;
+  /** The launcher under the card (the figure hands off toward it). */
+  launcher?: { w: number; h: number; position: 'left' | 'right' } | null;
+  /** The card is going: opened from it (or the chat opened) or closed with its x. */
+  leaving?: 'open' | 'close';
+  /** It has gone (its leaving moves are over). */
+  onGone?: () => void;
 }
+
+/** The mascot on the card (polish-home.css .cb-greet__mascot): 40 x 40, blinking, waving twice as the card appears. */
+const GreetingMascot: React.FC<{ look: MascotLook; accent: string; reduced: boolean }> = ({ look, accent, reduced }) => {
+  const layers = useMascotLayers(accent, 'wave', look);
+  const mood = useMascotMood({ mood: 'wave', arm: 'wave', waveCount: 2, size: 40, look, reduced });
+  return MascotSvg ? <MascotFigure layers={layers} size={40} styles={mood.styles} grin={mood.grin} Svg={MascotSvg} testID="cb-greet-mascot" /> : null;
+};
 
 const FONTS = {
   note: Platform.select({ ios: 'Noteworthy-Light', default: 'casual' }),
@@ -72,9 +94,35 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
     AccessibilityInfo.isReduceMotionEnabled?.().then((on) => setReduced(!!on)).catch(() => {});
   }, []);
 
-  // ---- Entrance (cb-greet-spring 620ms; notification slides down; neon flickers) ----
+  // ---- The card and its figure alive (core/mascotMotion): the spring or the plain entrance, the figure's moves, the ping, the words, the leaving ----
+  const withMascot = !!p.mascot && !!MascotSvg;
+  const figureSize = withMascot ? 40 : 32;
+  const [cardH, setCardH] = useState(120);
+  const width0 = WIDTH[style];
+  const gm = useGreetingMotion({
+    mode: p.motion || 'lively',
+    style,
+    text,
+    figure: withMascot ? 'mascot' : head.avatar && style !== 'imessage' ? 'avatar' : null,
+    figureSize,
+    cardSize: { w: width0, h: cardH },
+    toward: () => {
+      const l = p.launcher;
+      if (!l) return undefined;
+      // The figure sits at the card's top left (16, 14 in); the launcher 12 below the card, its outer edge in line.
+      const fx = 16 + figureSize / 2;
+      const fy = 14 + figureSize / 2;
+      const lx = l.position === 'right' ? width0 - l.w / 2 : l.w / 2;
+      return { x: lx - fx, y: cardH + 12 + l.h / 2 - fy };
+    },
+    leaving: p.leaving,
+    onGone: p.onGone,
+  });
+
+  // ---- Entrance: the notification slides down and neon flickers (their own); the rest above ----
   const enter = useRef(new Animated.Value(reduced ? 1 : 0)).current;
   useEffect(() => {
+    if (style !== 'neon' && style !== 'notification') return;
     if (style === 'neon') {
       // Hard steps: 0, 1, .3, 1, .55, 1 at 0/90/144/216/270/342ms.
       const steps: [number, number][] = [[90, 1], [54, 0.3], [72, 1], [54, 0.55], [72, 1]];
@@ -92,13 +140,15 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
   const entranceStyle =
     style === 'neon'
       ? { opacity: enter }
-      : {
+      : style === 'notification'
+      ? {
           opacity: enter.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 1, 1] }),
           transform: [
-            { translateY: enter.interpolate({ inputRange: [0, 0.55, 0.78, 1], outputRange: style === 'notification' ? [-14, -1, 0, 0] : [14, -3, 1, 0] }) },
-            { scale: enter.interpolate({ inputRange: [0, 0.55, 0.78, 1], outputRange: style === 'notification' ? [0.96, 1.005, 1, 1] : [0.94, 1.01, 0.998, 1] }) },
+            { translateY: enter.interpolate({ inputRange: [0, 0.55, 0.78, 1], outputRange: [-14, -1, 0, 0] }) },
+            { scale: enter.interpolate({ inputRange: [0, 0.55, 0.78, 1], outputRange: [0.96, 1.005, 1, 1] }) },
           ],
-        };
+        }
+      : gm.enter;
 
   // ---- imessage: typing dots 1.1s, the bubble pops at 1.05s, "Delivered" and chips at 1.45s ----
   const dotsIn = useRef(new Animated.Value(0)).current;
@@ -185,8 +235,22 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
   // ---- the head: avatar, name, "Online" ----
   const headView = (o: { name: object; status: object; avatar?: number; avatarRadius?: number; showAvatar?: boolean; statusText?: string; dot?: boolean; row?: boolean }) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: style === 'postcard' ? 62 : 22 }}>
-      {o.showAvatar !== false && head.avatar ? (
-        <Image source={{ uri: head.avatar }} style={{ width: o.avatar ?? 32, height: o.avatar ?? 32, borderRadius: o.avatarRadius ?? (o.avatar ?? 32) / 2, backgroundColor: '#eef2f7' }} />
+      {withMascot && p.mascot ? (
+        <Animated.View style={[{ width: 40, height: 40, marginTop: -6, marginBottom: -4, marginLeft: -2 }, gm.breath]}>
+          <Animated.View style={gm.gesture}>
+            <Animated.View style={gm.talk}>
+              <GreetingMascot look={p.mascot.look} accent={p.mascot.accent} reduced={reduced} />
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
+      ) : o.showAvatar !== false && head.avatar ? (
+        <Animated.View style={gm.breath}>
+          <Animated.View style={gm.gesture}>
+            <Animated.View style={gm.talk}>
+              <Image source={{ uri: head.avatar }} style={{ width: o.avatar ?? 32, height: o.avatar ?? 32, borderRadius: o.avatarRadius ?? (o.avatar ?? 32) / 2, backgroundColor: '#eef2f7' }} />
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
       ) : null}
       <View style={{ flex: 1, flexDirection: o.row ? 'row' : 'column', alignItems: o.row ? 'center' : 'flex-start' }}>
         <Text numberOfLines={1} style={[{ fontSize: 13.5, fontWeight: '700', color: '#0f172a', fontFamily: cardFont }, o.name]}>
@@ -194,7 +258,13 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
         </Text>
         {o.statusText !== undefined || head.online ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: o.row ? 'auto' : 0, paddingRight: o.row ? 18 : 0 }}>
-            {o.dot !== false && o.statusText === undefined ? <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22c55e' }} /> : null}
+            {o.dot !== false && o.statusText === undefined ? (
+              <View style={{ width: 7, height: 7 }}>
+                {/* The "Online" ping: the dot swells once and one soft ring goes out. */}
+                {gm.pingRing ? <Animated.View pointerEvents="none" style={[{ position: 'absolute', width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22c55e' }, gm.pingRing]} /> : null}
+                <Animated.View style={[{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22c55e' }, gm.pingDot]} />
+              </View>
+            ) : null}
             <Text style={[{ fontSize: 12, fontWeight: '500', color: '#64748b', fontFamily: cardFont }, o.status]}>{o.statusText ?? 'Online'}</Text>
           </View>
         ) : null}
@@ -278,12 +348,32 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
       </>
     );
   } else {
-    const msg = (s: object, lines = 3) => (
-      <Text numberOfLines={lines} style={[{ fontSize: 14, fontWeight: '500', lineHeight: 20.3, color: '#1e293b', fontFamily: cardFont }, s]}>
-        {style === 'typewriter' ? typed : text}
-        {style === 'typewriter' && !reduced ? <Animated.Text style={{ opacity: caret, color: accent }}>▌</Animated.Text> : null}
-      </Text>
-    );
+    const msg = (s: object, lines = 3) => {
+      const base = StyleSheet.flatten([{ fontSize: 14, fontWeight: '500', lineHeight: 20.3, color: '#1e293b', fontFamily: cardFont }, s]) as any;
+      // The words fading up one by one (lively): each its own text, laid out as the line would wrap.
+      if (gm.words && style !== 'typewriter') {
+        const { paddingRight, paddingLeft, paddingHorizontal, paddingTop, paddingBottom, marginTop, ...ink } = base;
+        return (
+          <View
+            accessible
+            accessibilityLabel={text}
+            style={{ flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden', maxHeight: (ink.lineHeight || 20.3) * lines, paddingRight, paddingLeft, paddingHorizontal, paddingTop, paddingBottom, marginTop }}
+          >
+            {gm.words.words.map((w, i) => (
+              <Animated.Text key={i} style={[ink, gm.words!.styles[i]]}>
+                {i < gm.words!.words.length - 1 ? `${w} ` : w}
+              </Animated.Text>
+            ))}
+          </View>
+        );
+      }
+      return (
+        <Text numberOfLines={lines} style={base}>
+          {style === 'typewriter' ? typed : text}
+          {style === 'typewriter' && !reduced ? <Animated.Text style={{ opacity: caret, color: accent }}>▌</Animated.Text> : null}
+        </Text>
+      );
+    };
     switch (style) {
       case 'note':
         box = { backgroundColor: '#fffdf5', borderRadius: 3, paddingTop: 20, transform: [{ rotate: reduced ? '0deg' : '-1.6deg' }], ...shadow(16, 34, '#1e293b', 0.35, 8) };
@@ -474,7 +564,8 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
   }
 
   return (
-    <Animated.View style={[{ width }, entranceStyle]}>
+    <Animated.View style={[{ width }, entranceStyle]} pointerEvents={p.leaving ? 'none' : 'auto'} onLayout={(e) => setCardH(e.nativeEvent.layout.height)}>
+      <Animated.View style={gm.leave}>
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
@@ -483,6 +574,7 @@ export const GreetingCard: React.FC<GreetingCardProps> = (p) => {
       >
         {body}
       </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 };
