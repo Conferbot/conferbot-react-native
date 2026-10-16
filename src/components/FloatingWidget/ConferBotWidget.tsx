@@ -180,6 +180,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   let unreadCount = 0;
   let agentBot: any = null;
   let sendMessage: ((text: string) => Promise<void>) | null = null;
+  // Past the home screen to the conversation, then ask (web firstImpression.ts openConversation).
+  let showChat: ((text?: string) => void) | null = null;
   let botId = '';
   try {
     const ctx = useConferBot();
@@ -187,6 +189,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     unreadCount = (ctx as any).unreadCount || 0;
     agentBot = (ctx as any).agentBot || null;
     sendMessage = (ctx as any).sendMessage || null;
+    showChat = (ctx as any).showChat || null;
     botId = (ctx as any).chatbotConfig?.botId || (ctx as any).botId || '';
   } catch {
     // Context not available — widget used outside provider, that's fine
@@ -518,7 +521,10 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
                 return;
               }
               if (!isChatOpen) toggleChat();
-              if (g.click === 'send' && sendMessage) setTimeout(() => sendMessage!(g.text).catch(() => {}), 400);
+              if (g.click === 'send') {
+                if (showChat) showChat(g.text);
+                else if (sendMessage) setTimeout(() => sendMessage!(g.text).catch(() => {}), 400);
+              }
             }}
             onClose={() => {
               greeting.dismiss();
@@ -527,7 +533,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
             onStarter={(text) => {
               greeting.closeForNow();
               if (!isChatOpen) toggleChat();
-              if (sendMessage) setTimeout(() => sendMessage!(text).catch(() => {}), 400);
+              if (showChat) showChat(text);
+              else if (sendMessage) setTimeout(() => sendMessage!(text).catch(() => {}), 400);
             }}
           />
           {/* Attention "wave": a waving hand on the card's corner (unless the text has its own). */}
