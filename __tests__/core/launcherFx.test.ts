@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { computedOffsets, evaluate, iterationProgress, REST } from '../../src/core/keyframes';
+import { computedOffsets, cssKeyframes, evaluate, iterationProgress, transformMatrix, transformOrder, REST } from '../../src/core/keyframes';
+import { moodPlan, TYPING_MASCOT } from '../../src/core/mascotMoods';
+import { cardEnterTrack, gestureTrack } from '../../src/core/mascotMotion';
 import { attentionTarget, attentionTracks, normalizeLauncherAttention, orbitPoint, ATTENTION_BASE } from '../../src/core/launcherAttention';
 import {
   afterCall,
@@ -39,8 +41,16 @@ describe('launcher entrance, attention and idle call as Chrome plays them', () =
     for (const c of golden.cases) {
       const tracks = inf(c.tracks);
       for (const s of c.samples) {
-        const want = { ...REST, ...s.v };
+        const want = { ...REST, ma: 1, mb: 0, mc: 0, md: 1, me: 0, mf: 0, ...s.v };
         const got = evaluate(tracks, s.t, c.base);
+        if (c.matrix) {
+          // A transform list: its matrix, in the order the list draws it.
+          const m = transformMatrix(got, transformOrder(tracks[0]));
+          ['ma', 'mb', 'mc', 'md', 'me', 'mf'].forEach((ch, i) => (max.matrix = Math.max(max.matrix || 0, Math.abs(m[i] - (want as any)[ch]))));
+          for (const ch of ['o', 'dash'] as const) max[ch] = Math.max(max[ch] || 0, Math.abs(got[ch] - want[ch]));
+          samples += 1;
+          continue;
+        }
         for (const ch of CH) max[ch] = Math.max(max[ch] || 0, Math.abs(got[ch] - want[ch]));
         if (c.path && want.px !== undefined) {
           const f = spriteFrame({ x: c.box.x, y: c.box.y, w: c.box.w, h: c.box.h, tracks, path: { d: c.path, rotate: true } }, s.t, got);
@@ -52,6 +62,8 @@ describe('launcher entrance, attention and idle call as Chrome plays them', () =
     expect(samples).toBeGreaterThan(15000);
     for (const ch of ['tx', 'ty', 'txp', 'typ', 'r', 'rx', 'ry', 'od', 'dash', 'clip']) expect(max[ch]).toBeLessThan(0.01);
     for (const ch of ['sx', 'sy', 'o']) expect(max[ch]).toBeLessThan(0.001);
+    // The mascot's transform lists (moods, typing, the card, the gestures), as matrices.
+    expect(max.matrix).toBeLessThan(0.001);
     // Chrome lays `left` out on a 1/64 px grid; the motion path is flattened.
     expect(max.left).toBeLessThan(0.05);
     expect(max.path).toBeLessThan(0.6);
@@ -70,6 +82,11 @@ describe('launcher entrance, attention and idle call as Chrome plays them', () =
     const knock = idleCallPerformance('knock', idleCallGeometry(g.width, g.height, 'right', false));
     check('idle:knock@right:self', knock.self);
     check('idle:knock@right:arm', knock.parts.arm);
+    check('mascot:mood-think:body', moodPlan('think').parts.body);
+    check('mascot:mood-wave@down:arm', moodPlan('wave', { arm: 'down' }).parts.arm);
+    check('mascot:typing:sway', [TYPING_MASCOT.sway]);
+    check('mascot:card:spring', [cardEnterTrack('lively', 'card')]);
+    check('mascot:gesture:handoff@0.75', [gestureTrack('handoff', 0.75, 0, { x: -40, y: 60 })]);
     const stage = entranceStage(g);
     for (const m of LAUNCHER_ENTRANCES) {
       if (m === 'classic') continue;
@@ -85,6 +102,24 @@ describe('launcher entrance, attention and idle call as Chrome plays them', () =
 });
 
 describe('the Web Animations evaluator', () => {
+  it('reads CSS @keyframes as CSS plays them: every selector, the timing on each keyframe', () => {
+    const k = cssKeyframes('0%,100%{transform:scaleY(0)}50%{transform:scaleY(1);opacity:.5}', 'ease-in-out');
+    expect(k.map((f) => f.offset)).toEqual([0, 0.5, 1]);
+    expect(k.every((f) => f.easing === 'ease-in-out')).toBe(true);
+    expect(k[1]).toMatchObject({ transform: 'scaleY(1)', opacity: '.5' });
+  });
+
+  it('interpolates a transform list function by function, and draws it in its own order', () => {
+    const tr = { keyframes: [{ transform: 'none' }, { transform: 'rotate(10deg) translateX(-2px)' }], options: { duration: 100 } };
+    expect(evaluate([tr], 50)).toMatchObject({ r: 5, tx: -1, sx: 1, sy: 1 });
+    expect(transformOrder(tr)).toBe('rts');
+    expect(transformOrder({ keyframes: [{ transform: 'scale(2)' }, { transform: 'translateY(-6px) scale(1)' }], options: { duration: 1 } })).toBe('tsr');
+    const m = transformMatrix({ tx: 0, ty: 1, sx: 1, sy: 1, r: 90 }, 'rts');
+    expect(m.map((x) => +x.toFixed(6))).toEqual([0, 1, -1, 0, -1, 0]);
+    // The eyelids' plain scaleY stays the scale's y alone.
+    expect(evaluate([{ keyframes: [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], options: { duration: 100 } }], 50, { tx: 3 })).toMatchObject({ sy: 0.5, tx: 3 });
+  });
+
   it('spaces missing offsets evenly', () => {
     expect(computedOffsets([{}, {}, { offset: 0.5 }, {}, {}])).toEqual([0, 0.25, 0.5, 0.75, 1]);
   });
