@@ -11,6 +11,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../theme';
 import { MessageStatus as MessageStatusEnum } from '../../types/messageStatus';
+import { t } from '../../core/i18n';
 
 // ========================================
 // PROPS INTERFACE
@@ -56,7 +57,7 @@ const PendingIcon: React.FC<{
       styles.iconContainer,
       { width: size, height: size, opacity: pulseAnim },
     ]}
-    accessibilityLabel="Queued"
+    accessibilityLabel={t('connection.waitingToSend')}
   >
     {/* Outer ring */}
     <View
@@ -98,7 +99,7 @@ const ClockIcon: React.FC<{ size: number; color: string }> = ({
       styles.iconContainer,
       { width: size, height: size },
     ]}
-    accessibilityLabel="Sending"
+    accessibilityLabel={t('common.sending')}
   >
     {/* Clock circle */}
     <View
@@ -151,7 +152,7 @@ const SingleCheckIcon: React.FC<{ size: number; color: string }> = ({
 }) => (
   <View
     style={[styles.iconContainer, { width: size, height: size }]}
-    accessibilityLabel="Sent"
+    accessibilityLabel={t('receipt.sent')}
   >
     <View
       style={[
@@ -178,7 +179,7 @@ const DoubleCheckIcon: React.FC<{
 }> = ({ size, color, isRead }) => (
   <View
     style={[styles.iconContainer, { width: size * 1.4, height: size }]}
-    accessibilityLabel={isRead ? 'Read' : 'Delivered'}
+    accessibilityLabel={isRead ? t('receipt.seen') : t('receipt.delivered')}
   >
     {/* First check (back) */}
     <View
@@ -222,7 +223,7 @@ const ErrorIcon: React.FC<{ size: number; color: string }> = ({
 }) => (
   <View
     style={[styles.iconContainer, { width: size, height: size }]}
-    accessibilityLabel="Failed"
+    accessibilityLabel={t('requests.notSent')}
   >
     <View
       style={[
@@ -433,7 +434,7 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({
       ]}
       testID={testID}
       accessibilityRole="text"
-      accessibilityLabel={`Message status: ${status}`}
+      accessibilityLabel={t('sdk.message.status', { status: statusWord(status) })}
     >
       {renderIcon()}
     </Animated.View>
@@ -446,8 +447,8 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({
         onPress={onRetry}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel="Message failed. Tap to retry"
-        accessibilityHint="Double tap to retry sending this message"
+        accessibilityLabel={t('sdk.message.failedRetry')}
+        accessibilityHint={t('sdk.message.retryHint')}
       >
         {content}
       </TouchableOpacity>
@@ -519,23 +520,26 @@ const styles = StyleSheet.create({
 /**
  * Hook to get status display text
  */
-export const useMessageStatusText = (status: MessageStatusEnum): string => {
+export const useMessageStatusText = (status: MessageStatusEnum): string => statusWord(status);
+
+/** A status in words (web receipt.*, connection.waitingToSend, requests.notSent). */
+function statusWord(status: MessageStatusEnum): string {
   switch (status) {
     case MessageStatusEnum.PENDING:
-      return 'Queued';
+      return t('connection.waitingToSend');
     case MessageStatusEnum.SENDING:
-      return 'Sending...';
+      return t('common.sending');
     case MessageStatusEnum.SENT:
-      return 'Sent';
+      return t('receipt.sent');
     case MessageStatusEnum.DELIVERED:
-      return 'Delivered';
+      return t('receipt.delivered');
     case MessageStatusEnum.READ:
-      return 'Read';
+      return t('receipt.seen');
     case MessageStatusEnum.FAILED:
-      return 'Failed';
+      return t('requests.notSent');
     default:
       return '';
   }
-};
+}
 
 export default MessageStatus;
