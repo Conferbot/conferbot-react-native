@@ -4,6 +4,7 @@
  * dayKeyInZone, noonInZone; displayStep.ts calendar-node). Slot times are
  * the bot's clock (data.timeZone); the visitor sees their own.
  */
+import { widgetLanguage, widgetLocale } from '../i18n';
 
 export interface CalendarSlot {
   start: string;
@@ -123,6 +124,14 @@ export const hhmmInZone = (date: Date, timeZone: string): string => {
 export const longDate = (date: Date, timeZone: string, locale = 'en-US'): string =>
   date.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone });
 
+/**
+ * The locale a visitor's own date is written in: the widget's (web
+ * displayStep.ts formattedVisitorDate uses widgetLocale()), "en-US" for
+ * English. The bot's date stays en-US, as the web keeps it.
+ */
+export const visitorLocale = (): string => (widgetLanguage() === 'en' ? 'en-US' : widgetLocale());
+
+/** The owner's day names (weeklyHours.dayName, excludeDays) are English: kept so here. */
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /** The weekday name of a day on the bot's clock. */
