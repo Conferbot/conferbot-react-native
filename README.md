@@ -290,6 +290,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 | `enableReadReceipts`   | `boolean`                | Read receipt tracking (default: true)                              |
 | `readReceiptConfig`    | `ReadReceiptConfig`      | `enabled`, `showIndicators`, `batchDebounceMs`, `autoMarkAsRead`   |
 | `offlineQueueConfig`   | `OfflineQueueConfig`     | `maxQueueSize`, `maxRetries`, retry backoff, `persistQueue`, `autoProcess` |
+| `widgetLanguage`       | `'auto' \| 'en' \| 'nl' \| 'fr' \| 'de' \| 'es'` | The language of the SDK's own words; wins over the owner's setting (see [Languages](#languages)) |
+
+### Languages
+
+The SDK draws its own words (buttons, hints, errors, the handover lines, the queue card, the help centre, "Helpful?", the requests, the home screen, the games, the greeting card, the step cards and their checks, "5 min ago") in English, Dutch, French, German or Spanish, as the web widget does. The language is the owner's choice (dashboard: `widgetLanguage`); with "auto", or a bot that never chose, it is the phone's first supported language, else English. `config.widgetLanguage` overrides both. What the owner wrote (greetings, messages, buttons in the flow) is shown as written; the stock English defaults a new bot comes with ("Hi there 👋") are shown in the language.
+
+```tsx
+import { t, widgetLanguage } from '@conferbot/react-native';
+
+t('chat.composer.send');  // "Senden" when the chat is in German
+useConferBot().widgetLanguage; // 'de'
+```
 
 ## Passing User Identity
 
