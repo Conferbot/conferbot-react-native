@@ -856,6 +856,7 @@ export const es: Partial<Record<I18nKey, string>> = {
   "sdk.bubble.reactHint": "Mantén pulsado para añadir una reacción",
   "sdk.calendar.dayClosed": "Este día no está disponible.",
   "sdk.calendar.noTimes": "No hay horas libres este día.",
+  "sdk.calendar.slotBooked": "{time}, reservado",
   "sdk.card.learnMore": "Más información",
   "sdk.chat.complete": "Conversación completada",
   "sdk.chat.loadOlder": "Cargar mensajes anteriores",
