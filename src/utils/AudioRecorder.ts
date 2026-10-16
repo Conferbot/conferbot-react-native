@@ -28,6 +28,7 @@
 
 // @ts-ignore
 import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
+import { t } from '../core/i18n';
 
 // ========================================
 // TYPES
@@ -287,11 +288,11 @@ const requestMicrophonePermission = async (): Promise<boolean> => {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
         {
-          title: 'Microphone Permission',
-          message: 'This app needs access to your microphone to record voice messages.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
+          title: t('sdk.permission.micTitle'),
+          message: t('sdk.permission.micMessage'),
+          buttonNeutral: t('sdk.permission.later'),
+          buttonNegative: t('common.cancel'),
+          buttonPositive: t('sdk.common.ok'),
         }
       );
       return granted === PermissionsAndroid.RESULTS.GRANTED;
@@ -315,11 +316,11 @@ const requestMicrophonePermission = async (): Promise<boolean> => {
  */
 const showPermissionDeniedAlert = (): void => {
   Alert.alert(
-    'Microphone Permission Required',
-    'Microphone permission is required to record voice messages. Please enable it in Settings.',
+    t('sdk.permission.requiredTitle'),
+    t('sdk.permission.micDenied'),
     [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Open Settings', onPress: () => Linking.openSettings() },
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('sdk.permission.openSettings'), onPress: () => Linking.openSettings() },
     ]
   );
 };
