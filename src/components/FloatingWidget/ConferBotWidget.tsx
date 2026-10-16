@@ -25,7 +25,7 @@ import { useLauncherAttention, ORBIT_DOT, GLOSS, HAND } from './useLauncherAtten
 import { useLauncherIdleCall } from './useLauncherIdleCall';
 import { FxSpriteView } from './FxSprites';
 import { IdleCallStage, IdleCallBubble } from './IdleCallView';
-import { mascotColor } from '../../core/mascotArt';
+import { LauncherMascot, mascotButtonXml } from '../Mascot/LauncherMascot';
 import { WAVING_HAND } from '../../core/launcherAttention';
 import { linearBox, radialDisc, stops } from '../../core/fxPaint';
 
@@ -224,6 +224,8 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   const iconImageUrl = widgetConfig.iconImageUrl || look.imageUrl;
   const avatarUrl = !iconImageUrl && look.style === 'avatar' ? look.avatar : null;
   const showLabel = !iconImageUrl && look.style === 'label';
+  // The owner's mascot on a soft light button (launcherStyle.ts "mascot"); the icon without react-native-svg.
+  const mascotStyle = !iconImageUrl && look.style === 'mascot' && !!SvgXml && widgetConfig.iconName === undefined;
 
   // A host-app CTA text (widgetConfig.ctaText) keeps the simple tooltip; the
   // bot's own greeting is the web's greeting card (core/greeting).
@@ -231,6 +233,25 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
   const ctaBorderRadius = Math.min(sc.widgetBorderRadius ?? 50, 20);
   const greeting = useGreeting({ customizations: serverCustomizations, chatOpen: isChatOpen, botId, agentBot, enabled: !ctaText });
   const cardShown = !!greeting.card && !isChatOpen;
+  // The card stays drawn while it leaves (its collapse or fade, the figure's hand-off or bow).
+  const shownCard = cardShown ? greeting.card : null;
+  const lastCard = useRef(shownCard);
+  const closing = useRef(false);
+  const [leavingCard, setLeavingCard] = useState<{ card: NonNullable<typeof shownCard>; reason: 'open' | 'close' } | null>(null);
+  useEffect(() => {
+    if (shownCard) {
+      lastCard.current = shownCard;
+      closing.current = false;
+      setLeavingCard(null);
+      return;
+    }
+    if (lastCard.current) setLeavingCard({ card: lastCard.current, reason: closing.current ? 'close' : 'open' });
+    lastCard.current = null;
+    closing.current = false;
+  }, [shownCard]);
+  // Until the effect runs, the card that just went is still the last one shown (the same card, no remount).
+  const drawnCard = shownCard || leavingCard?.card || lastCard.current || null;
+  const leavingReason: 'open' | 'close' | undefined = shownCard ? undefined : leavingCard?.reason ?? (lastCard.current ? (closing.current ? 'close' : 'open') : undefined);
 
   // The launcher's entrance, attention loop and idle call (core/launcherEntrance,
   // launcherAttention, launcherIdleCall): all off unless the owner chose one.
@@ -274,6 +295,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     botId,
     size: launcherSize,
     position,
+    look: look.mascot.look,
   });
 
   // The icon's idle and new-message moments and the ripple rings (core/launcherMotion).
@@ -282,7 +304,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
     mode: look.animation,
     chatOpen: isChatOpen,
     unreadCount,
-    enabled: !!serverCustomizations && !!SvgXml && !iconImageUrl && !avatarUrl,
+    enabled: !!serverCustomizations && !!SvgXml && !iconImageUrl && !avatarUrl && !mascotStyle,
     attention: attention.onLauncher,
   });
   // A moment playing pauses the attention loop.
@@ -369,6 +391,20 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         />
       );
     }
+    if (mascotStyle && SvgXml) {
+      return (
+        <LauncherMascot
+          look={look.mascot.look}
+          accent={look.mascot.accent}
+          scale={look.mascot.scale}
+          box={{ w: width, h: size }}
+          unread={unreadCount}
+          chatOpen={isChatOpen}
+          reduced={reduced}
+          Svg={SvgXml}
+        />
+      );
+    }
     if (avatarUrl) {
       // The photo fills the button inside a thin ring of its colour, with an online dot.
       const dot = Math.max(10, Math.round(size * 0.24));
@@ -444,6 +480,15 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
             <SvgXml xml={gradientXml(gradStart, gradEnd)} width="100%" height="100%" />
           </View>
         ) : null}
+        {/* The mascot's soft light button while closed; open, the brand colour with its cross. */}
+        {mascotStyle && SvgXml ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { opacity: openIconOpacity, overflow: 'hidden', borderTopLeftRadius: corners.topLeft, borderTopRightRadius: corners.topRight, borderBottomRightRadius: corners.bottomRight, borderBottomLeftRadius: corners.bottomLeft }]}
+          >
+            <SvgXml xml={mascotButtonXml(look.mascot.light)} width="100%" height="100%" />
+          </Animated.View>
+        ) : null}
         {innerContent}
         {/* Attention: the gloss band sweeping across, the spark circling it. */}
         {attention.styles?.shine && launcherSize ? (
@@ -504,7 +549,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
       ) : null}
 
       {/* The greeting card: 12 above the launcher, its edge in line with it. */}
-      {greeting.card && !isChatOpen ? (
+      {drawnCard ? (
         <View
           style={[styles.ctaWrapper, position === 'right' ? { right: Math.max(8, offsetX - look.tucked) } : { left: Math.max(8, offsetX - look.tucked) }, { bottom: offsetBottom + size + 12, maxWidth: screenWidth - 24 }]}
           pointerEvents="box-none"
@@ -512,8 +557,12 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
           <Animated.View style={entrance.styles?.greeting}>
           <Animated.View style={attention.target === 'greeting' ? attention.styles?.self : null}>
           <GreetingCard
-            {...greeting.card}
+            {...drawnCard}
+            launcher={launcherSize ? { w: launcherSize.w, h: launcherSize.h, position } : null}
+            leaving={leavingReason}
+            onGone={() => setLeavingCard(null)}
             onPress={() => {
+              if (!greeting.card) return;
               greeting.closeForNow();
               const g = greeting.card!;
               if (g.click === 'link' && g.linkUrl) {
@@ -527,10 +576,12 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
               }
             }}
             onClose={() => {
+              closing.current = true;
               greeting.dismiss();
               idleCall.greetingClosed();
             }}
             onStarter={(text) => {
+              if (!greeting.card) return;
               greeting.closeForNow();
               if (!isChatOpen) toggleChat();
               if (showChat) showChat(text);
@@ -538,7 +589,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
             }}
           />
           {/* Attention "wave": a waving hand on the card's corner (unless the text has its own). */}
-          {attention.styles?.hand && !greeting.card.text.includes(WAVING_HAND) ? (
+          {attention.styles?.hand && shownCard && !shownCard.text.includes(WAVING_HAND) ? (
             <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: -13, left: -9, width: HAND.w, height: HAND.h, zIndex: 3 }, attention.styles.hand]}>
               <Text style={{ fontSize: 20, lineHeight: 20 }}>{WAVING_HAND}</Text>
             </Animated.View>
@@ -569,7 +620,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         {/* The idle call's mascot, hidden behind the button until it slides out. */}
         {idleCall.perf && idleCall.styles && !idleCall.perf.front && SvgXml && launcherSize ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: launcherSize.w, height: launcherSize.h }}>
-            <IdleCallStage perf={idleCall.perf} styles={idleCall.styles} accent={mascotColor(serverCustomizations, bgColor)} launcherAccent={bgColor} Svg={SvgXml} />
+            <IdleCallStage perf={idleCall.perf} styles={idleCall.styles} look={look.mascot.look} launcherAccent={bgColor} Svg={SvgXml} />
           </View>
         ) : null}
         {entrance.plan && entrance.plan.behind && SvgXml ? renderStage() : null}
@@ -651,7 +702,7 @@ export const ConferBotWidget: React.FC<ConferBotWidgetProps> = ({
         {/* Knock and tap: the mascot in front of the button, its paw on it. */}
         {idleCall.perf && idleCall.styles && idleCall.perf.front && SvgXml && launcherSize ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: launcherSize.w, height: launcherSize.h, zIndex: 10001, elevation: 7 }}>
-            <IdleCallStage perf={idleCall.perf} styles={idleCall.styles} accent={mascotColor(serverCustomizations, bgColor)} launcherAccent={bgColor} Svg={SvgXml} />
+            <IdleCallStage perf={idleCall.perf} styles={idleCall.styles} look={look.mascot.look} launcherAccent={bgColor} Svg={SvgXml} />
           </View>
         ) : null}
         {entrance.plan && !entrance.plan.behind && SvgXml ? renderStage() : null}
