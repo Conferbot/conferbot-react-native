@@ -13,6 +13,7 @@ import {
   Animated,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 
 export interface ArticleRatingProps {
@@ -31,10 +32,12 @@ export const ArticleRating: React.FC<ArticleRatingProps> = ({
   articleId,
   onRate,
   hasRated = false,
-  question = 'Was this article helpful?',
-  thankYouMessage = 'Thank you for your feedback!',
+  question: questionProp,
+  thankYouMessage: thankYouMessageProp,
   testID,
 }) => {
+  const thankYouMessage = thankYouMessageProp ?? t('csat.thanks');
+  const question = questionProp ?? t('sdk.kb.wasArticleHelpful');
   const theme = useTheme();
   const styles = createStyles(theme);
 
@@ -123,7 +126,7 @@ export const ArticleRating: React.FC<ArticleRatingProps> = ({
                 onPress={() => handleRate(true)}
                 disabled={isSubmitting || isRated}
                 accessible={true}
-                accessibilityLabel="Yes, helpful"
+                accessibilityLabel={t('kb.helpedYes')}
                 accessibilityRole="button"
                 testID={`${testID}-yes`}
               >
@@ -142,7 +145,7 @@ export const ArticleRating: React.FC<ArticleRatingProps> = ({
                     selectedRating === 'no' && styles.unselectedText,
                   ]}
                 >
-                  Yes
+                  {t('sdk.common.yes')}
                 </Text>
               </TouchableOpacity>
             </Animated.View>
@@ -159,7 +162,7 @@ export const ArticleRating: React.FC<ArticleRatingProps> = ({
                 onPress={() => handleRate(false)}
                 disabled={isSubmitting || isRated}
                 accessible={true}
-                accessibilityLabel="No, not helpful"
+                accessibilityLabel={t('kb.helpedNo')}
                 accessibilityRole="button"
                 testID={`${testID}-no`}
               >
@@ -178,7 +181,7 @@ export const ArticleRating: React.FC<ArticleRatingProps> = ({
                     selectedRating === 'yes' && styles.unselectedText,
                   ]}
                 >
-                  No
+                  {t('sdk.common.no')}
                 </Text>
               </TouchableOpacity>
             </Animated.View>
