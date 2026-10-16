@@ -134,3 +134,81 @@ export const createSignalBus = () => {
 };
 
 export type SignalBus = ReturnType<typeof createSignalBus>;
+
+// ---------------------------------------------------------------------------
+// The AI escalation's max wait (web handoverWaiting.ts armAIEscalationNudge,
+// special.ts _handleAIEscalationWait)
+// ---------------------------------------------------------------------------
+
+/** After an AI escalation's max wait, how much longer the server is given before it is nudged. */
+export const SERVER_GRACE_MS = 30 * 1000;
+
+/** The handover step's max wait (minutes; 2 when unset) plus the grace, in ms. */
+export const aiEscalationNudgeMs = (maxWaitTimeMinutes: unknown): number => {
+  const minutes = Number(maxWaitTimeMinutes) > 0 ? Number(maxWaitTimeMinutes) : 2;
+  return minutes * 60 * 1000 + SERVER_GRACE_MS;
+};
+
+/**
+ * Does this agent-left start the escalation's wait? Only an AI agent handing
+ * the visitor on: a person leaving is not an escalation, and an inactivity
+ * close ends the chat (ai-agent-inactive-close).
+ */
+export const startsEscalationWait = (data: any): boolean =>
+  data?.agentDetails?.isAIAgent === true && data?.reason !== 'visitor_inactive';
+
+/**
+ * The handover step an escalation waits on: the flow's current handover
+ * step, else (an agent bot, whose silent handover is not a flow step) the
+ * latest handover step in the record.
+ */
+export const escalationHandoverData = (
+  stepData: Record<string, any> | null | undefined,
+  record: readonly any[] | null | undefined
+): Record<string, any> | undefined => {
+  if (stepData) return stepData;
+  const list = Array.isArray(record) ? record : [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const r = list[i];
+    if ((r?.type === 'human-handover-node' || r?.shape === 'human-handover-node') && r?.data && typeof r.data === 'object') return r.data;
+  }
+  return undefined;
+};
+
+/**
+ * After the AI escalates, the server owns the wait: it hands the chat back
+ * to the AI and says so (handover-waiting), or sends no-agents-available.
+ * This timer never draws anything; it only nudges (handover-timeout) a
+ * server that lost its own timer, the step's max wait plus 30s after the
+ * AI left.
+ *
+ *   arm(maxWait)  the AI escalated: (re)start the timer (one per chat).
+ *   clear()       someone accepted, the server's handover-waiting or
+ *                 no-agents-available came, the visitor left the queue, the
+ *                 chat ended or closed for inactivity, the visitor was
+ *                 blocked.
+ */
+export const createEscalationNudge = (
+  nudge: () => void,
+  setTimer: (fn: () => void, ms: number) => Timer = (fn, ms) => setTimeout(fn, ms),
+  clearTimer: (t: Timer) => void = (t) => clearTimeout(t as ReturnType<typeof setTimeout>)
+) => {
+  let timer: Timer | null = null;
+  const clear = () => {
+    if (timer) clearTimer(timer);
+    timer = null;
+  };
+  return {
+    arm: (maxWaitTimeMinutes: unknown) => {
+      clear();
+      timer = setTimer(() => {
+        timer = null;
+        nudge();
+      }, aiEscalationNudgeMs(maxWaitTimeMinutes));
+    },
+    clear,
+    pending: () => timer !== null,
+  };
+};
+
+export type EscalationNudge = ReturnType<typeof createEscalationNudge>;
