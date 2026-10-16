@@ -26,20 +26,30 @@
  * leave the input alone.
  */
 
+import { t, localized } from './i18n';
+
 export type HandoverOutcome = 'joined' | 'unavailable' | 'cancelled' | 'ended';
 export type HandoverPhase = 'none' | 'connecting' | 'joined';
 
-/** The web's English strings (ts/i18n/en.ts handover.*, system.*). */
-export const HANDOVER_TEXT = {
-  pending: 'Connecting you with the team…',
-  joined: 'Connected with the team',
-  unavailable: "The team couldn't join just now",
-  cancelled: 'You left the queue',
-  ended: 'Chat ended before the team joined',
-} as const;
+/** The web's strings (ts/i18n handover.*), in the active language. */
+export const HANDOVER_TEXT = localized({
+  pending: 'handover.pending',
+  joined: 'handover.joined',
+  unavailable: 'handover.unavailable',
+  cancelled: 'handover.cancelled',
+  ended: 'handover.ended',
+});
 
-/** The note under a person's join after an AI handed the visitor on. */
+/**
+ * The note under a person's join after an AI handed the visitor on. Kept
+ * in English on the record entry (the web's HANDED_OVER_NOTE marker);
+ * `handedOverNoteText` draws it in the active language.
+ */
 export const HANDED_OVER_NOTE = 'They can see your conversation so far';
+
+/** A join's note as drawn: the marker in the active language (web agentJoinedDivider.ts), else as written. */
+export const handedOverNoteText = (note: string): string =>
+  note === HANDED_OVER_NOTE ? t('system.handedOverNote') : note;
 
 export const isHandoverOutcome = (v: unknown): v is HandoverOutcome =>
   v === 'joined' || v === 'unavailable' || v === 'cancelled' || v === 'ended';
@@ -49,11 +59,12 @@ export const handoverLineText = (outcome?: HandoverOutcome | null): string =>
   isHandoverOutcome(outcome) ? HANDOVER_TEXT[outcome] : HANDOVER_TEXT.pending;
 
 /** "<name> joined the chat" (web agentJoinedDivider.ts). */
-export const joinedText = (name?: string | null): string => `${String(name || '').trim() || 'An agent'} joined the chat`;
+export const joinedText = (name?: string | null): string =>
+  `${String(name || '').trim() || t('agent.anAgent')}${t('system.joined')}`;
 
 /** "<name> left the chat", or the pending line for a handover (web agentLeftDivider.ts). */
 export const agentLeftText = (name: string | null | undefined, handover: boolean): string =>
-  handover ? handoverLineText(null) : `${String(name || '').trim() || 'The agent'} left the chat`;
+  handover ? handoverLineText(null) : `${String(name || '').trim() || t('agent.theAgent')}${t('system.left')}`;
 
 // ---------- reading the record ----------
 
