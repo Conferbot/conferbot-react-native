@@ -6,6 +6,7 @@ import { ConnectionStatus } from '../ConnectionStatus';
 import type { ConferBotTheme } from '../../theme/types';
 import type { Agent } from '../../types';
 import { t } from '../../core/i18n';
+import { useChatFont } from '../../hooks/useChatFont';
 
 /**
  * ChatHeader Props
@@ -99,6 +100,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   testID,
 }) => {
   const theme = useTheme();
+  const font = useChatFont();
   const styles = createStyles(theme);
 
   const displayTitle = agent ? agent.name : title;
@@ -155,7 +157,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       {/* Title and subtitle */}
       <View style={styles.titleContainer}>
         <Text
-          style={styles.title}
+          style={[styles.title, font.display(600)]}
           numberOfLines={1}
           accessible={true}
           accessibilityRole="header"
@@ -165,7 +167,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         </Text>
 
         {tagline && (
-          <Text style={styles.tagline} numberOfLines={1}>
+          <Text style={[styles.tagline, font.body()]} numberOfLines={1}>
             {tagline}
           </Text>
         )}
