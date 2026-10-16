@@ -247,4 +247,58 @@ describe('useLiveChatExtras', () => {
     expect(state.setUserMetadata).not.toHaveBeenCalled();
     expect(hook.result.current.mailSentTo).toBeNull();
   });
+  it('the max wait: a countdown deadline while waiting, then handover-timeout at it (#42)', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-16T10:00:00Z'));
+    const socket = fakeSocket();
+    const props: any = {
+      socketClient: { current: socket as any },
+      chatStateRef: { current: fakeState() as any },
+      record: [],
+      setRecord: jest.fn(),
+      isOpen: true,
+      waitingForPerson: false,
+      handoverWait: () => ({ data: { maxWaitTime: 2, assignmentType: 'auto' }, workspaceId: 'w1' }),
+    };
+    const hook = renderHook((p: any) => useLiveChatExtras(p), { initialProps: props });
+    expect(hook.result.current.waitEndsAt).toBeNull();
+    hook.rerender({ ...props, waitingForPerson: true });
+    expect(hook.result.current.waitEndsAt).toBe(Date.now() + 2 * 60000);
+    act(() => jest.advanceTimersByTime(2 * 60000 - 1));
+    expect(socket.emitToServer).not.toHaveBeenCalledWith('handover-timeout', expect.anything());
+    act(() => jest.advanceTimersByTime(1));
+    expect(socket.emitToServer).toHaveBeenCalledWith('handover-timeout', expect.objectContaining({ chatSessionId: 's1', workspaceId: 'w1' }));
+    // A person joined (or the wait ended): no countdown.
+    hook.rerender({ ...props, waitingForPerson: false });
+    expect(hook.result.current.waitEndsAt).toBeNull();
+    hook.unmount();
+    jest.useRealTimers();
+  });
+
+  it('a restored wait counts down from the server\'s seconds left, once (#42)', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-16T10:00:00Z'));
+    const socket = fakeSocket();
+    const props: any = {
+      socketClient: { current: socket as any },
+      chatStateRef: { current: fakeState() as any },
+      record: [],
+      setRecord: jest.fn(),
+      isOpen: true,
+      waitingForPerson: false,
+      handoverWait: () => ({ data: { maxWaitTime: 5 }, workspaceId: 'w1' }),
+    };
+    const hook = renderHook((p: any) => useLiveChatExtras(p), { initialProps: props });
+    act(() => hook.result.current.resumeWaitWith(40));
+    hook.rerender({ ...props, waitingForPerson: true });
+    expect(hook.result.current.waitEndsAt).toBe(Date.now() + 40000);
+    act(() => jest.advanceTimersByTime(40000));
+    expect(socket.emitToServer).toHaveBeenCalledWith('handover-timeout', expect.anything());
+    // The next wait has the step's full max wait again.
+    hook.rerender({ ...props, waitingForPerson: false });
+    hook.rerender({ ...props, waitingForPerson: true });
+    expect(hook.result.current.waitEndsAt).toBe(Date.now() + 5 * 60000);
+    hook.unmount();
+    jest.useRealTimers();
+  });
 });
