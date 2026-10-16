@@ -16,6 +16,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import type { KBArticle, KBCategoryWithArticles } from './types';
 import { ArticleCard } from './ArticleCard';
@@ -57,8 +58,8 @@ export const ArticleList: React.FC<ArticleListProps> = ({
   onLoadMore,
   hasMore = true,
   loadingMore = false,
-  emptyTitle = 'No articles yet',
-  emptyMessage = 'There are no articles in this category yet.',
+  emptyTitle: emptyTitleProp,
+  emptyMessage: emptyMessageProp,
   headerText,
   showCategoryHeader = true,
   showExcerpt = true,
@@ -70,6 +71,8 @@ export const ArticleList: React.FC<ArticleListProps> = ({
   accessibilityLabel,
   testID,
 }) => {
+  const emptyMessage = emptyMessageProp ?? t('sdk.kb.emptyCategory');
+  const emptyTitle = emptyTitleProp ?? t('kb.noArticles');
   const theme = useTheme();
   const styles = createStyles(theme);
 
@@ -126,7 +129,7 @@ export const ArticleList: React.FC<ArticleListProps> = ({
       accessible={true}
       accessibilityLabel={
         accessibilityLabel ||
-        (category ? `Articles in ${category.name} category` : 'Article list')
+        (category ? t('sdk.kb.articlesIn', { name: category.name }) : t('sdk.kb.articleList'))
       }
       testID={testID}
     >
