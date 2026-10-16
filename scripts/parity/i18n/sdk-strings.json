@@ -48,6 +48,20 @@
     "de": "Avatar von {name}",
     "es": "Avatar de {name}"
   },
+  "sdk.agent.connected": {
+    "en": "Agent Connected",
+    "nl": "Medewerker verbonden",
+    "fr": "Conseiller connecté",
+    "de": "Mitarbeiter verbunden",
+    "es": "Agente conectado"
+  },
+  "sdk.agent.supportAgent": {
+    "en": "Support Agent",
+    "nl": "Supportmedewerker",
+    "fr": "Conseiller support",
+    "de": "Support-Mitarbeiter",
+    "es": "Agente de soporte"
+  },
   "sdk.ai.regenerate": {
     "en": "Regenerate",
     "nl": "Opnieuw genereren",
@@ -160,6 +174,27 @@
     "de": "Mehr erfahren",
     "es": "Más información"
   },
+  "sdk.chat.complete": {
+    "en": "Conversation complete",
+    "nl": "Gesprek afgerond",
+    "fr": "Conversation terminée",
+    "de": "Unterhaltung abgeschlossen",
+    "es": "Conversación completada"
+  },
+  "sdk.chat.loadOlder": {
+    "en": "Load older messages",
+    "nl": "Oudere berichten laden",
+    "fr": "Charger les messages précédents",
+    "de": "Ältere Nachrichten laden",
+    "es": "Cargar mensajes anteriores"
+  },
+  "sdk.chat.loadingMore": {
+    "en": "Loading more messages...",
+    "nl": "Meer berichten laden...",
+    "fr": "Chargement d'autres messages...",
+    "de": "Weitere Nachrichten werden geladen...",
+    "es": "Cargando más mensajes..."
+  },
   "sdk.chat.loadingOlder": {
     "en": "Loading older messages...",
     "nl": "Oudere berichten laden...",
@@ -180,6 +215,20 @@
     "fr": "Fenêtre de chat",
     "de": "Chatfenster",
     "es": "Ventana de chat"
+  },
+  "sdk.chat.offlineQueued": {
+    "en": "Offline - messages queued",
+    "nl": "Offline - berichten in de wachtrij",
+    "fr": "Hors ligne - messages en attente",
+    "de": "Offline - Nachrichten in der Warteschlange",
+    "es": "Sin conexión - mensajes en cola"
+  },
+  "sdk.chat.offlineWillQueue": {
+    "en": "Offline - messages will be queued",
+    "nl": "Offline - berichten worden in de wachtrij gezet",
+    "fr": "Hors ligne - les messages seront mis en attente",
+    "de": "Offline - Nachrichten werden in die Warteschlange gestellt",
+    "es": "Sin conexión - los mensajes se pondrán en cola"
   },
   "sdk.chat.reconnecting": {
     "en": "Reconnecting...",
@@ -313,6 +362,20 @@
     "fr": "Choisissez une date...",
     "de": "Wähle ein Datum...",
     "es": "Elige una fecha..."
+  },
+  "sdk.datetime.chooseDate": {
+    "en": "Choose a date",
+    "nl": "Kies een datum",
+    "fr": "Choisissez une date",
+    "de": "Wähle ein Datum",
+    "es": "Elige una fecha"
+  },
+  "sdk.datetime.chooseTime": {
+    "en": "Choose a time",
+    "nl": "Kies een tijd",
+    "fr": "Choisissez une heure",
+    "de": "Wähle eine Uhrzeit",
+    "es": "Elige una hora"
   },
   "sdk.datetime.hours": {
     "en": "Hours",
@@ -524,6 +587,433 @@
     "de": "Noch keine Nachrichten",
     "es": "Aún no hay mensajes"
   },
+  "sdk.error.attempt": {
+    "en": "Attempt {n}",
+    "nl": "Poging {n}",
+    "fr": "Tentative {n}",
+    "de": "Versuch {n}",
+    "es": "Intento {n}"
+  },
+  "sdk.error.attemptOf": {
+    "en": "Attempt {n} of {max}",
+    "nl": "Poging {n} van {max}",
+    "fr": "Tentative {n} sur {max}",
+    "de": "Versuch {n} von {max}",
+    "es": "Intento {n} de {max}"
+  },
+  "sdk.error.badRequest": {
+    "en": "The request was invalid. Please try again.",
+    "nl": "Het verzoek was ongeldig. Probeer het opnieuw.",
+    "fr": "La requête n'était pas valide. Veuillez réessayer.",
+    "de": "Die Anfrage war ungültig. Bitte versuche es erneut.",
+    "es": "La solicitud no era válida. Inténtalo de nuevo."
+  },
+  "sdk.error.cannotConnect": {
+    "en": "Unable to connect. Please check your internet connection.",
+    "nl": "Kan geen verbinding maken. Controleer je internetverbinding.",
+    "fr": "Connexion impossible. Veuillez vérifier votre connexion Internet.",
+    "de": "Verbindung nicht möglich. Bitte prüfe deine Internetverbindung.",
+    "es": "No se puede conectar. Comprueba tu conexión a internet."
+  },
+  "sdk.error.code": {
+    "en": "Code: {code}",
+    "nl": "Code: {code}",
+    "fr": "Code : {code}",
+    "de": "Code: {code}",
+    "es": "Código: {code}"
+  },
+  "sdk.error.connectionLost": {
+    "en": "Connection lost",
+    "nl": "Verbinding verbroken",
+    "fr": "Connexion perdue",
+    "de": "Verbindung unterbrochen",
+    "es": "Conexión perdida"
+  },
+  "sdk.error.contactSupport": {
+    "en": "Contact Support",
+    "nl": "Contact opnemen met support",
+    "fr": "Contacter le support",
+    "de": "Support kontaktieren",
+    "es": "Contactar con soporte"
+  },
+  "sdk.error.critical": {
+    "en": "Critical Error",
+    "nl": "Kritieke fout",
+    "fr": "Erreur critique",
+    "de": "Kritischer Fehler",
+    "es": "Error crítico"
+  },
+  "sdk.error.errorCode": {
+    "en": "Error code: {code}",
+    "nl": "Foutcode: {code}",
+    "fr": "Code d'erreur : {code}",
+    "de": "Fehlercode: {code}",
+    "es": "Código de error: {code}"
+  },
+  "sdk.error.file": {
+    "en": "An error occurred while uploading the file.",
+    "nl": "Er ging iets mis bij het uploaden van het bestand.",
+    "fr": "Une erreur s'est produite lors de l'envoi du fichier.",
+    "de": "Beim Hochladen der Datei ist ein Fehler aufgetreten.",
+    "es": "Se produjo un error al subir el archivo."
+  },
+  "sdk.error.fileNotFound": {
+    "en": "File not found. Please select a different file.",
+    "nl": "Bestand niet gevonden. Kies een ander bestand.",
+    "fr": "Fichier introuvable. Veuillez choisir un autre fichier.",
+    "de": "Datei nicht gefunden. Bitte wähle eine andere Datei.",
+    "es": "No se encontró el archivo. Elige otro archivo."
+  },
+  "sdk.error.fileTimeout": {
+    "en": "Upload timed out. Please try again with a smaller file.",
+    "nl": "Het uploaden duurde te lang. Probeer het opnieuw met een kleiner bestand.",
+    "fr": "L'envoi a expiré. Veuillez réessayer avec un fichier plus petit.",
+    "de": "Das Hochladen hat zu lange gedauert. Bitte versuche es mit einer kleineren Datei.",
+    "es": "La subida tardó demasiado. Inténtalo de nuevo con un archivo más pequeño."
+  },
+  "sdk.error.fileTooLarge": {
+    "en": "File is too large. Maximum size is {mb}MB.",
+    "nl": "Bestand is te groot. De maximale grootte is {mb}MB.",
+    "fr": "Le fichier est trop volumineux. La taille maximale est de {mb} Mo.",
+    "de": "Die Datei ist zu groß. Die maximale Größe ist {mb} MB.",
+    "es": "El archivo es demasiado grande. El tamaño máximo es {mb} MB."
+  },
+  "sdk.error.fileType": {
+    "en": "This file type is not allowed. Allowed: {types}.",
+    "nl": "Dit bestandstype is niet toegestaan. Toegestaan: {types}.",
+    "fr": "Ce type de fichier n'est pas autorisé. Autorisés : {types}.",
+    "de": "Dieser Dateityp ist nicht erlaubt. Erlaubt: {types}.",
+    "es": "Este tipo de archivo no está permitido. Permitidos: {types}."
+  },
+  "sdk.error.fileUpload": {
+    "en": "Failed to upload file. Please try again.",
+    "nl": "Uploaden van het bestand mislukt. Probeer het opnieuw.",
+    "fr": "Échec de l'envoi du fichier. Veuillez réessayer.",
+    "de": "Die Datei konnte nicht hochgeladen werden. Bitte versuche es erneut.",
+    "es": "No se pudo subir el archivo. Inténtalo de nuevo."
+  },
+  "sdk.error.forbidden": {
+    "en": "You do not have permission to access this resource.",
+    "nl": "Je hebt geen toegang tot deze bron.",
+    "fr": "Vous n'avez pas l'autorisation d'accéder à cette ressource.",
+    "de": "Du hast keine Berechtigung, auf diese Ressource zuzugreifen.",
+    "es": "No tienes permiso para acceder a este recurso."
+  },
+  "sdk.error.generic": {
+    "en": "An error occurred. Please try again.",
+    "nl": "Er ging iets mis. Probeer het opnieuw.",
+    "fr": "Une erreur s'est produite. Veuillez réessayer.",
+    "de": "Ein Fehler ist aufgetreten. Bitte versuche es erneut.",
+    "es": "Se produjo un error. Inténtalo de nuevo."
+  },
+  "sdk.error.init": {
+    "en": "Failed to initialize chat. Please try again.",
+    "nl": "De chat kon niet worden gestart. Probeer het opnieuw.",
+    "fr": "Impossible d'initialiser le chat. Veuillez réessayer.",
+    "de": "Der Chat konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "es": "No se pudo iniciar el chat. Inténtalo de nuevo."
+  },
+  "sdk.error.initApiKey": {
+    "en": "Invalid API key. Please check your configuration.",
+    "nl": "Ongeldige API-sleutel. Controleer je configuratie.",
+    "fr": "Clé API non valide. Veuillez vérifier votre configuration.",
+    "de": "Ungültiger API-Schlüssel. Bitte prüfe deine Konfiguration.",
+    "es": "Clave de API no válida. Revisa tu configuración."
+  },
+  "sdk.error.initBotDisabled": {
+    "en": "This chatbot is currently disabled.",
+    "nl": "Deze chatbot is momenteel uitgeschakeld.",
+    "fr": "Ce chatbot est actuellement désactivé.",
+    "de": "Dieser Chatbot ist derzeit deaktiviert.",
+    "es": "Este chatbot está desactivado en este momento."
+  },
+  "sdk.error.initBotId": {
+    "en": "Invalid bot ID. Please check your configuration.",
+    "nl": "Ongeldige bot-ID. Controleer je configuratie.",
+    "fr": "ID de bot non valide. Veuillez vérifier votre configuration.",
+    "de": "Ungültige Bot-ID. Bitte prüfe deine Konfiguration.",
+    "es": "ID de bot no válido. Revisa tu configuración."
+  },
+  "sdk.error.initBotNotFound": {
+    "en": "Chatbot not found. Please check your configuration.",
+    "nl": "Chatbot niet gevonden. Controleer je configuratie.",
+    "fr": "Chatbot introuvable. Veuillez vérifier votre configuration.",
+    "de": "Chatbot nicht gefunden. Bitte prüfe deine Konfiguration.",
+    "es": "No se encontró el chatbot. Revisa tu configuración."
+  },
+  "sdk.error.initNetwork": {
+    "en": "Could not connect to server. Please check your connection.",
+    "nl": "Kan geen verbinding maken met de server. Controleer je verbinding.",
+    "fr": "Impossible de se connecter au serveur. Veuillez vérifier votre connexion.",
+    "de": "Keine Verbindung zum Server. Bitte prüfe deine Verbindung.",
+    "es": "No se pudo conectar con el servidor. Comprueba tu conexión."
+  },
+  "sdk.error.invalidField": {
+    "en": "Invalid {field}. {message}",
+    "nl": "Ongeldig: {field}. {message}",
+    "fr": "{field} non valide. {message}",
+    "de": "Ungültig: {field}. {message}",
+    "es": "{field} no válido. {message}"
+  },
+  "sdk.error.network": {
+    "en": "A network error occurred. Please check your connection.",
+    "nl": "Er is een netwerkfout opgetreden. Controleer je verbinding.",
+    "fr": "Une erreur réseau s'est produite. Veuillez vérifier votre connexion.",
+    "de": "Ein Netzwerkfehler ist aufgetreten. Bitte prüfe deine Verbindung.",
+    "es": "Se produjo un error de red. Comprueba tu conexión."
+  },
+  "sdk.error.nodeApiFailed": {
+    "en": "Could not complete the action. Please try again.",
+    "nl": "De actie kon niet worden voltooid. Probeer het opnieuw.",
+    "fr": "Impossible de terminer l'action. Veuillez réessayer.",
+    "de": "Die Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+    "es": "No se pudo completar la acción. Inténtalo de nuevo."
+  },
+  "sdk.error.nodeInvalid": {
+    "en": "Invalid conversation data. Please try again.",
+    "nl": "Ongeldige gespreksgegevens. Probeer het opnieuw.",
+    "fr": "Données de conversation non valides. Veuillez réessayer.",
+    "de": "Ungültige Gesprächsdaten. Bitte versuche es erneut.",
+    "es": "Datos de conversación no válidos. Inténtalo de nuevo."
+  },
+  "sdk.error.nodeNotFound": {
+    "en": "An error occurred in the conversation flow. Skipping to next step.",
+    "nl": "Er ging iets mis in het gesprek. We gaan door naar de volgende stap.",
+    "fr": "Une erreur s'est produite dans la conversation. Passage à l'étape suivante.",
+    "de": "Im Gesprächsablauf ist ein Fehler aufgetreten. Weiter zum nächsten Schritt.",
+    "es": "Se produjo un error en la conversación. Pasando al siguiente paso."
+  },
+  "sdk.error.nodeTimeout": {
+    "en": "The operation timed out. Please try again.",
+    "nl": "De bewerking duurde te lang. Probeer het opnieuw.",
+    "fr": "L'opération a expiré. Veuillez réessayer.",
+    "de": "Der Vorgang hat zu lange gedauert. Bitte versuche es erneut.",
+    "es": "La operación tardó demasiado. Inténtalo de nuevo."
+  },
+  "sdk.error.nodeUnsupported": {
+    "en": "This feature is not supported. Continuing...",
+    "nl": "Deze functie wordt niet ondersteund. We gaan verder...",
+    "fr": "Cette fonctionnalité n'est pas prise en charge. On continue...",
+    "de": "Diese Funktion wird nicht unterstützt. Es geht weiter...",
+    "es": "Esta función no es compatible. Continuando..."
+  },
+  "sdk.error.notFound": {
+    "en": "The requested resource was not found.",
+    "nl": "De gevraagde bron is niet gevonden.",
+    "fr": "La ressource demandée est introuvable.",
+    "de": "Die angeforderte Ressource wurde nicht gefunden.",
+    "es": "No se encontró el recurso solicitado."
+  },
+  "sdk.error.notice": {
+    "en": "Notice",
+    "nl": "Melding",
+    "fr": "Avis",
+    "de": "Hinweis",
+    "es": "Aviso"
+  },
+  "sdk.error.permCamera": {
+    "en": "Camera access is required for this feature. Please enable it in settings.",
+    "nl": "Voor deze functie is toegang tot de camera nodig. Schakel dit in bij de instellingen.",
+    "fr": "L'accès à l'appareil photo est nécessaire pour cette fonctionnalité. Veuillez l'activer dans les réglages.",
+    "de": "Für diese Funktion wird Zugriff auf die Kamera benötigt. Bitte aktiviere ihn in den Einstellungen.",
+    "es": "Esta función necesita acceso a la cámara. Actívalo en los ajustes."
+  },
+  "sdk.error.permLocation": {
+    "en": "Location access is required for this feature. Please enable it in settings.",
+    "nl": "Voor deze functie is toegang tot je locatie nodig. Schakel dit in bij de instellingen.",
+    "fr": "L'accès à la localisation est nécessaire pour cette fonctionnalité. Veuillez l'activer dans les réglages.",
+    "de": "Für diese Funktion wird Zugriff auf deinen Standort benötigt. Bitte aktiviere ihn in den Einstellungen.",
+    "es": "Esta función necesita acceso a tu ubicación. Actívalo en los ajustes."
+  },
+  "sdk.error.permMicrophone": {
+    "en": "Microphone access is required for this feature. Please enable it in settings.",
+    "nl": "Voor deze functie is toegang tot de microfoon nodig. Schakel dit in bij de instellingen.",
+    "fr": "L'accès au micro est nécessaire pour cette fonctionnalité. Veuillez l'activer dans les réglages.",
+    "de": "Für diese Funktion wird Zugriff auf das Mikrofon benötigt. Bitte aktiviere ihn in den Einstellungen.",
+    "es": "Esta función necesita acceso al micrófono. Actívalo en los ajustes."
+  },
+  "sdk.error.permNotifications": {
+    "en": "Notification permission is required for this feature. Please enable it in settings.",
+    "nl": "Voor deze functie is toestemming voor meldingen nodig. Schakel dit in bij de instellingen.",
+    "fr": "L'autorisation des notifications est nécessaire pour cette fonctionnalité. Veuillez l'activer dans les réglages.",
+    "de": "Für diese Funktion wird die Berechtigung für Mitteilungen benötigt. Bitte aktiviere sie in den Einstellungen.",
+    "es": "Esta función necesita permiso para notificaciones. Actívalo en los ajustes."
+  },
+  "sdk.error.permPhotos": {
+    "en": "Photo library access is required for this feature. Please enable it in settings.",
+    "nl": "Voor deze functie is toegang tot je fotobibliotheek nodig. Schakel dit in bij de instellingen.",
+    "fr": "L'accès à la photothèque est nécessaire pour cette fonctionnalité. Veuillez l'activer dans les réglages.",
+    "de": "Für diese Funktion wird Zugriff auf deine Fotos benötigt. Bitte aktiviere ihn in den Einstellungen.",
+    "es": "Esta función necesita acceso a tu fototeca. Actívalo en los ajustes."
+  },
+  "sdk.error.permStorage": {
+    "en": "Storage access is required for this feature. Please enable it in settings.",
+    "nl": "Voor deze functie is toegang tot de opslag nodig. Schakel dit in bij de instellingen.",
+    "fr": "L'accès au stockage est nécessaire pour cette fonctionnalité. Veuillez l'activer dans les réglages.",
+    "de": "Für diese Funktion wird Zugriff auf den Speicher benötigt. Bitte aktiviere ihn in den Einstellungen.",
+    "es": "Esta función necesita acceso al almacenamiento. Actívalo en los ajustes."
+  },
+  "sdk.error.permission": {
+    "en": "Permission is required for this feature. Please enable it in settings.",
+    "nl": "Voor deze functie is toestemming nodig. Schakel dit in bij de instellingen.",
+    "fr": "Une autorisation est nécessaire pour cette fonctionnalité. Veuillez l'activer dans les réglages.",
+    "de": "Für diese Funktion wird eine Berechtigung benötigt. Bitte aktiviere sie in den Einstellungen.",
+    "es": "Esta función necesita un permiso. Actívalo en los ajustes."
+  },
+  "sdk.error.requestTimeout": {
+    "en": "The request timed out. Please check your connection.",
+    "nl": "Het verzoek duurde te lang. Controleer je verbinding.",
+    "fr": "La requête a expiré. Veuillez vérifier votre connexion.",
+    "de": "Die Anfrage hat zu lange gedauert. Bitte prüfe deine Verbindung.",
+    "es": "La solicitud tardó demasiado. Comprueba tu conexión."
+  },
+  "sdk.error.serverUnavailable": {
+    "en": "Server is temporarily unavailable. Please try again later.",
+    "nl": "De server is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
+    "fr": "Le serveur est temporairement indisponible. Veuillez réessayer plus tard.",
+    "de": "Der Server ist vorübergehend nicht erreichbar. Bitte versuche es später erneut.",
+    "es": "El servidor no está disponible temporalmente. Inténtalo más tarde."
+  },
+  "sdk.error.session": {
+    "en": "A session error occurred. Please try again.",
+    "nl": "Er is een sessiefout opgetreden. Probeer het opnieuw.",
+    "fr": "Une erreur de session s'est produite. Veuillez réessayer.",
+    "de": "Ein Sitzungsfehler ist aufgetreten. Bitte versuche es erneut.",
+    "es": "Se produjo un error de sesión. Inténtalo de nuevo."
+  },
+  "sdk.error.sessionCreate": {
+    "en": "Could not start a new conversation. Please try again.",
+    "nl": "Er kon geen nieuw gesprek worden gestart. Probeer het opnieuw.",
+    "fr": "Impossible de démarrer une nouvelle conversation. Veuillez réessayer.",
+    "de": "Es konnte keine neue Unterhaltung gestartet werden. Bitte versuche es erneut.",
+    "es": "No se pudo iniciar una nueva conversación. Inténtalo de nuevo."
+  },
+  "sdk.error.sessionExpired": {
+    "en": "Your session has expired. Starting a new conversation.",
+    "nl": "Je sessie is verlopen. We starten een nieuw gesprek.",
+    "fr": "Votre session a expiré. Démarrage d'une nouvelle conversation.",
+    "de": "Deine Sitzung ist abgelaufen. Eine neue Unterhaltung wird gestartet.",
+    "es": "Tu sesión ha caducado. Iniciando una nueva conversación."
+  },
+  "sdk.error.sessionNotFound": {
+    "en": "Conversation not found. Starting a new one.",
+    "nl": "Gesprek niet gevonden. We starten een nieuw gesprek.",
+    "fr": "Conversation introuvable. Démarrage d'une nouvelle conversation.",
+    "de": "Unterhaltung nicht gefunden. Eine neue wird gestartet.",
+    "es": "No se encontró la conversación. Iniciando una nueva."
+  },
+  "sdk.error.sessionRestore": {
+    "en": "Could not restore your conversation. Starting fresh.",
+    "nl": "Je gesprek kon niet worden hersteld. We beginnen opnieuw.",
+    "fr": "Impossible de restaurer votre conversation. Nouveau départ.",
+    "de": "Deine Unterhaltung konnte nicht wiederhergestellt werden. Es geht von vorne los.",
+    "es": "No se pudo restaurar tu conversación. Empezando de nuevo."
+  },
+  "sdk.error.socket": {
+    "en": "Real-time connection error. Please try again.",
+    "nl": "Fout in de live verbinding. Probeer het opnieuw.",
+    "fr": "Erreur de connexion en temps réel. Veuillez réessayer.",
+    "de": "Fehler bei der Live-Verbindung. Bitte versuche es erneut.",
+    "es": "Error en la conexión en tiempo real. Inténtalo de nuevo."
+  },
+  "sdk.error.socketAuth": {
+    "en": "Connection authentication failed. Please try again.",
+    "nl": "Verificatie van de verbinding mislukt. Probeer het opnieuw.",
+    "fr": "L'authentification de la connexion a échoué. Veuillez réessayer.",
+    "de": "Die Authentifizierung der Verbindung ist fehlgeschlagen. Bitte versuche es erneut.",
+    "es": "Falló la autenticación de la conexión. Inténtalo de nuevo."
+  },
+  "sdk.error.socketFailed": {
+    "en": "Unable to establish real-time connection. Retrying...",
+    "nl": "Kan geen live verbinding maken. Opnieuw proberen...",
+    "fr": "Impossible d'établir la connexion en temps réel. Nouvelle tentative...",
+    "de": "Live-Verbindung konnte nicht hergestellt werden. Neuer Versuch...",
+    "es": "No se puede establecer la conexión en tiempo real. Reintentando..."
+  },
+  "sdk.error.socketLost": {
+    "en": "Connection lost. Attempting to reconnect...",
+    "nl": "Verbinding verbroken. Opnieuw verbinden...",
+    "fr": "Connexion perdue. Tentative de reconnexion...",
+    "de": "Verbindung unterbrochen. Neue Verbindung wird hergestellt...",
+    "es": "Conexión perdida. Intentando reconectar..."
+  },
+  "sdk.error.socketReconnectFailed": {
+    "en": "Could not reconnect. Please check your connection.",
+    "nl": "Opnieuw verbinden is mislukt. Controleer je verbinding.",
+    "fr": "Impossible de se reconnecter. Veuillez vérifier votre connexion.",
+    "de": "Neue Verbindung fehlgeschlagen. Bitte prüfe deine Verbindung.",
+    "es": "No se pudo reconectar. Comprueba tu conexión."
+  },
+  "sdk.error.socketTimeout": {
+    "en": "Connection timed out. Please try again.",
+    "nl": "De verbinding duurde te lang. Probeer het opnieuw.",
+    "fr": "La connexion a expiré. Veuillez réessayer.",
+    "de": "Zeitüberschreitung der Verbindung. Bitte versuche es erneut.",
+    "es": "Se agotó el tiempo de conexión. Inténtalo de nuevo."
+  },
+  "sdk.error.storage": {
+    "en": "A storage error occurred.",
+    "nl": "Er is een opslagfout opgetreden.",
+    "fr": "Une erreur de stockage s'est produite.",
+    "de": "Ein Speicherfehler ist aufgetreten.",
+    "es": "Se produjo un error de almacenamiento."
+  },
+  "sdk.error.storageDelete": {
+    "en": "Could not clear saved data.",
+    "nl": "Opgeslagen gegevens konden niet worden gewist.",
+    "fr": "Impossible d'effacer les données enregistrées.",
+    "de": "Gespeicherte Daten konnten nicht gelöscht werden.",
+    "es": "No se pudieron borrar los datos guardados."
+  },
+  "sdk.error.storageFull": {
+    "en": "Storage is full. Please free up some space.",
+    "nl": "De opslag is vol. Maak wat ruimte vrij.",
+    "fr": "Le stockage est plein. Veuillez libérer de l'espace.",
+    "de": "Der Speicher ist voll. Bitte gib etwas Platz frei.",
+    "es": "El almacenamiento está lleno. Libera algo de espacio."
+  },
+  "sdk.error.storageRead": {
+    "en": "Could not load saved data.",
+    "nl": "Opgeslagen gegevens konden niet worden geladen.",
+    "fr": "Impossible de charger les données enregistrées.",
+    "de": "Gespeicherte Daten konnten nicht geladen werden.",
+    "es": "No se pudieron cargar los datos guardados."
+  },
+  "sdk.error.storageWrite": {
+    "en": "Could not save data. Please try again.",
+    "nl": "Gegevens konden niet worden opgeslagen. Probeer het opnieuw.",
+    "fr": "Impossible d'enregistrer les données. Veuillez réessayer.",
+    "de": "Daten konnten nicht gespeichert werden. Bitte versuche es erneut.",
+    "es": "No se pudieron guardar los datos. Inténtalo de nuevo."
+  },
+  "sdk.error.tooManyRequests": {
+    "en": "Too many requests. Please wait a moment and try again.",
+    "nl": "Te veel verzoeken. Wacht even en probeer het opnieuw.",
+    "fr": "Trop de requêtes. Veuillez patienter un instant puis réessayer.",
+    "de": "Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut.",
+    "es": "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo."
+  },
+  "sdk.error.unauthorized": {
+    "en": "Authentication failed. Please check your credentials.",
+    "nl": "Verificatie mislukt. Controleer je inloggegevens.",
+    "fr": "L'authentification a échoué. Veuillez vérifier vos identifiants.",
+    "de": "Authentifizierung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.",
+    "es": "Falló la autenticación. Revisa tus credenciales."
+  },
+  "sdk.error.warning": {
+    "en": "Warning",
+    "nl": "Waarschuwing",
+    "fr": "Avertissement",
+    "de": "Warnung",
+    "es": "Advertencia"
+  },
+  "sdk.file.allowed": {
+    "en": "Allowed: {types}",
+    "nl": "Toegestaan: {types}",
+    "fr": "Autorisés : {types}",
+    "de": "Erlaubt: {types}",
+    "es": "Permitidos: {types}"
+  },
   "sdk.file.browseDocuments": {
     "en": "Browse documents",
     "nl": "Door documenten bladeren",
@@ -607,6 +1097,13 @@
     "fr": "Photothèque",
     "de": "Fotomediathek",
     "es": "Fototeca"
+  },
+  "sdk.file.pickFailed": {
+    "en": "Couldn't open that file. Please try again.",
+    "nl": "Dat bestand kon niet worden geopend. Probeer het opnieuw.",
+    "fr": "Impossible d'ouvrir ce fichier. Veuillez réessayer.",
+    "de": "Die Datei konnte nicht geöffnet werden. Bitte versuch es noch einmal.",
+    "es": "No se pudo abrir ese archivo. Inténtalo de nuevo."
   },
   "sdk.file.pickerMissing": {
     "en": "Sending files isn't available here",
@@ -874,6 +1371,13 @@
     "de": "jetzt",
     "es": "ahora"
   },
+  "sdk.handover.allBusyMessage": {
+    "en": "All our agents are currently busy. Please try again later or leave us a message.",
+    "nl": "Al onze medewerkers zijn momenteel bezet. Probeer het later opnieuw of laat een bericht achter.",
+    "fr": "Tous nos conseillers sont actuellement occupés. Veuillez réessayer plus tard ou nous laisser un message.",
+    "de": "Alle unsere Mitarbeiter sind gerade beschäftigt. Versuch es bitte später noch einmal oder hinterlass uns eine Nachricht.",
+    "es": "Todos nuestros agentes están ocupados en este momento. Inténtalo más tarde o déjanos un mensaje."
+  },
   "sdk.handover.cancelGoBack": {
     "en": "Cancel and go back",
     "nl": "Annuleren en teruggaan",
@@ -923,6 +1427,13 @@
     "de": "Mit dem Bot weitermachen",
     "es": "Seguir con el bot"
   },
+  "sdk.handover.detailsPrompt": {
+    "en": "Please provide your details so our agent can assist you better.",
+    "nl": "Vul je gegevens in, zodat onze medewerker je beter kan helpen.",
+    "fr": "Veuillez indiquer vos coordonnées afin que notre conseiller puisse mieux vous aider.",
+    "de": "Gib bitte deine Daten an, damit unser Mitarbeiter dir besser helfen kann.",
+    "es": "Indica tus datos para que nuestro agente pueda ayudarte mejor."
+  },
   "sdk.handover.endChat": {
     "en": "End Chat",
     "nl": "Chat beëindigen",
@@ -964,6 +1475,13 @@
     "fr": "En relation avec un conseiller",
     "de": "Gespräch mit einem Menschen",
     "es": "Hablando con una persona"
+  },
+  "sdk.handover.leaveMessage": {
+    "en": "Leave Message",
+    "nl": "Bericht achterlaten",
+    "fr": "Laisser un message",
+    "de": "Nachricht hinterlassen",
+    "es": "Dejar un mensaje"
   },
   "sdk.handover.noAgents": {
     "en": "Sorry, no agents are available at the moment. Please try again later.",
@@ -1119,6 +1637,13 @@
     "de": "Alle",
     "es": "Todas"
   },
+  "sdk.kb.allArticles": {
+    "en": "All articles",
+    "nl": "Alle artikelen",
+    "fr": "Tous les articles",
+    "de": "Alle Artikel",
+    "es": "Todos los artículos"
+  },
   "sdk.kb.allCategories": {
     "en": "All categories",
     "nl": "Alle categorieën",
@@ -1133,12 +1658,33 @@
     "de": "Artikel: {title}",
     "es": "Artículo: {title}"
   },
+  "sdk.kb.articleFetchFailed": {
+    "en": "Failed to fetch article",
+    "nl": "Artikel ophalen is mislukt",
+    "fr": "Impossible de récupérer l'article",
+    "de": "Artikel konnte nicht abgerufen werden",
+    "es": "No se pudo obtener el artículo"
+  },
   "sdk.kb.articleList": {
     "en": "Article list",
     "nl": "Artikellijst",
     "fr": "Liste des articles",
     "de": "Artikelliste",
     "es": "Lista de artículos"
+  },
+  "sdk.kb.articleNotFound": {
+    "en": "Article not found",
+    "nl": "Artikel niet gevonden",
+    "fr": "Article introuvable",
+    "de": "Artikel nicht gefunden",
+    "es": "Artículo no encontrado"
+  },
+  "sdk.kb.articlesFetchFailed": {
+    "en": "Failed to fetch articles",
+    "nl": "Artikelen ophalen is mislukt",
+    "fr": "Impossible de récupérer les articles",
+    "de": "Artikel konnten nicht abgerufen werden",
+    "es": "No se pudieron obtener los artículos"
   },
   "sdk.kb.articlesIn": {
     "en": "Articles in {name} category",
@@ -1153,6 +1699,13 @@
     "fr": "{articles} dans {categories}",
     "de": "{articles} in {categories}",
     "es": "{articles} en {categories}"
+  },
+  "sdk.kb.articlesLoadFailed": {
+    "en": "Failed to load articles",
+    "nl": "Artikelen laden is mislukt",
+    "fr": "Impossible de charger les articles",
+    "de": "Artikel konnten nicht geladen werden",
+    "es": "No se pudieron cargar los artículos"
   },
   "sdk.kb.author": {
     "en": "Author: {name}",
@@ -1203,12 +1756,33 @@
     "de": "{n} Kategorien",
     "es": "{n} categorías"
   },
+  "sdk.kb.categoriesLoadFailed": {
+    "en": "Failed to load categories",
+    "nl": "Categorieën laden is mislukt",
+    "fr": "Impossible de charger les catégories",
+    "de": "Kategorien konnten nicht geladen werden",
+    "es": "No se pudieron cargar las categorías"
+  },
+  "sdk.kb.checkOut": {
+    "en": "Check out this article: {title}",
+    "nl": "Bekijk dit artikel: {title}",
+    "fr": "Découvrez cet article : {title}",
+    "de": "Schau dir diesen Artikel an: {title}",
+    "es": "Mira este artículo: {title}"
+  },
   "sdk.kb.collapse": {
     "en": "Collapse",
     "nl": "Inklappen",
     "fr": "Réduire",
     "de": "Einklappen",
     "es": "Contraer"
+  },
+  "sdk.kb.couldNotLoad": {
+    "en": "This article could not be loaded.",
+    "nl": "Dit artikel kon niet worden geladen.",
+    "fr": "Cet article n'a pas pu être chargé.",
+    "de": "Dieser Artikel konnte nicht geladen werden.",
+    "es": "No se pudo cargar este artículo."
   },
   "sdk.kb.cover": {
     "en": "Cover image for {title}",
@@ -1224,12 +1798,47 @@
     "de": "In dieser Kategorie gibt es noch keine Artikel.",
     "es": "Todavía no hay artículos en esta categoría."
   },
+  "sdk.kb.errorOccurred": {
+    "en": "An error occurred",
+    "nl": "Er is een fout opgetreden",
+    "fr": "Une erreur s'est produite",
+    "de": "Ein Fehler ist aufgetreten",
+    "es": "Se produjo un error"
+  },
   "sdk.kb.featured": {
     "en": "Featured topics",
     "nl": "Uitgelichte onderwerpen",
     "fr": "Sujets à la une",
     "de": "Ausgewählte Themen",
     "es": "Temas destacados"
+  },
+  "sdk.kb.foundArticle": {
+    "en": "I found this helpful article: \"{title}\"",
+    "nl": "Ik vond dit handige artikel: \"{title}\"",
+    "fr": "J'ai trouvé cet article utile : « {title} »",
+    "de": "Ich habe diesen hilfreichen Artikel gefunden: „{title}“",
+    "es": "Encontré este artículo útil: \"{title}\""
+  },
+  "sdk.kb.helpCentreLoadFailed": {
+    "en": "Failed to load the help centre",
+    "nl": "Het helpcentrum laden is mislukt",
+    "fr": "Impossible de charger le centre d'aide",
+    "de": "Das Hilfecenter konnte nicht geladen werden",
+    "es": "No se pudo cargar el centro de ayuda"
+  },
+  "sdk.kb.invalidRating": {
+    "en": "Invalid rating",
+    "nl": "Ongeldige beoordeling",
+    "fr": "Note invalide",
+    "de": "Ungültige Bewertung",
+    "es": "Valoración no válida"
+  },
+  "sdk.kb.lessThanMinRead": {
+    "en": "Less than 1 min read",
+    "nl": "Minder dan 1 min lezen",
+    "fr": "Moins d'1 min de lecture",
+    "de": "Weniger als 1 Min. Lesezeit",
+    "es": "Menos de 1 min de lectura"
   },
   "sdk.kb.loadFailed": {
     "en": "Failed to load knowledge base",
@@ -1238,12 +1847,47 @@
     "de": "Das Hilfecenter konnte nicht geladen werden",
     "es": "No se pudo cargar el centro de ayuda"
   },
+  "sdk.kb.loadMore": {
+    "en": "Load more",
+    "nl": "Meer laden",
+    "fr": "Charger plus",
+    "de": "Mehr laden",
+    "es": "Cargar más"
+  },
+  "sdk.kb.noArticlesFor": {
+    "en": "No articles found for \"{query}\"",
+    "nl": "Geen artikelen gevonden voor \"{query}\"",
+    "fr": "Aucun article trouvé pour « {query} »",
+    "de": "Keine Artikel gefunden für „{query}“",
+    "es": "No se encontraron artículos para «{query}»"
+  },
+  "sdk.kb.noArticlesFound": {
+    "en": "No articles found",
+    "nl": "Geen artikelen gevonden",
+    "fr": "Aucun article trouvé",
+    "de": "Keine Artikel gefunden",
+    "es": "No se encontraron artículos"
+  },
+  "sdk.kb.noArticlesInCategory": {
+    "en": "No articles in this category",
+    "nl": "Geen artikelen in deze categorie",
+    "fr": "Aucun article dans cette catégorie",
+    "de": "Keine Artikel in dieser Kategorie",
+    "es": "No hay artículos en esta categoría"
+  },
   "sdk.kb.noCategories": {
     "en": "No categories available",
     "nl": "Geen categorieën beschikbaar",
     "fr": "Aucune catégorie disponible",
     "de": "Keine Kategorien verfügbar",
     "es": "No hay categorías disponibles"
+  },
+  "sdk.kb.noRatings": {
+    "en": "No ratings",
+    "nl": "Nog geen beoordelingen",
+    "fr": "Aucune note",
+    "de": "Keine Bewertungen",
+    "es": "Sin valoraciones"
   },
   "sdk.kb.open": {
     "en": "Open {label}",
@@ -1266,6 +1910,27 @@
     "de": "Veröffentlicht am {date}",
     "es": "Publicado el {date}"
   },
+  "sdk.kb.rateFailed": {
+    "en": "Failed to submit rating",
+    "nl": "Beoordeling versturen is mislukt",
+    "fr": "Impossible d'envoyer la note",
+    "de": "Bewertung konnte nicht gesendet werden",
+    "es": "No se pudo enviar la valoración"
+  },
+  "sdk.kb.rating.fair": {
+    "en": "Fair",
+    "nl": "Redelijk",
+    "fr": "Passable",
+    "de": "Mittelmäßig",
+    "es": "Regular"
+  },
+  "sdk.kb.rating.veryGood": {
+    "en": "Very Good",
+    "nl": "Zeer goed",
+    "fr": "Très bien",
+    "de": "Sehr gut",
+    "es": "Muy bueno"
+  },
   "sdk.kb.readArticle": {
     "en": "Read article",
     "nl": "Artikel lezen",
@@ -1279,6 +1944,20 @@
     "fr": "Touchez deux fois pour lire l'article",
     "de": "Doppeltippen, um den Artikel zu lesen",
     "es": "Toca dos veces para leer el artículo"
+  },
+  "sdk.kb.searchArticles": {
+    "en": "Search articles...",
+    "nl": "Artikelen zoeken...",
+    "fr": "Rechercher des articles...",
+    "de": "Artikel durchsuchen...",
+    "es": "Buscar artículos..."
+  },
+  "sdk.kb.searchFailed": {
+    "en": "Search failed",
+    "nl": "Zoeken is mislukt",
+    "fr": "La recherche a échoué",
+    "de": "Suche fehlgeschlagen",
+    "es": "La búsqueda falló"
   },
   "sdk.kb.searchHint": {
     "en": "Type to search knowledge base articles",
@@ -1307,6 +1986,34 @@
     "fr": "Recherche : {query}",
     "de": "Suche: {query}",
     "es": "Búsqueda: {query}"
+  },
+  "sdk.kb.share": {
+    "en": "Share",
+    "nl": "Delen",
+    "fr": "Partager",
+    "de": "Teilen",
+    "es": "Compartir"
+  },
+  "sdk.kb.shareInChat": {
+    "en": "Share in Chat",
+    "nl": "Delen in chat",
+    "fr": "Partager dans le chat",
+    "de": "Im Chat teilen",
+    "es": "Compartir en el chat"
+  },
+  "sdk.kb.shareText": {
+    "en": "Share: {text}",
+    "nl": "Delen: {text}",
+    "fr": "Partager : {text}",
+    "de": "Teilen: {text}",
+    "es": "Compartir: {text}"
+  },
+  "sdk.kb.somethingWrong": {
+    "en": "Something went wrong",
+    "nl": "Er ging iets mis",
+    "fr": "Un problème est survenu",
+    "de": "Etwas ist schiefgelaufen",
+    "es": "Algo salió mal"
   },
   "sdk.kb.term.account": {
     "en": "Account settings",
@@ -1371,6 +2078,13 @@
     "de": "Vorschläge:",
     "es": "Sugerencias:"
   },
+  "sdk.kb.tryAdjusting": {
+    "en": "Try adjusting your search or filters",
+    "nl": "Probeer je zoekopdracht of filters aan te passen",
+    "fr": "Essayez de modifier votre recherche ou vos filtres",
+    "de": "Versuch, deine Suche oder Filter anzupassen",
+    "es": "Prueba a ajustar tu búsqueda o tus filtros"
+  },
   "sdk.kb.unknownAuthor": {
     "en": "Unknown Author",
     "nl": "Onbekende auteur",
@@ -1399,6 +2113,13 @@
     "de": "Kategorie anzeigen",
     "es": "Ver categoría"
   },
+  "sdk.kb.views": {
+    "en": "{n} views",
+    "nl": "{n} weergaven",
+    "fr": "{n} vues",
+    "de": "{n} Aufrufe",
+    "es": "{n} visitas"
+  },
   "sdk.kb.wasArticleHelpful": {
     "en": "Was this article helpful?",
     "nl": "Was dit artikel nuttig?",
@@ -1406,12 +2127,61 @@
     "de": "War dieser Artikel hilfreich?",
     "es": "¿Te ha sido útil este artículo?"
   },
+  "sdk.link.cannotNavigate": {
+    "en": "Could not navigate to {path}",
+    "nl": "Kan niet naar {path} gaan",
+    "fr": "Impossible d'accéder à {path}",
+    "de": "{path} konnte nicht geöffnet werden",
+    "es": "No se pudo ir a {path}"
+  },
+  "sdk.link.cannotOpen": {
+    "en": "Could not open link",
+    "nl": "Kan de link niet openen",
+    "fr": "Impossible d'ouvrir le lien",
+    "de": "Link konnte nicht geöffnet werden",
+    "es": "No se pudo abrir el enlace"
+  },
+  "sdk.link.externalAsk": {
+    "en": "Do you want to open {host} in your browser?",
+    "nl": "Wil je {host} openen in je browser?",
+    "fr": "Voulez-vous ouvrir {host} dans votre navigateur ?",
+    "de": "Möchtest du {host} in deinem Browser öffnen?",
+    "es": "¿Quieres abrir {host} en tu navegador?"
+  },
+  "sdk.link.externalTitle": {
+    "en": "Open External Link",
+    "nl": "Externe link openen",
+    "fr": "Ouvrir un lien externe",
+    "de": "Externen Link öffnen",
+    "es": "Abrir enlace externo"
+  },
   "sdk.link.imageFrom": {
     "en": "Image from {domain}",
     "nl": "Afbeelding van {domain}",
     "fr": "Image de {domain}",
     "de": "Bild von {domain}",
     "es": "Imagen de {domain}"
+  },
+  "sdk.link.noEmailApp": {
+    "en": "Could not open email app",
+    "nl": "Kan de e-mailapp niet openen",
+    "fr": "Impossible d'ouvrir l'application e-mail",
+    "de": "E-Mail-App konnte nicht geöffnet werden",
+    "es": "No se pudo abrir la app de correo"
+  },
+  "sdk.link.noPhoneApp": {
+    "en": "Could not open phone app",
+    "nl": "Kan de telefoonapp niet openen",
+    "fr": "Impossible d'ouvrir l'application Téléphone",
+    "de": "Telefon-App konnte nicht geöffnet werden",
+    "es": "No se pudo abrir la app de teléfono"
+  },
+  "sdk.link.noSmsApp": {
+    "en": "Could not open messaging app",
+    "nl": "Kan de berichtenapp niet openen",
+    "fr": "Impossible d'ouvrir l'application de messagerie",
+    "de": "Nachrichten-App konnte nicht geöffnet werden",
+    "es": "No se pudo abrir la app de mensajes"
   },
   "sdk.link.openDomain": {
     "en": "Open link: {domain}",
@@ -1511,6 +2281,13 @@
     "de": "Wähle in jeder Zeile alles, was zutrifft",
     "es": "Elige en cada fila todo lo que corresponda"
   },
+  "sdk.media.audioFailed": {
+    "en": "Failed to play audio",
+    "nl": "Audio afspelen mislukt",
+    "fr": "Impossible de lire l'audio",
+    "de": "Audio konnte nicht abgespielt werden",
+    "es": "No se pudo reproducir el audio"
+  },
   "sdk.media.audioPaused": {
     "en": "Audio player. Paused",
     "nl": "Audiospeler. Gepauzeerd",
@@ -1573,6 +2350,13 @@
     "fr": "Lire la vidéo",
     "de": "Video abspielen",
     "es": "Reproducir vídeo"
+  },
+  "sdk.media.videoFailed": {
+    "en": "Failed to load video",
+    "nl": "Video laden mislukt",
+    "fr": "Impossible de charger la vidéo",
+    "de": "Video konnte nicht geladen werden",
+    "es": "No se pudo cargar el vídeo"
   },
   "sdk.media.videoPlayer": {
     "en": "Video player. Tap to play",
@@ -1643,6 +2427,13 @@
     "fr": "Liste des messages",
     "de": "Nachrichtenliste",
     "es": "Lista de mensajes"
+  },
+  "sdk.message.nameEdited": {
+    "en": "{name} · Edited",
+    "nl": "{name} · Bewerkt",
+    "fr": "{name} · Modifié",
+    "de": "{name} · Bearbeitet",
+    "es": "{name} · Editado"
   },
   "sdk.message.retryHint": {
     "en": "Double tap to retry sending this message",
@@ -1833,6 +2624,13 @@
     "de": "{n} Nachrichten warten",
     "es": "{n} mensajes pendientes"
   },
+  "sdk.offline.sendNow": {
+    "en": "Send Now",
+    "nl": "Nu versturen",
+    "fr": "Envoyer maintenant",
+    "de": "Jetzt senden",
+    "es": "Enviar ahora"
+  },
   "sdk.offline.sendingQueued.one": {
     "en": "Sending {n} queued message...",
     "nl": "{n} bericht in de wachtrij wordt verstuurd...",
@@ -1980,12 +2778,47 @@
     "de": "Speicherzugriff",
     "es": "Permiso de almacenamiento"
   },
+  "sdk.prechat.answerPlaceholder": {
+    "en": "Enter your answer",
+    "nl": "Typ je antwoord",
+    "fr": "Saisissez votre réponse",
+    "de": "Gib deine Antwort ein",
+    "es": "Escribe tu respuesta"
+  },
+  "sdk.prechat.askEmail": {
+    "en": "What is your email address?",
+    "nl": "Wat is je e-mailadres?",
+    "fr": "Quelle est votre adresse e-mail ?",
+    "de": "Wie lautet deine E-Mail-Adresse?",
+    "es": "¿Cuál es tu correo electrónico?"
+  },
+  "sdk.prechat.askName": {
+    "en": "What is your name?",
+    "nl": "Wat is je naam?",
+    "fr": "Quel est votre nom ?",
+    "de": "Wie heißt du?",
+    "es": "¿Cómo te llamas?"
+  },
+  "sdk.prechat.askPhone": {
+    "en": "What is your phone number?",
+    "nl": "Wat is je telefoonnummer?",
+    "fr": "Quel est votre numéro de téléphone ?",
+    "de": "Wie lautet deine Telefonnummer?",
+    "es": "¿Cuál es tu número de teléfono?"
+  },
   "sdk.prechat.email": {
     "en": "Email",
     "nl": "E-mail",
     "fr": "E-mail",
     "de": "E-Mail",
     "es": "Correo electrónico"
+  },
+  "sdk.prechat.emailAddressPlaceholder": {
+    "en": "Enter your email address",
+    "nl": "Vul je e-mailadres in",
+    "fr": "Saisissez votre adresse e-mail",
+    "de": "Gib deine E-Mail-Adresse ein",
+    "es": "Escribe tu correo electrónico"
   },
   "sdk.prechat.emailPlaceholder": {
     "en": "Enter your email",
@@ -2008,6 +2841,13 @@
     "de": "Ungültiges Format",
     "es": "Formato no válido"
   },
+  "sdk.prechat.messagePlaceholder": {
+    "en": "Enter your message",
+    "nl": "Typ je bericht",
+    "fr": "Saisissez votre message",
+    "de": "Gib deine Nachricht ein",
+    "es": "Escribe tu mensaje"
+  },
   "sdk.prechat.name": {
     "en": "Name",
     "nl": "Naam",
@@ -2021,6 +2861,20 @@
     "fr": "Saisissez votre nom",
     "de": "Gib deinen Namen ein",
     "es": "Escribe tu nombre"
+  },
+  "sdk.prechat.phonePlaceholder": {
+    "en": "Enter your phone number",
+    "nl": "Vul je telefoonnummer in",
+    "fr": "Saisissez votre numéro de téléphone",
+    "de": "Gib deine Telefonnummer ein",
+    "es": "Escribe tu número de teléfono"
+  },
+  "sdk.prechat.required": {
+    "en": "Required",
+    "nl": "Verplicht",
+    "fr": "Obligatoire",
+    "de": "Pflichtfeld",
+    "es": "Obligatorio"
   },
   "sdk.prechat.requiredField": {
     "en": "Required field",
@@ -2064,12 +2918,75 @@
     "de": "Die Eingabe ist zu kurz",
     "es": "El texto es demasiado corto"
   },
+  "sdk.queue.agentsAvailable.one": {
+    "en": "{n} agent available",
+    "nl": "{n} medewerker beschikbaar",
+    "fr": "{n} conseiller disponible",
+    "de": "{n} Mitarbeiter verfügbar",
+    "es": "{n} agente disponible"
+  },
+  "sdk.queue.agentsAvailable.other": {
+    "en": "{n} agents available",
+    "nl": "{n} medewerkers beschikbaar",
+    "fr": "{n} conseillers disponibles",
+    "de": "{n} Mitarbeiter verfügbar",
+    "es": "{n} agentes disponibles"
+  },
+  "sdk.queue.agentsAvailableAny": {
+    "en": "Agents available",
+    "nl": "Medewerkers beschikbaar",
+    "fr": "Conseillers disponibles",
+    "de": "Mitarbeiter verfügbar",
+    "es": "Agentes disponibles"
+  },
+  "sdk.queue.allBusy": {
+    "en": "All agents busy",
+    "nl": "Alle medewerkers zijn bezet",
+    "fr": "Tous les conseillers sont occupés",
+    "de": "Alle Mitarbeiter sind beschäftigt",
+    "es": "Todos los agentes están ocupados"
+  },
+  "sdk.queue.estWait": {
+    "en": "Est. Wait",
+    "nl": "Geschatte wachttijd",
+    "fr": "Attente estimée",
+    "de": "Geschätzte Wartezeit",
+    "es": "Espera estimada"
+  },
+  "sdk.queue.leave": {
+    "en": "Leave queue",
+    "nl": "Wachtrij verlaten",
+    "fr": "Quitter la file d'attente",
+    "de": "Warteschlange verlassen",
+    "es": "Salir de la cola"
+  },
   "sdk.queue.leaveHint": {
     "en": "Leave the queue",
     "nl": "De wachtrij verlaten",
     "fr": "Quitter la file d'attente",
     "de": "Die Warteschlange verlassen",
     "es": "Salir de la cola"
+  },
+  "sdk.queue.maxWaitMin": {
+    "en": "Max wait: {n} min",
+    "nl": "Max. wachttijd: {n} min",
+    "fr": "Attente max. : {n} min",
+    "de": "Max. Wartezeit: {n} Min.",
+    "es": "Espera máx.: {n} min"
+  },
+  "sdk.queue.positionLabel": {
+    "en": "Position",
+    "nl": "Positie",
+    "fr": "Position",
+    "de": "Position",
+    "es": "Posición"
+  },
+  "sdk.queue.timeElapsed": {
+    "en": "Time elapsed",
+    "nl": "Verstreken tijd",
+    "fr": "Temps écoulé",
+    "de": "Vergangene Zeit",
+    "es": "Tiempo transcurrido"
   },
   "sdk.quiz.submit": {
     "en": "Submit Answer",
@@ -2337,6 +3254,20 @@
     "de": "{label} hoch",
     "es": "{label} más"
   },
+  "sdk.survey.addFeedback": {
+    "en": "Add feedback",
+    "nl": "Feedback toevoegen",
+    "fr": "Ajouter un commentaire",
+    "de": "Feedback hinzufügen",
+    "es": "Añadir comentarios"
+  },
+  "sdk.survey.additional": {
+    "en": "Additional feedback",
+    "nl": "Aanvullende feedback",
+    "fr": "Commentaires supplémentaires",
+    "de": "Zusätzliches Feedback",
+    "es": "Comentarios adicionales"
+  },
   "sdk.survey.feedbackLabel": {
     "en": "Feedback text input",
     "nl": "Feedback invullen",
@@ -2358,6 +3289,13 @@
     "de": "Noch weiteres Feedback? (optional)",
     "es": "¿Algún comentario más? (opcional)"
   },
+  "sdk.survey.improve": {
+    "en": "Please tell us how we can improve",
+    "nl": "Vertel ons hoe we het beter kunnen doen",
+    "fr": "Dites-nous comment nous pouvons nous améliorer",
+    "de": "Sag uns bitte, was wir besser machen können",
+    "es": "Cuéntanos cómo podemos mejorar"
+  },
   "sdk.survey.loading": {
     "en": "Loading survey...",
     "nl": "Enquête laden...",
@@ -2371,6 +3309,20 @@
     "fr": "Veuillez noter votre conversation",
     "de": "Bitte bewerte dein Gespräch",
     "es": "Valora tu conversación"
+  },
+  "sdk.survey.rateThis": {
+    "en": "Rate this conversation",
+    "nl": "Beoordeel dit gesprek",
+    "fr": "Évaluez cette conversation",
+    "de": "Bewerte dieses Gespräch",
+    "es": "Valora esta conversación"
+  },
+  "sdk.survey.rateWith": {
+    "en": "Rate your chat with {name}",
+    "nl": "Beoordeel je chat met {name}",
+    "fr": "Évaluez votre échange avec {name}",
+    "de": "Bewerte deinen Chat mit {name}",
+    "es": "Valora tu chat con {name}"
   },
   "sdk.survey.ratingQuestion": {
     "en": "Please rate your conversation",
@@ -2463,6 +3415,20 @@
     "de": "Gesendet",
     "es": "Enviado"
   },
+  "sdk.survey.thanksTitle": {
+    "en": "Thank you!",
+    "nl": "Bedankt!",
+    "fr": "Merci !",
+    "de": "Danke!",
+    "es": "¡Gracias!"
+  },
+  "sdk.survey.veryPoor": {
+    "en": "Very Poor",
+    "nl": "Zeer slecht",
+    "fr": "Très mauvais",
+    "de": "Sehr schlecht",
+    "es": "Muy malo"
+  },
   "sdk.time.placeholder": {
     "en": "Select a time...",
     "nl": "Kies een tijd...",
@@ -2519,6 +3485,13 @@
     "de": "Hochladen fehlgeschlagen",
     "es": "Error al subir"
   },
+  "sdk.validation.atLeast": {
+    "en": "Must be at least {n} characters",
+    "nl": "Moet minstens {n} tekens zijn",
+    "fr": "Doit contenir au moins {n} caractères",
+    "de": "Muss mindestens {n} Zeichen lang sein",
+    "es": "Debe tener al menos {n} caracteres"
+  },
   "sdk.validation.date": {
     "en": "Please enter a valid date (YYYY-MM-DD)",
     "nl": "Vul een geldige datum in (JJJJ-MM-DD)",
@@ -2526,12 +3499,61 @@
     "de": "Bitte gib ein gültiges Datum ein (JJJJ-MM-TT)",
     "es": "Introduce una fecha válida (AAAA-MM-DD)"
   },
+  "sdk.validation.dateRequired": {
+    "en": "Date is required",
+    "nl": "Datum is verplicht",
+    "fr": "La date est requise",
+    "de": "Datum ist erforderlich",
+    "es": "La fecha es obligatoria"
+  },
+  "sdk.validation.emailRequired": {
+    "en": "Email address is required",
+    "nl": "E-mailadres is verplicht",
+    "fr": "L'adresse e-mail est requise",
+    "de": "E-Mail-Adresse ist erforderlich",
+    "es": "El correo electrónico es obligatorio"
+  },
+  "sdk.validation.fieldMaxLength": {
+    "en": "{field} must be at most {n} characters",
+    "nl": "{field} mag hoogstens {n} tekens bevatten",
+    "fr": "{field} doit contenir au plus {n} caractères",
+    "de": "{field} darf höchstens {n} Zeichen lang sein",
+    "es": "{field} debe tener como máximo {n} caracteres"
+  },
+  "sdk.validation.fieldMinLength": {
+    "en": "{field} must be at least {n} characters",
+    "nl": "{field} moet minstens {n} tekens bevatten",
+    "fr": "{field} doit contenir au moins {n} caractères",
+    "de": "{field} muss mindestens {n} Zeichen lang sein",
+    "es": "{field} debe tener al menos {n} caracteres"
+  },
+  "sdk.validation.fieldRequired": {
+    "en": "{field} is required",
+    "nl": "{field} is verplicht",
+    "fr": "{field} est requis",
+    "de": "{field} ist erforderlich",
+    "es": "{field} es obligatorio"
+  },
   "sdk.validation.format": {
     "en": "Invalid format",
     "nl": "Ongeldige notatie",
     "fr": "Format non valide",
     "de": "Ungültiges Format",
     "es": "Formato no válido"
+  },
+  "sdk.validation.fullName": {
+    "en": "Please enter your full name",
+    "nl": "Vul je volledige naam in",
+    "fr": "Veuillez saisir votre nom complet",
+    "de": "Gib bitte deinen vollständigen Namen ein",
+    "es": "Introduce tu nombre completo"
+  },
+  "sdk.validation.invalidValue": {
+    "en": "Please enter a valid value",
+    "nl": "Vul een geldige waarde in",
+    "fr": "Veuillez saisir une valeur valide",
+    "de": "Gib bitte einen gültigen Wert ein",
+    "es": "Introduce un valor válido"
   },
   "sdk.validation.max": {
     "en": "Maximum value is {max}",
@@ -2561,12 +3583,61 @@
     "de": "Mindestens {n} Zeichen erforderlich",
     "es": "Se necesitan al menos {n} caracteres"
   },
+  "sdk.validation.numberAtLeast": {
+    "en": "Number must be at least {min}",
+    "nl": "Het getal moet minstens {min} zijn",
+    "fr": "Le nombre doit être d'au moins {min}",
+    "de": "Die Zahl muss mindestens {min} sein",
+    "es": "El número debe ser al menos {min}"
+  },
+  "sdk.validation.numberAtMost": {
+    "en": "Number must be at most {max}",
+    "nl": "Het getal mag hoogstens {max} zijn",
+    "fr": "Le nombre doit être d'au plus {max}",
+    "de": "Die Zahl darf höchstens {max} sein",
+    "es": "El número debe ser como máximo {max}"
+  },
+  "sdk.validation.numberRequired": {
+    "en": "Number is required",
+    "nl": "Getal is verplicht",
+    "fr": "Le nombre est requis",
+    "de": "Zahl ist erforderlich",
+    "es": "El número es obligatorio"
+  },
+  "sdk.validation.phoneRequired": {
+    "en": "Phone number is required",
+    "nl": "Telefoonnummer is verplicht",
+    "fr": "Le numéro de téléphone est requis",
+    "de": "Telefonnummer ist erforderlich",
+    "es": "El número de teléfono es obligatorio"
+  },
   "sdk.validation.required": {
     "en": "This field is required",
     "nl": "Dit veld is verplicht",
     "fr": "Ce champ est obligatoire",
     "de": "Dieses Feld ist erforderlich",
     "es": "Este campo es obligatorio"
+  },
+  "sdk.validation.thisField": {
+    "en": "This field",
+    "nl": "Dit veld",
+    "fr": "Ce champ",
+    "de": "Dieses Feld",
+    "es": "Este campo"
+  },
+  "sdk.validation.urlRequired": {
+    "en": "URL is required",
+    "nl": "URL is verplicht",
+    "fr": "L'URL est requise",
+    "de": "URL ist erforderlich",
+    "es": "La URL es obligatoria"
+  },
+  "sdk.validation.validDate": {
+    "en": "Please enter a valid date",
+    "nl": "Voer een geldige datum in",
+    "fr": "Veuillez saisir une date valide",
+    "de": "Bitte gib ein gültiges Datum ein",
+    "es": "Introduce una fecha válida"
   },
   "sdk.voice.cancel": {
     "en": "Cancel recording",
@@ -2596,6 +3667,20 @@
     "de": "Aufnahmefehler",
     "es": "Error de grabación"
   },
+  "sdk.voice.holdLonger": {
+    "en": "Recording too short. Hold longer to record.",
+    "nl": "Opname te kort. Houd langer ingedrukt om op te nemen.",
+    "fr": "Enregistrement trop court. Maintenez plus longtemps pour enregistrer.",
+    "de": "Aufnahme zu kurz. Halte länger gedrückt, um aufzunehmen.",
+    "es": "Grabación demasiado corta. Mantén pulsado más tiempo para grabar."
+  },
+  "sdk.voice.holdToRecord": {
+    "en": "Hold to record",
+    "nl": "Ingedrukt houden om op te nemen",
+    "fr": "Maintenez pour enregistrer",
+    "de": "Gedrückt halten zum Aufnehmen",
+    "es": "Mantén pulsado para grabar"
+  },
   "sdk.voice.label": {
     "en": "Voice message, {duration}",
     "nl": "Spraakbericht, {duration}",
@@ -2609,6 +3694,13 @@
     "fr": "Chargement du message vocal...",
     "de": "Sprachnachricht wird geladen...",
     "es": "Cargando mensaje de voz..."
+  },
+  "sdk.voice.maxDuration": {
+    "en": "Max {min} min {sec} sec",
+    "nl": "Max. {min} min {sec} sec",
+    "fr": "Max. {min} min {sec} s",
+    "de": "Max. {min} Min. {sec} Sek.",
+    "es": "Máx. {min} min {sec} s"
   },
   "sdk.voice.message": {
     "en": "Voice message",
@@ -2645,12 +3737,40 @@
     "de": "Bitte nimm mindestens {duration} auf.",
     "es": "Graba al menos {duration}."
   },
+  "sdk.voice.recordInstead": {
+    "en": "Record instead",
+    "nl": "Liever opnemen",
+    "fr": "Enregistrer plutôt",
+    "de": "Lieber aufnehmen",
+    "es": "Grabar en su lugar"
+  },
+  "sdk.voice.recordOrType": {
+    "en": "Please record a voice message or type your response",
+    "nl": "Neem een spraakbericht op of typ je antwoord",
+    "fr": "Veuillez enregistrer un message vocal ou saisir votre réponse",
+    "de": "Bitte nimm eine Sprachnachricht auf oder tippe deine Antwort",
+    "es": "Graba un mensaje de voz o escribe tu respuesta"
+  },
+  "sdk.voice.recordPrompt": {
+    "en": "Please record a voice message",
+    "nl": "Neem een spraakbericht op",
+    "fr": "Veuillez enregistrer un message vocal",
+    "de": "Bitte nimm eine Sprachnachricht auf",
+    "es": "Graba un mensaje de voz"
+  },
   "sdk.voice.recording": {
     "en": "Recording...",
     "nl": "Opnemen...",
     "fr": "Enregistrement...",
     "de": "Aufnahme läuft...",
     "es": "Grabando..."
+  },
+  "sdk.voice.responseSubmitted": {
+    "en": "Response submitted",
+    "nl": "Antwoord verstuurd",
+    "fr": "Réponse envoyée",
+    "de": "Antwort gesendet",
+    "es": "Respuesta enviada"
   },
   "sdk.voice.retry": {
     "en": "Tap to retry",
@@ -2665,6 +3785,13 @@
     "fr": "Envoyer le message vocal",
     "de": "Sprachnachricht senden",
     "es": "Enviar mensaje de voz"
+  },
+  "sdk.voice.slideToCancel": {
+    "en": "Slide to cancel",
+    "nl": "Schuif om te annuleren",
+    "fr": "Glissez pour annuler",
+    "de": "Zum Abbrechen wischen",
+    "es": "Desliza para cancelar"
   },
   "sdk.voice.start": {
     "en": "Start recording",
@@ -2714,6 +3841,13 @@
     "fr": "Enregistrement trop court",
     "de": "Aufnahme zu kurz",
     "es": "Grabación demasiado corta"
+  },
+  "sdk.voice.typeResponse": {
+    "en": "Type your response...",
+    "nl": "Typ je antwoord...",
+    "fr": "Saisissez votre réponse...",
+    "de": "Gib deine Antwort ein...",
+    "es": "Escribe tu respuesta..."
   },
   "sdk.voice.unavailable": {
     "en": "Voice recording isn't available on this device.",
