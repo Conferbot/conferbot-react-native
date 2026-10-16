@@ -26,6 +26,7 @@
  *
  * Pure: the floating launcher drives the clock and keeps the pacing.
  */
+import { localized } from './i18n';
 import type { Track } from './keyframes';
 import type { MascotArm } from './mascotArt';
 
@@ -39,14 +40,14 @@ export const IDLE_CALL_RETRY_MS = 4000;
 /** A greeting on screen gets this long alone before the mascot may call. */
 export const GREETING_FIRST_MS = 15000;
 
-/** The bubble's line per style (i18n en idle.*). */
-export const IDLE_CALL_LINES: Record<Exclude<LauncherIdleCall, 'off'>, string> = {
-  psst: 'Psst!',
-  peek: 'Hey, over here!',
-  wave: 'Hi there!',
-  knock: 'Knock knock!',
-  tap: 'Got a question?',
-};
+/** The bubble's line per style, in the active language (web i18n idle.*). */
+export const IDLE_CALL_LINES: Record<Exclude<LauncherIdleCall, 'off'>, string> = localized({
+  psst: 'idle.psst',
+  peek: 'idle.peek',
+  wave: 'idle.wave',
+  knock: 'idle.knock',
+  tap: 'idle.tap',
+});
 
 export const normalizeLauncherIdleCall = (value: unknown): LauncherIdleCall =>
   LAUNCHER_IDLE_CALLS.includes(value as LauncherIdleCall) ? (value as LauncherIdleCall) : DEFAULT_LAUNCHER_IDLE_CALL;
