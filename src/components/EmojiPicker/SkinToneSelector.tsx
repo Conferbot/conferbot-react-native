@@ -9,8 +9,9 @@ import {
   Modal,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
-import { SKIN_TONES, applySkintone, type SkinToneId } from './emojiData';
+import { SKIN_TONES, applySkintone, skinToneName, type SkinToneId } from './emojiData';
 
 export interface SkinToneSelectorProps {
   visible: boolean;
@@ -107,7 +108,7 @@ export const SkinToneSelector: React.FC<SkinToneSelectorProps> = ({
         onPress={onClose}
         activeOpacity={1}
         accessible={true}
-        accessibilityLabel="Close skin tone selector"
+        accessibilityLabel={t('sdk.emoji.toneClose')}
         accessibilityRole="button"
       >
         <Animated.View
@@ -131,7 +132,7 @@ export const SkinToneSelector: React.FC<SkinToneSelectorProps> = ({
                   style={styles.skinToneButton}
                   activeOpacity={0.7}
                   accessible={true}
-                  accessibilityLabel={`${skinTone.name} skin tone`}
+                  accessibilityLabel={t('sdk.emoji.tone', { name: skinToneName(skinTone) })}
                   accessibilityRole="button"
                   testID={`${testID}-${skinTone.id}`}
                 >
