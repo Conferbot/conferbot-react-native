@@ -53,3 +53,23 @@ export {
   LoadingIndicator,
   QuizQuestion,
 } from './SpecialComponents';
+
+// The flow steps' own cards (consent, OTP, address, signature, ranking,
+// matrix, payment, slider, date / time, cards, pictures) and the router
+// NodeRenderer uses, for custom renderers.
+export {
+  stepViewFor,
+  useStepLook,
+  ConsentStep,
+  PaymentStep,
+  RankingStep,
+  MatrixStep,
+  OtpStep,
+  AddressStep,
+  SignatureStep,
+  SliderStep,
+  DateTimeStep,
+  CardsStep,
+  ImageChoiceStep,
+} from './steps';
+export type { StepViewProps, StepLook } from './steps';
