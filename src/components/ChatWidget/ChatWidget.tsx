@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useTheme, ThemeProvider } from '../../theme';
+import { t } from '../../core/i18n';
 import { useConferBot } from '../../context/ConferBotContext';
 import { ChatHeader } from '../ChatHeader';
 import { HeaderMenu } from '../ChatHeader/HeaderMenu';
@@ -192,8 +193,8 @@ class ConferBotErrorBoundary extends React.Component<
 const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   visible: controlledVisible,
   onClose,
-  title = 'Chat',
-  placeholder = 'Type a message...',
+  title: titleProp,
+  placeholder: placeholderProp,
   enableAttachments = false,
   enableVoiceMessage = false,
   showTimestamps = false,
@@ -204,6 +205,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   voiceMaxDuration = 300000, // 5 minutes
   voiceMinDuration = 1000, // 1 second
 }) => {
+  const placeholder = placeholderProp ?? t('chat.composer.placeholder');
+  const title = titleProp ?? t('tabs.chat');
   const theme = useTheme();
   const styles = createStyles(theme);
 
@@ -376,12 +379,12 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
   // ---- Header Menu Actions ---- //
   const handleRestartChat = useCallback(() => {
     Alert.alert(
-      'Restart Chat',
-      'This will clear the current conversation and start fresh. Continue?',
+      t('sdk.restart.title'),
+      t('sdk.restart.message'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Restart',
+          text: t('chat.menu.restart'),
           style: 'destructive',
           onPress: () => resetConversation(),
         },
@@ -391,7 +394,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
   const handleDownloadTranscript = useCallback(() => {
     if (!record || record.length === 0) {
-      Alert.alert('No Messages', 'There are no messages to share.');
+      Alert.alert(t('sdk.transcript.emptyTitle'), t('sdk.transcript.empty'));
       return;
     }
 
@@ -399,15 +402,15 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     for (const msg of record) {
       const time = msg.time ? new Date(msg.time).toLocaleTimeString() : '';
       if (msg.type === 'user-message' || msg.type === 'user-live-message') {
-        lines.push(`[${time}] You: ${msg.text || ''}`);
+        lines.push(`[${time}] ${t('transcript.you')}: ${msg.text || ''}`);
       } else if (
         msg.type === 'bot-message' ||
         msg.type === 'agent-message'
       ) {
         const sender =
           msg.type === 'agent-message'
-            ? msg.agentDetails?.name || 'Agent'
-            : botName || 'Bot';
+            ? msg.agentDetails?.name || t('agent.agent')
+            : botName || t('transcript.bot');
         lines.push(`[${time}] ${sender}: ${msg.text || ''}`);
       } else if (msg.type === 'agent-joined-message' || msg.type === 'agent-left-chat') {
         lines.push(`[${time}] --- ${msg.text || ''} ---`);
@@ -418,21 +421,21 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
     Share.share({
       message: transcript,
-      title: `Chat Transcript — ${botName || 'Conferbot'}`,
+      title: t('transcript.title', { name: botName || 'Conferbot' }),
     }).catch(() => {});
   }, [record, botName]);
 
   const headerMenuItems: HeaderMenuItem[] = [
     {
       id: 'restart',
-      label: 'Restart Chat',
+      label: t('sdk.restart.title'),
       icon: '↻',
       onPress: handleRestartChat,
       destructive: true,
     },
     {
       id: 'transcript',
-      label: 'Share Transcript',
+      label: t('sdk.transcript.share'),
       icon: '↗',
       onPress: handleDownloadTranscript,
     },
@@ -569,7 +572,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       }
     } catch (error: any) {
       console.error('[ChatWidget] Failed to send voice message:', error);
-      Alert.alert('Send Failed', error.message || 'Failed to send voice message. Please try again.');
+      Alert.alert(t('sdk.send.failedTitle'), t('voice.messageFailed'));
       throw error;
     }
   }, [debug, uploadFileToServer, sendMessage]);
@@ -581,9 +584,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     // Validate file size
     if (file.size > MAX_ATTACHMENT_SIZE) {
       Alert.alert(
-        'File Too Large',
-        `Maximum file size is ${formatFileSize(MAX_ATTACHMENT_SIZE)}. Your file is ${formatFileSize(file.size)}.`,
-        [{ text: 'OK' }]
+        t('sdk.file.tooLargeTitle'),
+        t('upload.overSize', { mb: Math.round(MAX_ATTACHMENT_SIZE / (1024 * 1024)) }),
+        [{ text: t('sdk.common.ok') }]
       );
       return;
     }
@@ -628,7 +631,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
     if (hasImagePicker) {
       buttons.push({
-        text: 'Take Photo',
+        text: t('sdk.file.takePhoto'),
         onPress: async () => {
           try {
             const result = await FilePicker.takePhoto({
@@ -641,7 +644,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
             }
           } catch (error) {
             if (error instanceof FilePickerError && error.code !== 'NOT_AVAILABLE') {
-              Alert.alert('Error', error.message);
+              Alert.alert(t('sdk.common.error'), t('common.somethingWrong'));
             }
           }
         },
@@ -649,7 +652,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
 
       buttons.push({
-        text: 'Choose from Gallery',
+        text: t('sdk.file.gallery'),
         onPress: async () => {
           try {
             const results = await FilePicker.pickImages({
@@ -663,7 +666,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
             }
           } catch (error) {
             if (error instanceof FilePickerError && error.code !== 'NOT_AVAILABLE') {
-              Alert.alert('Error', error.message);
+              Alert.alert(t('sdk.common.error'), t('common.somethingWrong'));
             }
           }
         },
@@ -673,7 +676,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
     if (hasFilePicker) {
       buttons.push({
-        text: 'Choose Document',
+        text: t('sdk.file.document'),
         onPress: async () => {
           try {
             const results = await FilePicker.pickDocuments({
@@ -686,7 +689,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
             }
           } catch (error) {
             if (error instanceof FilePickerError && error.code !== 'NOT_AVAILABLE') {
-              Alert.alert('Error', error.message);
+              Alert.alert(t('sdk.common.error'), t('common.somethingWrong'));
             }
           }
         },
@@ -695,13 +698,13 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     }
 
     buttons.push({
-      text: 'Cancel',
+      text: t('common.cancel'),
       style: 'cancel',
       onPress: () => {},
     });
 
 
-    Alert.alert('Attach File', 'Choose how you want to add a file', buttons);
+    Alert.alert(t('chat.composer.attach'), t('sdk.file.selectMessage'), buttons);
   }, [debug, handleFileSelected]);
 
   /**
@@ -778,10 +781,10 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       setSelectedAttachment(prev => prev ? {
         ...prev,
         isUploading: false,
-        error: error.message || 'Failed to upload file',
+        error: t('upload.failed'),
       } : null);
 
-      Alert.alert('Upload Failed', error.message || 'Failed to upload file. Please try again.');
+      Alert.alert(t('sdk.upload.failedTitle'), t('upload.failed'));
     }
   }, [selectedAttachment, uploadFileToServer, sendMessage, debug, isLiveChatMode, sendLiveFile]);
 
@@ -808,7 +811,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
 
   // Under the bot's name: "Reconnecting..." while offline. The header keeps
   // the bot (never the agent), as the web widget does.
-  const getSubtitle = (): string | undefined => (!isConnected ? 'Reconnecting...' : undefined);
+  const getSubtitle = (): string | undefined => (!isConnected ? t('sdk.chat.reconnecting') : undefined);
 
   // "Online", the team's reply time, or plain "Online" once a person is in
   // the chat (core/replyTime.ts, the web's replyTime.ts / headerPresence.ts).
@@ -873,7 +876,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
             {/* Header */}
             <View style={styles.attachmentPreviewHeader}>
               <Text style={[styles.attachmentPreviewTitle, { color: theme.colors.text }]}>
-                Attachment Preview
+                {t('sdk.attachment.preview')}
               </Text>
               <TouchableOpacity
                 onPress={handleCancelAttachment}
@@ -945,7 +948,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
                 disabled={isUploading}
               >
                 <Text style={[styles.attachmentCancelText, { color: theme.colors.text }]}>
-                  Cancel
+                  {t('common.cancel')}
                 </Text>
               </TouchableOpacity>
 
@@ -963,7 +966,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
                   <ActivityIndicator size="small" color={theme.colors.textInverse} />
                 ) : (
                   <Text style={[styles.attachmentSendText, { color: theme.colors.textInverse }]}>
-                    Send
+                    {t('common.send')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -991,7 +994,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       }}
       statusBarTranslucent={false}
       accessible={true}
-      accessibilityLabel="Chat modal"
+      accessibilityLabel={t('sdk.chat.modal')}
       testID={testID}
     >
       <ThemeProvider theme={serverThemeOverride || undefined}>
@@ -1081,7 +1084,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
               <ChatBottomBar
                 onSend={handleSendMessage}
                 onTyping={handleTyping}
-                placeholder={closed?.inputOff ? closed.text : lockedBy || !visitorInputEnabled ? 'Replies are turned off for now' : placeholder}
+                placeholder={closed?.inputOff ? closed.text : lockedBy || !visitorInputEnabled ? t('sdk.chat.repliesOff') : placeholder}
                 disabled={!isConnected || !!lockedBy || !visitorInputEnabled || !!closed?.inputOff}
                 onAttach={
                   isLiveChatMode && canPickFiles && (visitorUploadsOn(serverCustomizations) || !!fileRequestedBy)
