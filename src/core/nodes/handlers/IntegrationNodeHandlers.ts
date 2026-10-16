@@ -95,6 +95,7 @@ import { surveyRatingPayload } from '../../liveChat';
 import { stripHtml } from './DisplayNodeHandlers';
 import { ctxOf, FlowContext } from '../../flow/context';
 import { EN, isValidEmail, isValidPhone, normalizePhone, ownerTextOr } from '../../flow/inputs';
+import { liveEventId } from '../../liveEvents';
 
 // ========================================
 // ADDITIONAL TYPES
@@ -747,6 +748,21 @@ export class GPTHandler extends BaseIntegrationHandler {
 // ========================================
 
 /**
+ * The handover step's post-chat survey questions, asked when an agent ends
+ * the live chat (web core/events/agentListeners.ts onChatEnded, special.ts
+ * _handlePostChatSurveyQuestionsLooper). The builder saves the switch as
+ * `enablePostChatSurveyQuestions`; the older `enablePostChatSurvey` still
+ * counts, as in the Android (#72) and Flutter (#74) SDKs. Off, or no
+ * questions: none.
+ */
+export const postChatSurveyQuestionsOf = (data: Record<string, any> | null | undefined): any[] => {
+  if (!data) return [];
+  const on = data.enablePostChatSurveyQuestions === true || data.enablePostChatSurvey === true;
+  const list = Array.isArray(data.postChatSurveyQuestions) ? data.postChatSurveyQuestions : [];
+  return on ? list.filter((q: any) => q && typeof q === 'object') : [];
+};
+
+/**
  * Handles human handover node - initiates live agent handover
  * with full pre-chat form, queue management, and post-chat survey support.
  */
@@ -772,6 +788,12 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
       });
       return this.askPreChat(node, state, 0);
     }
+
+    // The post-chat survey's answer variables, known from the start (web
+    // index.ts, the handover step's transcript and answerVariables).
+    postChatSurveyQuestionsOf(data as Record<string, any>).forEach((q) => {
+      if (q?.answerVariable) state.registerAnswerVariable(String(q.id), q.answerVariable);
+    });
 
     // Pre-chat form gate: when configured, collect visitor details BEFORE
     // initiating the handover. handleResponse({ action: 'preChatSubmit' })
@@ -907,6 +929,71 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
   }
 
   /**
+   * Post-chat survey question `index`, after 2000 ms of typing, answered in
+   * the composer (web special.ts _handlePostChatSurveyQuestionsLooper): the
+   * question goes into the record as post-chat-survey-question.
+   */
+  private async askPostChat(node: Record<string, unknown>, state: ChatState, index: number): Promise<NodeResult> {
+    const data = (this.getNodeData(node) || {}) as Record<string, any>;
+    const nodeId = this.getNodeId(node);
+    const q = postChatSurveyQuestionsOf(data)[index] || {};
+    if ((node as any).ctx) await ctxOf(node as Record<string, any>, state).typing(2000);
+    state.setVariable(`_postChat_${nodeId}`, index);
+    const question = stripHtml(state.resolveVariables(String(q.questionText || ''), 'html'));
+    if (question) state.addBotMessage(question, nodeId, 'human-handover-node');
+    state.addRecord({
+      id: q.id,
+      shape: 'post-chat-survey-question',
+      type: 'post-chat-survey-question',
+      text: q.questionText,
+    } as any);
+    const variable = String(q.answerVariable || '').toLowerCase();
+    return NodeResult.displayUI({
+      ...NodeUIState.textInput(nodeId, question, q.answerVariable || '', variable === 'email' ? 'email' : variable === 'phone' || variable === 'mobile' ? 'phone' : 'text'),
+      awaitInput: true,
+    });
+  }
+
+  /**
+   * An answer to a post-chat survey question: checked as the web checks it,
+   * recorded as post-chat-survey-question-response (its own id, the
+   * question's id as questionId) and as the question's answer variable;
+   * then the next question, or the flow carries on along the handover
+   * step's next edge (web special.ts _handlePostChatSurveyQuestionsSubmit,
+   * _handoverProceedToNextStep).
+   */
+  private async answerPostChat(response: unknown, node: Record<string, unknown>, state: ChatState, index: number): Promise<NodeResult> {
+    const data = (this.getNodeData(node) || {}) as Record<string, any>;
+    const nodeId = this.getNodeId(node);
+    const questions = postChatSurveyQuestionsOf(data);
+    const q = questions[index] || {};
+    const value = typeof response === 'string' ? response.trim() : String((response as any)?.value ?? (response as any)?.text ?? '').trim();
+    const ui = { ...NodeUIState.textInput(nodeId, stripHtml(String(q.questionText || '')), q.answerVariable || '', 'text'), awaitInput: true };
+    if (!value) return NodeResult.displayUI(ui);
+    if (q.answerVariable === 'email' && !isValidEmail(value)) {
+      return NodeResult.invalid(ownerTextOr(q.incorrectEmailResponse, EN.emailInvalid, ['Please enter a valid email']), ui);
+    }
+    if (q.answerVariable === 'mobile' || q.answerVariable === 'phone') {
+      if (!isValidPhone(value)) return NodeResult.invalid(ownerTextOr(q.incorrectPhoneNumberResponse, EN.phoneInvalid), ui);
+    }
+    if (q.answerVariable === 'name') state.setUserName(value);
+    if (q.answerVariable === 'email') state.setUserEmail(value);
+    if (q.answerVariable === 'mobile' || q.answerVariable === 'phone') state.setUserPhone(normalizePhone(value));
+    state.addRecord({
+      id: liveEventId('post-chat-answer'),
+      questionId: q.id,
+      shape: 'post-chat-survey-question-response',
+      type: 'post-chat-survey-question-response',
+      text: value,
+    } as any);
+    state.addUserMessage(value, nodeId);
+    state.setAnswerVariable(String(q.id), value);
+    if (index + 1 < questions.length) return this.askPostChat(node, state, index + 1);
+    state.setVariable(`_postChat_${nodeId}`, 'done');
+    return this.proceed(node, { handoverEnded: true, postChatSurvey: true });
+  }
+
+  /**
    * Handles handover status updates and UI actions
    */
   async handleResponse(
@@ -916,6 +1003,11 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
   ): Promise<NodeResult> {
     const data = this.getNodeData(node);
     const nodeId = this.getNodeId(node);
+
+    const postIndex = state.getVariable(`_postChat_${nodeId}`);
+    if (typeof postIndex === 'number' && (typeof response === 'string' || (response && !(response as any).action && !(response as any).status))) {
+      return this.answerPostChat(response, node, state, postIndex);
+    }
 
     const preIndex = state.getVariable(`_preChat_${nodeId}`);
     if (typeof preIndex === 'number' && (typeof response === 'string' || (response && !(response as any).action && !(response as any).status))) {
@@ -1004,6 +1096,16 @@ export class HumanHandoverHandler extends BaseIntegrationHandler {
 
       case 'continue':
         return Promise.resolve(this.proceed(node, { handoverEnded: true }));
+
+      // An agent ended the live chat (chat-ended): the step's post-chat
+      // survey questions when it has them, else the flow carries on along
+      // its next edge (web agentListeners.ts onChatEnded).
+      case 'chatEnded': {
+        state.setVariable('_handoverEnded', true);
+        state.setVariable('_handoverEndTime', new Date().toISOString());
+        if (postChatSurveyQuestionsOf(data as Record<string, any>).length) return this.askPostChat(node, state, 0);
+        return Promise.resolve(this.proceed(node, { handoverEnded: true }));
+      }
     }
 
     // Handle socket status updates
