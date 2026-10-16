@@ -24,11 +24,14 @@
  * "For this page" articles and a greeting page rule's own questions; an app
  * has no page address or title, so the agent's own questions are used), the
  * help card's own search's "For this page", and the floating panel's
- * three-article cap (wider than 500px only). The mascot is a later item:
- * `HomeModel.mascot` is where it will go.
+ * three-article cap (wider than 500px only). The web's home draws no mascot
+ * (it appears on the launcher, the greeting card, the typing bubble and the
+ * idle call); `HomeModel.mascot` is the owner's, for an app's own
+ * `<HomeScreen renderMascot>` (components/Mascot `<Mascot>`).
  *
  * Pure: everything the view needs comes out of `homeModel`.
  */
+import { mascotLookOf, type MascotLook } from './mascotArt';
 import { answersFor, flattenArticles, helpCentreOn, isRealQuestion, keywordsOf, searchArticles, tokenize, type HelpArticle } from './waitArticles';
 import { homePeople, STRINGS as REPLY, type Tone } from './replyTime';
 import { isNewReply, ordered, rowLine, stateOf, requestsAccent, ON_HOME, type RequestState, type RequestSummary } from './requests';
@@ -568,8 +571,8 @@ export interface HomeModel {
   order: HomeSection[];
   /** Every article the ask box and the help card search. */
   articles: HelpArticle[];
-  /** Where the home's mascot will go (a later item): null for now. */
-  mascot: null;
+  /** The owner's mascot (art3d mascotLookOf) and its colour, for an app that draws it on its home (renderMascot); the web's home has none. */
+  mascot: { look: MascotLook; accent: string };
 }
 
 const truncate = (text: unknown, max: number): string => {
@@ -687,7 +690,7 @@ export const homeModel = (input: HomeInput): HomeModel | null => {
     trust,
     order,
     articles,
-    mascot: null,
+    mascot: { look: mascotLookOf(c), accent: (typeof c.widgetIconBgColor === 'string' && c.widgetIconBgColor.trim()) || (typeof c.headerBgColor === 'string' && c.headerBgColor.trim()) || '#4f46e5' },
   };
 };
 
