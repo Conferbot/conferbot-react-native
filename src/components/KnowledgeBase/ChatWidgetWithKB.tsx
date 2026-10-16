@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import type { KBCategoryWithArticles, KBArticle } from './types';
 import { KnowledgeBaseScreen } from './KnowledgeBaseScreen';
@@ -59,18 +60,20 @@ export interface ChatWidgetWithKBProps {
 export const ChatWidgetWithKB: React.FC<ChatWidgetWithKBProps> = ({
   visible: controlledVisible,
   onClose,
-  chatTitle = 'Chat',
+  chatTitle: chatTitleProp,
   placeholder,
   enableAttachments = false,
   showTimestamps = false,
   enableKnowledgeBase = true,
   kbCategories = [],
-  kbTitle = 'Help Center',
+  kbTitle: kbTitleProp,
   kbIntegration = 'tab',
   onArticleView,
   debug = false,
   testID,
 }) => {
+  const kbTitle = kbTitleProp ?? t('home.helpCentre');
+  const chatTitle = chatTitleProp ?? t('tabs.chat');
   const theme = useTheme();
   const styles = createStyles(theme);
 
@@ -149,7 +152,7 @@ export const ChatWidgetWithKB: React.FC<ChatWidgetWithKBProps> = ({
           style={styles.tab}
           onPress={() => handleTabChange('chat')}
           accessible={true}
-          accessibilityLabel="Chat tab"
+          accessibilityLabel={t('tabs.chat')}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'chat' }}
           testID={`${testID}-tab-chat`}
@@ -176,7 +179,7 @@ export const ChatWidgetWithKB: React.FC<ChatWidgetWithKBProps> = ({
           style={styles.tab}
           onPress={() => handleTabChange('kb')}
           accessible={true}
-          accessibilityLabel="Help center tab"
+          accessibilityLabel={t('home.helpCentre')}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'kb' }}
           testID={`${testID}-tab-kb`}
@@ -252,7 +255,7 @@ export const ChatWidgetWithKB: React.FC<ChatWidgetWithKBProps> = ({
                 onPress={onClose}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessible={true}
-                accessibilityLabel="Close"
+                accessibilityLabel={t('common.close')}
                 accessibilityRole="button"
                 testID={`${testID}-close`}
               >
