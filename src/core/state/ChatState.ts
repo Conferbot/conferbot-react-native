@@ -1271,6 +1271,24 @@ export class ChatState {
   }
 
   /**
+   * Puts a saved state (toJSON) back in place, keeping this instance and
+   * its listeners: what "Edit" on an answer returns to (core/delight.ts).
+   */
+  restore(data: Record<string, any>): void {
+    const copy = ChatState.fromJSON(JSON.parse(JSON.stringify({ ...data, sessionId: this._sessionId, botId: this._botId })));
+    this._answerVariables = copy._answerVariables;
+    this._variables = copy._variables;
+    this._userMetadata = copy._userMetadata;
+    this._transcript = copy._transcript;
+    this._record = copy._record;
+    this._currentNodeId = copy._currentNodeId;
+    this._visitedNodes = copy._visitedNodes;
+    this._isFlowComplete = copy._isFlowComplete;
+    this._flowCompletionReason = copy._flowCompletionReason;
+    this.notifyListeners();
+  }
+
+  /**
    * Resets the state for a new conversation
    */
   reset(): void {
