@@ -237,3 +237,25 @@ export const homePeople = (
   const words = phraseOf(rt);
   return { text: fixedOf(rt) || (words ? H.usually(words) : H.usuallyInstantly), tone: 'online' };
 };
+
+/** The usual wait, per bucket, in the active language (web reply.wait.*). */
+export const WAITS: Record<string, string> = localized(
+  BUCKETS.reduce((out, b) => ({ ...out, [b]: `reply.wait.${b}` as I18nKey }), {} as Record<string, I18nKey>)
+);
+
+const waitOf = (bucket?: string | null, fallback?: string | null): string => (bucket && WAITS[bucket]) || fallback || '';
+
+/**
+ * "Typical wait: a few minutes" for the wait card (web replyTime.ts
+ * typicalWait): the routed team's usual first reply (queue-status
+ * `typical`), else the workspace's (customizations.replyTime). null when
+ * the owner chose Fixed or Hide, or there is no data.
+ */
+export const typicalWait = (
+  rt: ReplyTime | null | undefined,
+  queueTypical?: { bucket?: string | null; wait?: string | null } | null
+): string | null => {
+  if (rt && (rt.mode === 'hide' || fixedOf(rt))) return null;
+  const w = waitOf(queueTypical?.bucket, queueTypical?.wait) || (rt ? waitOf(rt.bucket, rt.wait) : '');
+  return w ? t('reply.typicalWait', { wait: w }) : null;
+};
