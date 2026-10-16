@@ -29,6 +29,7 @@ import {
   KB_CLIENT_TIMEOUT_MS,
   MatrixSelection,
   OTP_LENGTH,
+  OTP_RESEND_SECONDS,
   PAYMENT_PEEK_MS,
   PaymentOutcome,
   addressErrorText,
@@ -493,12 +494,19 @@ export class OtpNodeHandler extends RichHandler {
 
   private ui(node: Record<string, any>, state: ChatState, stage: 'email' | 'code'): NodeUIState.TextInput {
     const question = stage === 'email' ? this.prompt(node, state) || 'Email address' : `Enter the ${OTP_LENGTH}-digit code we sent you`;
+    const st = state.getVariable(this.key(node)) || {};
     return {
       ...NodeUIState.textInput(node.id, question, node.data?.answerVariable || '', stage === 'email' ? 'email' : 'number', {
         placeholder: stage === 'email' ? 'name@example.com' : '123456',
       }),
       awaitInput: true,
-      ...({ stage, allowSkip: !!node.data?.allowSkip, skipLabel: String(node.data?.skipLabel || '').trim() || 'Skip' } as any),
+      ...({
+        stage,
+        allowSkip: !!node.data?.allowSkip,
+        skipLabel: String(node.data?.skipLabel || '').trim() || 'Skip',
+        // The code card: where it went, and when Resend opens (web OTP_RESEND_SECONDS / resendIn).
+        ...(stage === 'code' ? { sentTo: st.email || '', sentAt: st.sentAt || 0, resendIn: st.resendIn ?? OTP_RESEND_SECONDS } : {}),
+      } as any),
     };
   }
 
@@ -521,7 +529,8 @@ export class OtpNodeHandler extends RichHandler {
     const target = to.trim().toLowerCase();
     const r = await richPost(ctx, 'otp/send', { nodeId: String(node.id), sessionId: sessionOf(state), email: target });
     if (r.ok || r.code === 'resend_wait') {
-      state.setVariable(this.key(node), { stage: 'code', email: target });
+      const wait = Number(r.code === 'resend_wait' ? r.data?.retryAfter : r.data?.resendIn) || OTP_RESEND_SECONDS;
+      state.setVariable(this.key(node), { stage: 'code', email: target, sentAt: Date.now(), resendIn: wait });
       botSay(state, `We sent a ${OTP_LENGTH}-digit code to ${String(r.data?.sentTo || target)}`, node.id, this.nodeType);
       if (r.code === 'resend_wait') return NodeResult.invalid(otpErrorText('resend_wait', { retryAfter: r.data?.retryAfter }), this.ui(node, state, 'code'), true);
       return NodeResult.displayUI(this.ui(node, state, 'code'));
@@ -927,10 +936,12 @@ export class SignatureNodeHandler extends RichHandler {
     }
     if (method === 'typed' && (!cfg.allowTyped || !isSignatureName(name))) return NodeResult.invalid('Type your full name to sign.', this.ui(node, state), true);
     const image = method === 'typed' ? typedSignatureSvg(name) : { dataUrl: response.dataUrl, width: Number(response.width) || 0, height: Number(response.height) || 0 };
+    // Typed names and the native pad's strokes are SVG; an app's own pad may hand over a PNG.
+    const svg = method === 'typed' || /^data:image\/svg\+xml/i.test(String(image.dataUrl));
     const up = await ctxOf(node, state).upload({
       dataUrl: image.dataUrl,
-      name: `signature-${Date.now()}.${method === 'typed' ? 'svg' : 'png'}`,
-      type: method === 'typed' ? 'image/svg+xml' : 'image/png',
+      name: `signature-${Date.now()}.${svg ? 'svg' : 'png'}`,
+      type: svg ? 'image/svg+xml' : 'image/png',
     });
     if (!up.ok || !up.url) return NodeResult.invalid("We couldn't save your signature. Please try again.", this.ui(node, state), true);
     const at = new Date().toISOString();
@@ -981,7 +992,11 @@ export class PaymentNodeHandler extends RichHandler {
     const buttons: NodeUIState.Buttons['buttons'] = [{ id: 'open', label: s?.amountText ? `${label} · ${s.amountText}` : label, value: url || '', style: 'primary' }];
     if (s?.waiting) buttons.push({ id: 'check', label: t('pay.ivePaid'), style: 'outline' });
     buttons.push({ id: 'cancel', label: t('common.cancel'), style: 'outline' });
-    return { ...NodeUIState.buttons(node.id, this.prompt(node, state), buttons), awaitInput: true, ...({ checkoutUrl: url } as any) };
+    return {
+      ...NodeUIState.buttons(node.id, this.prompt(node, state), buttons),
+      awaitInput: true,
+      ...({ checkoutUrl: url, expiresAt: s && s.paymentId ? s.deadline : undefined, waiting: !!s?.waiting } as any),
+    };
   }
 
   private stop(s: PaymentSession) {
