@@ -42,6 +42,7 @@ import {
   helpSearch,
   homePalette,
   remoteQueryFor,
+  type HomeModel,
 } from '../../core/home';
 
 let SvgXml: any = null;
@@ -110,8 +111,12 @@ const Rise = ({ delay = 0, still, children, style }: any) => {
 export interface HomeScreenProps {
   /** The cross at the top: close the chat. */
   onClose?: () => void;
-  /** Where the home's mascot will go (a later item): drawn above the greeting. */
-  renderMascot?: () => React.ReactNode;
+  /**
+   * The app's own mascot spot, above the greeting: given the owner's mascot
+   * (look and colour), e.g. `(m) => <Mascot look={m.look} accent={m.accent} mood="wave" />`.
+   * The web's home draws none, so nothing is drawn without it.
+   */
+  renderMascot?: (mascot: HomeModel['mascot']) => React.ReactNode;
   testID?: string;
 }
 
@@ -613,7 +618,7 @@ const HomeView: React.FC<HomeScreenProps> = ({ onClose, renderMascot, testID = '
                 ) : null}
               </View>
             ) : null}
-            {renderMascot ? renderMascot() : null}
+            {renderMascot ? renderMascot(m.mascot) : null}
             <Text style={[{ color: bandInk, fontSize: 13.5, fontWeight: '600', opacity: 0.82 }, ff]} testID={`${testID}-hello`}>
               {m.hello}
             </Text>
