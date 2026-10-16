@@ -22,6 +22,7 @@ import {
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.75;
@@ -72,7 +73,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         isBot ? styles.botMessage : styles.userMessage,
       ]}
       accessibilityRole="text"
-      accessibilityLabel={isBot ? `Bot message: ${text}` : `Your message: ${text}`}
+      accessibilityLabel={isBot ? t('sdk.message.bot', { text }) : t('sdk.message.yours', { text })}
       testID={testID}
     >
       {showAvatar && isBot && (
@@ -82,7 +83,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             { backgroundColor: theme.colors.primary },
           ]}
           accessibilityRole="image"
-          accessibilityLabel="Bot avatar"
+          accessibilityLabel={t('sdk.message.botAvatar')}
         >
           <Text style={[styles.avatarText, { color: theme.colors.textInverse }]}>
             B
@@ -186,7 +187,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
         theme.shadows.sm,
       ]}
       accessibilityRole="image"
-      accessibilityLabel={alt || caption || 'Image'}
+      accessibilityLabel={alt || caption || t('sdk.media.image')}
       testID={testID}
     >
       {loading && (
@@ -197,7 +198,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
       {error ? (
         <View style={styles.imageError}>
           <Text style={[styles.imageErrorText, { color: theme.colors.error }]}>
-            Failed to load image
+            {t('sdk.media.imageFailed')}
           </Text>
         </View>
       ) : (
@@ -273,7 +274,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         theme.shadows.sm,
       ]}
       accessibilityRole="button"
-      accessibilityLabel="Video player. Tap to play"
+      accessibilityLabel={t('sdk.media.videoPlayer')}
       testID={testID}
     >
       {poster ? (
@@ -300,7 +301,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         ]}
         onPress={handlePlayPress}
         accessibilityRole="button"
-        accessibilityLabel="Play video"
+        accessibilityLabel={t('sdk.media.playVideo')}
       >
         <Text style={[styles.playIcon, { color: theme.colors.textInverse }]}>
           {'\u25B6'}
@@ -351,7 +352,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         theme.shadows.sm,
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`Audio player. ${isPlaying ? 'Playing' : 'Paused'}`}
+      accessibilityLabel={isPlaying ? t('sdk.media.audioPlaying') : t('sdk.media.audioPaused')}
       testID={testID}
     >
       <TouchableOpacity
@@ -361,7 +362,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         ]}
         onPress={handlePlayPause}
         accessibilityRole="button"
-        accessibilityLabel={isPlaying ? 'Pause audio' : 'Play audio'}
+        accessibilityLabel={isPlaying ? t('sdk.media.pauseAudio') : t('sdk.media.playAudio')}
       >
         <Text style={[styles.audioPlayIcon, { color: theme.colors.textInverse }]}>
           {isPlaying ? '\u275A\u275A' : '\u25B6'}
@@ -466,7 +467,7 @@ export const FileDownload: React.FC<FileDownloadProps> = ({
       onPress={handleDownload}
       disabled={downloading}
       accessibilityRole="button"
-      accessibilityLabel={`Download file: ${filename}`}
+      accessibilityLabel={t('sdk.media.downloadFile', { name: filename })}
       testID={testID}
     >
       <View style={[styles.fileIcon, { backgroundColor: theme.colors.primaryLight }]}>
@@ -552,7 +553,7 @@ export const HTMLView: React.FC<HTMLViewProps> = ({ nodeId, content, testID }) =
         },
       ]}
       accessibilityRole="text"
-      accessibilityLabel="HTML content"
+      accessibilityLabel={t('sdk.media.html')}
       testID={testID}
     >
       <ScrollView
