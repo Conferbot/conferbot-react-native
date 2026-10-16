@@ -28,6 +28,7 @@
 
 // @ts-ignore
 import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
+import { t } from '../core/i18n';
 
 // ========================================
 // TYPES
@@ -339,11 +340,11 @@ const requestCameraPermission = async (): Promise<boolean> => {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.CAMERA,
         {
-          title: 'Camera Permission',
-          message: 'This app needs access to your camera to take photos.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
+          title: t('sdk.permission.cameraTitle'),
+          message: t('sdk.permission.cameraMessage'),
+          buttonNeutral: t('sdk.permission.later'),
+          buttonNegative: t('common.cancel'),
+          buttonPositive: t('sdk.common.ok'),
         }
       );
       return granted === PermissionsAndroid.RESULTS.GRANTED;
@@ -385,11 +386,11 @@ const requestMediaLibraryPermission = async (): Promise<boolean> => {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
         {
-          title: 'Storage Permission',
-          message: 'This app needs access to your files to select documents.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
+          title: t('sdk.permission.storageTitle'),
+          message: t('sdk.permission.storageMessage'),
+          buttonNeutral: t('sdk.permission.later'),
+          buttonNegative: t('common.cancel'),
+          buttonPositive: t('sdk.common.ok'),
         }
       );
       return granted === PermissionsAndroid.RESULTS.GRANTED;
@@ -414,12 +415,12 @@ const requestMediaLibraryPermission = async (): Promise<boolean> => {
 const showPermissionDeniedAlert = (type: 'camera' | 'storage'): void => {
   const message =
     type === 'camera'
-      ? 'Camera permission is required to take photos. Please enable it in Settings.'
-      : 'Storage permission is required to select files. Please enable it in Settings.';
+      ? t('sdk.permission.cameraDenied')
+      : t('sdk.permission.storageDenied');
 
-  Alert.alert('Permission Required', message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Open Settings', onPress: () => Linking.openSettings() },
+  Alert.alert(t('sdk.permission.requiredTitle'), message, [
+    { text: t('common.cancel'), style: 'cancel' },
+    { text: t('sdk.permission.openSettings'), onPress: () => Linking.openSettings() },
   ]);
 };
 
@@ -977,7 +978,7 @@ export const FilePicker = {
 
       if (options.showCamera !== false && (imagePicker || expoImagePicker)) {
         buttons.push({
-          text: 'Take Photo',
+          text: t('sdk.file.takePhoto'),
           onPress: async () => {
             const result = await FilePicker.takePhoto(options);
             resolve(result ? [result] : []);
@@ -987,7 +988,7 @@ export const FilePicker = {
 
       if (options.showGallery !== false && (imagePicker || expoImagePicker)) {
         buttons.push({
-          text: 'Choose from Gallery',
+          text: t('sdk.file.gallery'),
           onPress: async () => {
             const results = await FilePicker.pickImages(options);
             resolve(results);
@@ -997,7 +998,7 @@ export const FilePicker = {
 
       if (options.showDocuments !== false && (documentPicker || expoDocumentPicker)) {
         buttons.push({
-          text: 'Choose Document',
+          text: t('sdk.file.document'),
           onPress: async () => {
             const results = await FilePicker.pickDocuments(options);
             resolve(results);
@@ -1006,12 +1007,12 @@ export const FilePicker = {
       }
 
       buttons.push({
-        text: 'Cancel',
+        text: t('common.cancel'),
         style: 'cancel',
         onPress: () => resolve([]),
       });
 
-      Alert.alert(options.title || 'Select File', '', buttons);
+      Alert.alert(options.title || t('sdk.file.selectTitle'), '', buttons);
     });
   },
 };
