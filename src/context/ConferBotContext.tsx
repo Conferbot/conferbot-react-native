@@ -40,6 +40,8 @@ import { useChatFontLoader } from '../hooks/useChatFont';
 import { createDraftSender, draftPreviewOn, isSensitiveField } from '../core/typingPreview';
 import { handoverPhase } from '../core/handoverState';
 import { usePostChatRedirect } from './hooks/usePostChatRedirect';
+import { usePushNotifications } from './hooks/usePushNotifications';
+import { getDeviceModel, getOSVersion } from '../services/analytics/DeviceInfo';
 
 // ********** Context Creation ********** //
 const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
@@ -708,19 +710,6 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setIsOpen(false);
   }, []);
 
-  const registerPushToken = useCallback(async (token: string): Promise<void> => {
-    if (!apiClient.current) return;
-    try {
-      const platform = Platform.OS as 'ios' | 'android';
-      await apiClient.current.registerPushToken(token, platform);
-      if (__DEV__) {
-        console.log('[ConferBot] Push token registered:', token);
-      }
-    } catch (error) {
-      console.error('[ConferBot] Failed to register push token:', error);
-    }
-  }, []);
-
   const rateKBArticle = useCallback(
     (articleId: string, helpful: boolean, rating: number, feedback?: string): void => {
       if (!socketClient.current || !socketClient.current.isConnected()) {
@@ -776,6 +765,33 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   });
   requestsRef.current = requests;
 
+  // ********** Push notifications ********** //
+  // Opt-in: the app's FCM / APNs token registered with the conversation,
+  // a tapped Conferbot notification opens it (core/push.ts; embed-server
+  // docs/mobile-push.md).
+  const push = usePushNotifications({
+    botId,
+    api: () => apiClient.current,
+    chatSessionId,
+    recordLength: record.length,
+    userId: user?.id,
+    isInitialized,
+    isOpen,
+    chatVisible: home.view === 'chat',
+    openChat,
+    showChat: home.showChat,
+    openRequests: requests.openRequests,
+    bumpUnread: () => setUnreadCount((n) => n + 1),
+    deviceInfo: () => ({ model: getDeviceModel(), osVersion: getOSVersion() }),
+  });
+  // The legacy name: the token registered with the conversation.
+  const registerPushToken = useCallback((token: string) => push.setPushToken(token), []);
+  // Clearing the visitor also stops their pushes.
+  const clearAllData = useCallback(async () => {
+    await push.unregisterPush();
+    await clearPersistedData();
+  }, [clearPersistedData]);
+
   // What the visitor types in a live or agent chat is what they came for,
   // for "Welcome back" (web special.ts _handleHumanHandoverInputSubmit).
   const sendAndRemember = useCallback(
@@ -817,13 +833,16 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     closeChat,
     sendMessage: sendAndRemember,
     registerPushToken,
+    setPushToken: push.setPushToken,
+    unregisterPush: push.unregisterPush,
+    handlePushNotification: push.handlePushNotification,
     on,
     off,
     addReaction,
     removeReaction,
     getReactions,
     submitNodeResponse,
-    clearPersistedData,
+    clearPersistedData: clearAllData,
     resetConversation,
     getMessageStatus,
     markMessageAsRead: markAsRead,
