@@ -32,6 +32,7 @@ The complete flow recorded live on an Android emulator against production: open 
 - **Server-driven Theming** - Colors, bot name, and avatar configured in the dashboard apply automatically
 - **Live Agent Handover** - Seamless transition between bot and human agents, as on the web widget: a "Connecting you with the team…" line that settles to how the wait ended, the queue, leaving it, agent typing indicators, and a live chat picked back up after an app restart
 - **AI answers as on the web** - Tables, headings, quotes, code blocks and strikethrough in replies; "Helpful?" under each answer (a No is sent at once, then reasons, a comment, "Talk to a person", "Ask another way"; the vote can change); a notice when a reply takes longer than 45s; the device language sent so short messages are answered in it
+- **While you wait** - As on the web widget: 6s into a wait for a person, the help articles that may answer the visitor's question (or the server's own pick, with "That solved it" leaving the queue); 2.5s after the waiting signal, an offer of seven small games (owner setting `waitingGames`) that saves a game and steps aside the moment a person joins
 - **Email me this chat** - From the chat menu, the visitor gets the whole conversation in their inbox (`POST /api/v1/mobile/chat/transcript-email`)
 - **Offline Support** - Messages are queued locally and retried when connectivity returns
 - **Session Persistence** - Conversations survive app restarts via AsyncStorage
@@ -513,6 +514,14 @@ How a handover reads in the chat:
 - The same end twice (an agent's double click) draws one "Chat ended" line and one survey. Once the chat has ended and nothing is going on, the composer turns off and "Start a new chat" starts a fresh conversation.
 - A visitor the workspace blocked sees "This conversation has been closed." (mid-chat, or at connect: the visitor id goes with the socket handshake) and can't type or start a new chat.
 
+### While you wait
+
+The chat fills a wait for a person the way the web widget does. Nothing here is sent anywhere except "That solved it", and the cards are never saved on the device or in the conversation's record.
+
+- **Help articles:** 6 seconds into a wait (a handover with no AI agent first, or an AI passing the visitor on), "While you wait, this might help" lists up to two help-centre articles that match the visitor's last real question. Only with the help centre on (`enableKnowledgeBase`). A tapped article opens in the chat; a page opens in the browser.
+- **The server's pick:** when the server keeps a queue it chooses the help itself (`queue-help`, at most two cards per wait). Its card has "That solved it": the SDK sends `queue-self-resolve { chatSessionId, articleId }`, and once the server says ok the visitor leaves the queue ("You left the queue. Glad that helped.") and the flow carries on. Once the wait is over the card stays under "Articles that might help".
+- **Games:** 2.5 seconds after `cb:waiting-for-human` the card offers rock paper scissors, tic-tac-toe, a quick quiz (with questions from your help centre when it is on), memory match, a reflex test, emoji riddles and a word scramble. Typing "play" or "games" while waiting opens the menu instead of sending the words. "Not now" (or the x) means no more offers for this app session. When a person joins, an unused offer goes and a game in progress is saved ("Sam's here! Your game is saved - finish it later?", "Finish my game"); when the wait ends without anyone, an unused offer goes and a game being played stays. Set `waitingGames: { enabled, games, offerText }` in the dashboard; unset means on with every game.
+
 ## Bot Flows
 
 The SDK runs a bot's flow the way the web widget does. The shared flow-node spec in `scripts/parity/flows/` is the reference, and `__tests__/parity/flows.test.ts` runs all 156 of its cases through the engine. `__tests__/components/FlowStepViews.test.tsx` plays the cases for the step cards on the cards themselves.
@@ -614,6 +623,9 @@ Actions:
 | `sendVisitorTyping` | `(isTyping: boolean) => void` | Emit visitor typing status |
 | `leaveQueue` | `() => Promise<boolean>` | Leave the queue for a person (`queue-self-resolve`), then the flow carries on. `false` when a person already has the chat |
 | `onWidgetSignal` | `(name, (detail) => void) => () => void` | Listen to `cb:waiting-for-human`, `cb:human-joined`, `cb:wait-over` (see Waiting for a person) |
+| `waitHelp` / `openHelpItem` / `solveWait` | state / `(item) => void` / `() => Promise<boolean>` | The while-you-wait help card, a row opened, "That solved it" (see While you wait) |
+| `gamesCard` / `interceptPlay` | `GamesCard \| null` / `(text) => boolean` | The waiting games card on screen (`subscribe`, `getState`, `open`, `press`, `input`); "play" typed while waiting opens it |
+| `openArticle` / `closeArticle` / `openedArticle` | `(id) => void` / `() => void` / article | A help article opened in the chat by id |
 | `openEmailTranscript` / `closeEmailTranscript` | `() => void` | Show / hide the "Email me this chat" card (the chat menu has it) |
 | `emailTranscript` | `(email: string) => Promise<{ ok: boolean; message?: string }>` | Email the transcript to this address; on success the address is kept as the visitor's |
 
