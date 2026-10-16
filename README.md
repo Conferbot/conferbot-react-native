@@ -303,6 +303,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 | `readReceiptConfig`    | `ReadReceiptConfig`      | `enabled`, `showIndicators`, `batchDebounceMs`, `autoMarkAsRead`   |
 | `offlineQueueConfig`   | `OfflineQueueConfig`     | `maxQueueSize`, `maxRetries`, retry backoff, `persistQueue`, `autoProcess` |
 | `widgetLanguage`       | `'auto' \| 'en' \| 'nl' \| 'fr' \| 'de' \| 'es'` | The language of the SDK's own words; wins over the owner's setting (see [Languages](#languages)) |
+| `onPostChatRedirect`   | `(url: string) => boolean \| void` | The owner's post-chat redirect, before the countdown: return `true` when the app handled the URL (or wants none) and no countdown is shown (see [Redirect after chat](#redirect-after-chat)) |
+| `disablePostChatRedirect` | `boolean`             | Never follow the owner's post-chat redirect (default false)       |
+
+### Redirect after chat
+
+When the owner sets a URL in Customize > Conversations > Post-chat redirect, the SDK follows it as the web widget does: once the conversation ends (the flow reaches its end, or an agent ends the chat) and the post-chat rating is sent or put away, a quiet line reads "Taking you to example.com in 10s" with Cancel, then the URL opens in the system browser (`Linking.openURL`). It stops if the visitor cancels, starts a new chat, closes the chat or the app goes to the background, and it is offered only once per conversation. Only `http(s)` addresses are followed.
+
+```tsx
+<ConferBotProvider
+  apiKey="..."
+  botId="..."
+  config={{
+    // Open it in your own screen instead; true = handled, no countdown.
+    onPostChatRedirect: (url) => {
+      navigation.navigate('Web', { url });
+      return true;
+    },
+    // Or turn it off: disablePostChatRedirect: true,
+  }}
+>
+```
 
 ### Languages
 
