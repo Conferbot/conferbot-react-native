@@ -14,6 +14,7 @@ import {
 import { useTheme } from '../../theme';
 import { readableOn } from '../../theme/color';
 import type { ConferBotTheme } from '../../theme/types';
+import { t } from '../../core/i18n';
 
 const CONFERBOT_URL = 'https://www.conferbot.com';
 const CONFERBOT_LOGO_URL =
@@ -47,7 +48,7 @@ export interface ChatBottomBarProps {
 export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
   onSend,
   onTyping,
-  placeholder = 'Type a message...',
+  placeholder = t('chat.composer.placeholder'),
   disabled = false,
   hideBrand = false,
   customBrand,
@@ -99,7 +100,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
             activeOpacity={0.7}
             style={[styles.attachButton, disabled && { opacity: 0.4 }]}
             accessibilityRole="button"
-            accessibilityLabel="Attach a file"
+            accessibilityLabel={t('chat.composer.attach')}
             testID={testID ? `${testID}-attach` : undefined}
           >
             <Text style={styles.attachIcon}>{'\u{1F4CE}'}</Text>
@@ -167,7 +168,7 @@ export const ChatBottomBar: React.FC<ChatBottomBarProps> = ({
             <Text style={styles.customBrandText}>{customBrand}</Text>
           ) : (
             <View style={styles.footerRow}>
-              <Text style={styles.poweredByText}>Powered by </Text>
+              <Text style={styles.poweredByText}>{t('chat.poweredBy')} </Text>
               {!logoFailed ? (
                 <Image
                   source={{ uri: CONFERBOT_LOGO_URL }}
