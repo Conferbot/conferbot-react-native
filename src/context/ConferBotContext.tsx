@@ -24,6 +24,7 @@ import { useSocketListeners } from './hooks/useSocketListeners';
 import { useLiveChat } from './hooks/useLiveChat';
 import { useThemeOverride } from './hooks/useThemeOverride';
 import { resolveCustomizations } from '../core/customizations';
+import { setWidgetLanguage } from '../core/i18n';
 import { resolveWidgetTheme, withThemePalette } from '../core/widgetTheme';
 import { useAgentBot } from './hooks/useAgentBot';
 import { useLiveChatExtras } from './hooks/useLiveChatExtras';
@@ -266,6 +267,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     [themedCustomizations, prefersDark]
   );
   const { serverThemeOverride } = useThemeOverride(themedCustomizations, widgetTheme);
+  // The SDK's own words: the app's choice, else the owner's widgetLanguage,
+  // "auto" (and every bot that never chose) the phone's languages, set
+  // before the chat is drawn (core/i18n; web index.ts setWidgetLanguage).
+  const languageSetting = config?.widgetLanguage ?? serverCustomizations?.widgetLanguage;
+  const widgetLanguage = useMemo(() => setWidgetLanguage(languageSetting), [languageSetting]);
   // The bot's settings as the web widget applies them (core/customizations).
   const customizations = useMemo(
     () => resolveCustomizations(themedCustomizations, '', widgetTheme),
@@ -712,6 +718,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     serverThemeOverride,
     customizations,
     widgetTheme,
+    widgetLanguage,
     botName: serverCustomizations?.botName || serverCustomizations?.logoText || null,
     botAvatarUrl: serverCustomizations ? customizations.avatar : null,
     isRestoring,
