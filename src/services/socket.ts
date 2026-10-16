@@ -62,9 +62,18 @@ interface SocketOptions {
   visitorId?: string;
   socketUrl?: string;
   autoConnect?: boolean;
+  /** How many times socket.io tries to reconnect (config.reconnectionAttempts; default ConferBotNetworkConfig's). */
   reconnectionAttempts?: number;
+  /** The first wait before a reconnect, in ms (config.reconnectionDelay; default ConferBotNetworkConfig's). */
   reconnectionDelay?: number;
 }
+
+/**
+ * A response record sent while the socket is down: the provider's offline
+ * queue takes it and sends the latest record on reconnect (#80). `meta`
+ * names the visitor's message, when the send was one.
+ */
+export type OfflineSendHandler = (data: any, meta?: { messageId?: string }) => void;
 
 // Socket event listeners map
 type SocketEventListener = (...args: any[]) => void;
@@ -80,6 +89,9 @@ class ConferBotSocket {
   private socketUrl: string;
   private listeners: EventListenersMap = new Map();
   private isInitialized: boolean = false;
+  private reconnectionAttempts?: number;
+  private reconnectionDelay?: number;
+  private offlineHandler: OfflineSendHandler | null = null;
   /** Current chat session ID — set by joinChatRoomVisitor, used for reconnect room-join */
   chatSessionId?: string;
 
@@ -89,6 +101,13 @@ class ConferBotSocket {
     this.userId = options.userId;
     this.visitorId = options.visitorId;
     this.socketUrl = options.socketUrl || ConferBotEndpoints.socketUrl;
+    this.reconnectionAttempts = options.reconnectionAttempts;
+    this.reconnectionDelay = options.reconnectionDelay;
+  }
+
+  /** Where a response record sent while disconnected goes (null: it is dropped, as before). */
+  setOfflineHandler(handler: OfflineSendHandler | null): void {
+    this.offlineHandler = handler;
   }
 
   // ********** Connection Methods ********** //
@@ -104,8 +123,8 @@ class ConferBotSocket {
         this.socket = io(this.socketUrl, {
           transports: ['websocket', 'polling'],
           reconnection: true,
-          reconnectionAttempts: ConferBotNetworkConfig.reconnectionAttempts,
-          reconnectionDelay: ConferBotNetworkConfig.reconnectionDelay,
+          reconnectionAttempts: this.reconnectionAttempts ?? ConferBotNetworkConfig.reconnectionAttempts,
+          reconnectionDelay: this.reconnectionDelay ?? ConferBotNetworkConfig.reconnectionDelay,
           reconnectionDelayMax: ConferBotNetworkConfig.reconnectionDelayMax,
           timeout: ConferBotNetworkConfig.socketTimeout,
           autoConnect: true,
@@ -203,6 +222,8 @@ class ConferBotSocket {
         console.log('[ConferBot Socket] Disconnected:', reason);
       }
       this.isInitialized = false;
+      // The provider's connection state and offline queue follow it (#80).
+      this.emit('disconnect', reason);
     });
 
     // Reconnecting
@@ -461,8 +482,13 @@ class ConferBotSocket {
     botId?: string; // Optional, falls back to instance botId
     record: any;
     answerVariables?: any;
-  }): void {
+  }, meta?: { messageId?: string }): void {
     if (!this.socket || !this.isConnected()) {
+      // Offline: the provider's queue sends it on reconnect (#80).
+      if (this.offlineHandler) {
+        this.offlineHandler({ ...data, botId: data.botId || this.botId }, meta);
+        return;
+      }
       if (__DEV__) {
         console.warn('[ConferBot Socket] Cannot send response: not connected');
       }
