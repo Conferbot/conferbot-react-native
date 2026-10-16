@@ -4,7 +4,7 @@
  *
  * Chat widget with integrated Knowledge Base access via tabs or modal
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useContext } from 'react';
 import {
   View,
   Modal,
@@ -23,6 +23,8 @@ import type { KBCategoryWithArticles, KBArticle } from './types';
 import { KnowledgeBaseScreen } from './KnowledgeBaseScreen';
 import { KBButton } from './KBButton';
 import { ChatWidget } from '../ChatWidget';
+import ConferBotContext from '../../context/ConferBotContext';
+import { kbWidgetCategories, kbWidgetOn } from '../../core/home';
 
 export interface ChatWidgetWithKBProps {
   // Chat widget props
@@ -34,7 +36,13 @@ export interface ChatWidgetWithKBProps {
   showTimestamps?: boolean;
 
   // Knowledge Base props
+  /**
+   * Leave unset to follow the owner's help centre switch
+   * (`enableKnowledgeBase` in the bot's settings), as the web widget does.
+   * true or false overrides it.
+   */
   enableKnowledgeBase?: boolean;
+  /** The categories to browse; unset or empty uses the bot's own help centre. */
   kbCategories?: KBCategoryWithArticles[];
   kbTitle?: string;
   kbIntegration?: 'tab' | 'modal' | 'header-button';
@@ -64,8 +72,8 @@ export const ChatWidgetWithKB: React.FC<ChatWidgetWithKBProps> = ({
   placeholder,
   enableAttachments = false,
   showTimestamps = false,
-  enableKnowledgeBase = true,
-  kbCategories = [],
+  enableKnowledgeBase: enableKnowledgeBaseProp,
+  kbCategories: kbCategoriesProp,
   kbTitle: kbTitleProp,
   kbIntegration = 'tab',
   onArticleView,
@@ -76,9 +84,15 @@ export const ChatWidgetWithKB: React.FC<ChatWidgetWithKBProps> = ({
   const chatTitle = chatTitleProp ?? t('tabs.chat');
   const theme = useTheme();
   const styles = createStyles(theme);
+  // The owner's help centre switch, unless the host overrides it
+  // (core/home.ts kbWidgetOn); the bot's own articles unless the host passes some.
+  const ctx = useContext(ConferBotContext);
+  const enableKnowledgeBase = kbWidgetOn(enableKnowledgeBaseProp, ctx?.serverCustomizations);
+  const kbCategories = kbWidgetCategories(kbCategoriesProp, ctx?.knowledgeBase?.categories) as KBCategoryWithArticles[];
 
-  // Active tab state
-  const [activeTab, setActiveTab] = useState<'chat' | 'kb'>('chat');
+  // Active tab state (the chat once the help centre is off)
+  const [chosenTab, setActiveTab] = useState<'chat' | 'kb'>('chat');
+  const activeTab = enableKnowledgeBase ? chosenTab : 'chat';
 
   // KB modal state (for header-button integration)
   const [isKBModalOpen, setIsKBModalOpen] = useState(false);
