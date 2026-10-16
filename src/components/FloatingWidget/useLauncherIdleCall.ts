@@ -12,7 +12,7 @@ import {
   idleCallPerformance,
 } from '../../core/launcherIdleCall';
 import type { IdleCallPerformance, LauncherIdleCall, MascotPart, VisitState } from '../../core/launcherIdleCall';
-import { MASCOT_ORIGINS } from '../../core/mascotArt';
+import { mascotOrigins, type MascotLook } from '../../core/mascotArt';
 import { installedAsyncStorage } from '../../utils/deviceStorage';
 import { FxClock, boxTransform, curve, sample } from './fxAnimated';
 import { launcherOpenedRecently } from './useLauncherMotion';
@@ -59,6 +59,8 @@ export function useLauncherIdleCall(o: {
   botId: string;
   size: { w: number; h: number } | null;
   position: 'left' | 'right';
+  /** The owner's mascot: its joints (the lids sit where its eyes are). */
+  look?: Partial<MascotLook>;
 }) {
   const { mode, enabled, reduced, botId } = o;
   const [perf, setPerf] = useState<IdleCallPerformance | null>(null);
@@ -159,6 +161,7 @@ export function useLauncherIdleCall(o: {
     if (!perf) return null;
     const end = perf.total;
     const k = perf.mascot.size / 100;
+    const joints = mascotOrigins(o.look);
     const box = sample(0, end, (t) => {
       const v = evaluate(perf.self, t, perf.mascot.base);
       return { o: v.o, tx: v.tx, ty: v.ty, r: v.r, sx: v.sx, sy: v.sy };
@@ -194,11 +197,11 @@ export function useLauncherIdleCall(o: {
     });
     return {
       mascot: { opacity: curve(clock.value, box.times, box.values.o), transform: boxTransform(clock.value, box, perf.mascot.size, perf.mascot.size) },
-      body: part('body', MASCOT_ORIGINS.body),
-      arm: part('arm', MASCOT_ORIGINS.arm),
-      look: part('look', MASCOT_ORIGINS.look),
-      lid: part('lid', MASCOT_ORIGINS.lid) || { transform: [{ scaleY: 0 }] },
-      brow: part('brow', MASCOT_ORIGINS.brow),
+      body: part('body', joints.body),
+      arm: part('arm', joints.arm),
+      look: part('look', joints.look),
+      lid: part('lid', joints.lid) || { transform: [{ scaleY: 0 }] },
+      brow: part('brow', joints.brow),
       smile: part('smile', [50, 50]),
       o: part('o', [50, 50]) || { opacity: 0 },
       grin: part('grin', [50, 50]) || { opacity: 0 },
@@ -206,7 +209,8 @@ export function useLauncherIdleCall(o: {
       rings,
       bubble: { opacity: curve(clock.value, b.times, b.values.o), transform: boxTransform(clock.value, b, 1, 1) },
     };
-  }, [perf, clock]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perf, clock, o.look?.shape]);
 
   return { perf, styles, greetingClosed, stop: end };
 }
