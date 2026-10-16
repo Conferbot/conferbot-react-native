@@ -310,3 +310,34 @@ export const lastQuestion = (record: unknown): string => {
   }
   return '';
 };
+
+// ---------------------------------------------------------------------------
+// The wait card's max-wait countdown (web queueCard.ts clock, setRemaining;
+// special.ts _attachHandoverWait)
+// ---------------------------------------------------------------------------
+
+/** "1:05" (never below 0:00). */
+export const clock = (seconds: number): string => {
+  const s = Math.max(0, Math.round(Number(seconds) || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** The card's countdown line: "Max wait 1:05", in the visitor's language. */
+export const maxWaitText = (seconds: number): string => t('queue.maxWait', { time: clock(seconds) });
+
+/**
+ * When the handover's max wait runs out (ms since the epoch): the server's
+ * seconds left for a wait picked back up after a restart (live-chat-state
+ * waitEndsAt, core/handoverState.ts restoredLiveChat), else the step's max
+ * wait from now (minutes; 2 when unset).
+ */
+export const waitDeadline = (maxWaitTimeMinutes: unknown, remainingSeconds: number | null | undefined, now: number = Date.now()): number => {
+  const seconds =
+    typeof remainingSeconds === 'number' && Number.isFinite(remainingSeconds) && remainingSeconds >= 0
+      ? Math.round(remainingSeconds)
+      : (Number(maxWaitTimeMinutes) > 0 ? Number(maxWaitTimeMinutes) : 2) * 60;
+  return now + seconds * 1000;
+};
+
+/** Whole seconds left before the deadline (0 once it has passed). */
+export const secondsLeft = (deadline: number, now: number = Date.now()): number => Math.max(0, Math.ceil((deadline - now) / 1000));
