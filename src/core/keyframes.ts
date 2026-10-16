@@ -16,7 +16,17 @@
  *   - delay, iterations (Infinity loops) and fill (forwards / backwards /
  *     both; none: the element's own value outside the animation);
  *   - several animations on one element: the later one wins for the
- *     properties it sets.
+ *     properties it sets;
+ *   - the `transform` property: "scaleY(n)" (the eyelids) is the scale's y;
+ *     a list ("translateY(-3px) scale(0.92, 1.14)", "rotate(-7deg)
+ *     translateX(-1px)", "none") is interpolated function by function, as
+ *     Chrome does for lists of the same functions (none is their identity),
+ *     into tx / ty / sx / sy / r; `transformOrder` says in which order to
+ *     draw them. Its values share the channels of the individual
+ *     translate / scale / rotate, so an element animated both ways is drawn
+ *     as two nested boxes (the individual properties outside);
+ *   - CSS @keyframes (`cssKeyframes`): each selector's offsets, the
+ *     animation's timing function on every keyframe, as CSS plays it.
  *
  * Checked against Chrome's own animations, frame by frame
  * (scripts/parity/launcherfx). Pure.
@@ -98,8 +108,125 @@ const CHANNELS: Record<Group, (keyof FxValues)[]> = {
   strokeDashoffset: ['dash'],
   clipPath: ['clip'],
   left: ['left'],
-  // Only "scaleY(n)" is used (the eyelids): it is the scale's y.
+  // "scaleY(n)" (the eyelids) is the scale's y; a function list sets them all (TRANSFORM_LIST).
   transform: ['sy'],
+};
+const TRANSFORM_LIST: (keyof FxValues)[] = ['tx', 'ty', 'sx', 'sy', 'r'];
+const SCALE_Y_ONLY = /^scaleY\([^)]*\)$/;
+/** A track whose `transform` is a function list (not the eyelids' plain scaleY). */
+const listTransform = (kfs: Keyframe[]): boolean =>
+  kfs.some((k) => k.transform !== undefined && k.transform !== null && !SCALE_Y_ONLY.test(String(k.transform).trim()));
+
+/** A CSS transform list as tx / ty (px), sx / sy, r (deg); "none" is the identity. */
+const transformList = (s: string): Partial<FxValues> => {
+  const out = { tx: 0, ty: 0, sx: 1, sy: 1, r: 0 };
+  if (s === 'none') return out;
+  const re = /([a-zA-Z]+)\(([^)]*)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) {
+    const args = m[2].split(/[\s,]+/).filter(Boolean).map((a) => parseFloat(a));
+    const a = Number.isFinite(args[0]) ? args[0] : 0;
+    const b = args.length > 1 && Number.isFinite(args[1]) ? args[1] : undefined;
+    switch (m[1]) {
+      case 'translate':
+        out.tx = a;
+        out.ty = b ?? 0;
+        break;
+      case 'translateX':
+        out.tx = a;
+        break;
+      case 'translateY':
+        out.ty = a;
+        break;
+      case 'scale':
+        out.sx = a;
+        out.sy = b ?? a;
+        break;
+      case 'scaleX':
+        out.sx = a;
+        break;
+      case 'scaleY':
+        out.sy = a;
+        break;
+      case 'rotate':
+        out.r = a;
+        break;
+    }
+  }
+  return out;
+};
+
+/**
+ * The order a track's transform list draws its functions in ("t" translate,
+ * "r" rotate, "s" scale), from its fullest list: "ts" for
+ * "translateY(..) scale(..)", "rt" for "rotate(..) translateX(..)". The
+ * individual properties (and a plain scaleY) draw translate, rotate, scale.
+ */
+export const transformOrder = (track: Track): string => {
+  // The fullest list names the order ("scale(..)" then "translateY(..) scale(..)": translate first).
+  let order = '';
+  for (const k of track.keyframes) {
+    const s = k.transform === undefined || k.transform === null ? '' : String(k.transform).trim();
+    if (!s || s === 'none' || SCALE_Y_ONLY.test(s)) continue;
+    let o = '';
+    s.replace(/([a-zA-Z]+)\(/g, (_m, fn: string) => {
+      const c = fn.startsWith('translate') ? 't' : fn.startsWith('scale') ? 's' : fn.startsWith('rotate') ? 'r' : '';
+      if (c && !o.includes(c)) o += c;
+      return '';
+    });
+    if (o.length > order.length) order = o;
+  }
+  for (const c of 'trs') if (!order.includes(c)) order += c;
+  return order;
+};
+
+/**
+ * A transform's values as the CSS matrix [a, b, c, d, e, f] (x' = a x + c y
+ * + e, y' = b x + d y + f), its functions in `order` (transformOrder).
+ */
+export const transformMatrix = (v: Pick<FxValues, 'tx' | 'ty' | 'sx' | 'sy' | 'r'>, order = 'trs'): number[] => {
+  let m = [1, 0, 0, 1, 0, 0];
+  const mul = (n: number[]) => {
+    const [a1, b1, c1, d1, e1, f1] = m;
+    const [a2, b2, c2, d2, e2, f2] = n;
+    m = [a1 * a2 + c1 * b2, b1 * a2 + d1 * b2, a1 * c2 + c1 * d2, b1 * c2 + d1 * d2, a1 * e2 + c1 * f2 + e1, b1 * e2 + d1 * f2 + f1];
+  };
+  for (const op of order) {
+    if (op === 't') mul([1, 0, 0, 1, v.tx, v.ty]);
+    else if (op === 's') mul([v.sx, 0, 0, v.sy, 0, 0]);
+    else if (op === 'r') {
+      const a = (v.r * Math.PI) / 180;
+      mul([Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a), 0, 0]);
+    }
+  }
+  return m;
+};
+
+/**
+ * A CSS @keyframes body ("0%,100%{transform:scaleY(0)}42.6%{transform:scaleY(1)}")
+ * as keyframes, in offset order, each eased by the animation's timing
+ * function (CSS eases every keyframe interval with it).
+ */
+export const cssKeyframes = (body: string, timing = 'ease'): Keyframe[] => {
+  const out: Keyframe[] = [];
+  const re = /([^{}]+)\{([^}]*)\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body))) {
+    const props: Record<string, string> = {};
+    m[2].split(';').forEach((decl) => {
+      const i = decl.indexOf(':');
+      if (i < 0) return;
+      const name = decl.slice(0, i).trim().replace(/-([a-z])/g, (_x, c: string) => c.toUpperCase());
+      const value = decl.slice(i + 1).trim();
+      if (name && value) props[name] = value;
+    });
+    m[1].split(',').forEach((sel) => {
+      const t = sel.trim();
+      const offset = t === 'from' ? 0 : t === 'to' ? 1 : parseFloat(t) / 100;
+      if (Number.isFinite(offset)) out.push({ offset, easing: timing, ...props });
+    });
+  }
+  return out.sort((a, b) => (a.offset as number) - (b.offset as number));
 };
 const GROUPS = Object.keys(CHANNELS) as Group[];
 
@@ -123,10 +250,11 @@ const length = (v: string): [number, number] => {
 };
 
 /** One keyframe's value for a group, or undefined when it does not set it. */
-const parse = (k: Keyframe, g: Group): Partial<FxValues> | undefined => {
+const parse = (k: Keyframe, g: Group, list = false): Partial<FxValues> | undefined => {
   const v = k[g];
   if (v === undefined || v === null) return undefined;
   const s = String(v).trim();
+  if (g === 'transform' && list) return transformList(s);
   switch (g) {
     case 'translate': {
       // Split on spaces outside calc().
@@ -225,16 +353,18 @@ export const trackValues = (track: Track, t: number, base: FxValues = REST): Par
   const offs = computedOffsets(kfs);
   const out: Partial<FxValues> = {};
   let any = false;
+  const list = listTransform(kfs);
   for (const g of GROUPS) {
+    const channels = g === 'transform' && list ? TRANSFORM_LIST : CHANNELS[g];
     const pts: { at: number; v: Partial<FxValues>; e: number[] }[] = [];
     kfs.forEach((k, i) => {
-      const v = parse(k, g);
+      const v = parse(k, g, list);
       if (v) pts.push({ at: offs[i], v, e: easingOf(k.easing) });
     });
     if (!pts.length) continue;
     any = true;
     const neutral: Partial<FxValues> = {};
-    for (const ch of CHANNELS[g]) neutral[ch] = base[ch];
+    for (const ch of channels) neutral[ch] = base[ch];
     // As Chrome does: a missing 0% keyframe takes the easing of the keyframe at 0% (if any).
     const first = kfs.findIndex((_, i) => offs[i] === 0);
     if (pts[0].at !== 0) pts.unshift({ at: 0, v: neutral, e: first >= 0 ? easingOf(kfs[first].easing) : EASE.linear });
@@ -254,13 +384,13 @@ export const trackValues = (track: Track, t: number, base: FxValues = REST): Par
       const span = b.at - a.at;
       const local = span > 0 ? ease(a.e, (p - a.at) / span) : 1;
       value = {};
-      for (const ch of CHANNELS[g]) {
+      for (const ch of channels) {
         const va = (a.v[ch] ?? base[ch]) as number;
         const vb = (b.v[ch] ?? base[ch]) as number;
         value[ch] = va + (vb - va) * local;
       }
     }
-    for (const ch of CHANNELS[g]) if (value[ch] !== undefined) out[ch] = value[ch];
+    for (const ch of channels) if (value[ch] !== undefined) out[ch] = value[ch];
   }
   if (!any) return null;
   // The computed opacity is clamped (an overshooting easing goes past 1).
