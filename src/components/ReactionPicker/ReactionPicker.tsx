@@ -11,6 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import { REACTION_EMOJIS, type ReactionEmoji } from '../../types';
 
@@ -202,7 +203,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({
         style={styles.backdrop}
         onPress={onClose}
         accessible={true}
-        accessibilityLabel="Close reaction picker"
+        accessibilityLabel={t('sdk.reaction.close')}
         accessibilityRole="button"
       >
         <Animated.View
@@ -236,7 +237,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({
                     ]}
                     activeOpacity={0.7}
                     accessible={true}
-                    accessibilityLabel={`React with ${emoji}`}
+                    accessibilityLabel={t('sdk.reaction.with', { emoji })}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     testID={`${testID}-emoji-${emoji}`}
