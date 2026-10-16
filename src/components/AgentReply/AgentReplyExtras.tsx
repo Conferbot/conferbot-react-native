@@ -9,7 +9,8 @@ import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
-import { answerFeedbackOn, conversionEventOf, isAIAgentDetails, sourceHost } from '../../core/agentBot';
+import { answerFeedbackOn, conversionEventOf, isAIAgentDetails, sourceHost, sourceTarget } from '../../core/agentBot';
+import { helpCentreOn } from '../../core/waitArticles';
 import { talkToPersonAllowed } from '../../core/handoverState';
 import {
   FEEDBACK_REASONS,
@@ -46,6 +47,14 @@ export const AgentReplyExtras: React.FC<AgentReplyExtrasProps> = ({ message, tes
   const open = (url: string) => url && Linking.openURL(url).catch(() => {});
 
   const sources = Array.isArray(message.sources) ? message.sources : [];
+  // A help article opens in the app's help centre when it is on (web
+  // agentSources.ts), else its public page.
+  const canOpenArticles = helpCentreOn(ctx?.serverCustomizations) && !!ctx?.openArticle;
+  const go = (s: any) => {
+    const target = sourceTarget(s, canOpenArticles);
+    if (target?.kind === 'article') ctx.openArticle(target.id);
+    else if (target?.kind === 'url') open(target.url);
+  };
   const actions = Array.isArray(message.actions) ? message.actions : [];
   const answerId = String(message._id || message.id || '');
   const showHelpful =
@@ -62,19 +71,29 @@ export const AgentReplyExtras: React.FC<AgentReplyExtrasProps> = ({ message, tes
     <View style={styles.wrap} testID={testID}>
       {sources.length > 0 && (
         <View style={styles.sources} accessibilityLabel={t('sources.count', { n: sources.length })}>
-          {sources.map((s, i) => (
-            <TouchableOpacity
-              key={i}
-              style={styles.source}
-              onPress={() => open(s.url)}
-              disabled={!s.url}
-              accessibilityRole="link"
-              accessibilityLabel={`${t('sources.one')}: ${s.title}`}
-            >
-              <Text style={styles.sourceTitle} numberOfLines={1}>{s.title}</Text>
-              {s.url ? <Text style={styles.sourceHost}>{sourceHost(s.url)} ↗</Text> : null}
-            </TouchableOpacity>
-          ))}
+          {sources.map((s, i) => {
+            const target = sourceTarget(s, canOpenArticles);
+            return (
+              <TouchableOpacity
+                key={i}
+                style={styles.source}
+                onPress={() => go(s)}
+                disabled={!target}
+                accessibilityRole={target?.kind === 'article' ? 'button' : 'link'}
+                accessibilityLabel={`${t('sources.one')}: ${s.title}`}
+                testID={testID ? `${testID}-source-${i}` : undefined}
+              >
+                <Text style={styles.sourceTitle} numberOfLines={1}>{s.title}</Text>
+                {target?.kind === 'article' ? (
+                  <Text style={styles.sourceHost}>{t('kb.helpArticle')} ›</Text>
+                ) : target?.kind === 'url' ? (
+                  <Text style={styles.sourceHost}>{sourceHost(target.url)} ↗</Text>
+                ) : s.articleId ? (
+                  <Text style={styles.sourceHost}>{t('kb.helpArticle')}</Text>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
