@@ -829,6 +829,10 @@ export const en = {
   "games.reaction.ms": "{ms} milliseconds",
   "launcher.openThe": "Open the chat",
   "screenshare.canSee": "{name} can see it",
+  "redirect.countdown": "Taking you to {host} in {n}s",
+  "redirect.cancel": "Cancel going to {host}",
+  "redirect.going": "Taking you to {host}…",
+  "redirect.continue": "Continue to {host}",
   // SDK only (sdk-strings.json)
   "sdk.action.confirmed": "Confirmed",
   "sdk.action.notThroughAsk": "That did not go through. Please ask again.",
