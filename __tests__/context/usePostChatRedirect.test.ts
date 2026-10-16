@@ -131,6 +131,23 @@ it('a chat that ended off screen does not count down when opened later', async (
   expect(s.went).toEqual([]);
 });
 
+it('an agent ending it again: tried again, but never offered twice', async () => {
+  const s = setup({ chatVisible: false });
+  act(() => s.hook.result.current.conversationEnded());
+  await s.wait(REDIRECT_SETTLE_MS);
+  expect(s.line()).toBeNull();
+  // On screen now, and it ends again (the agent took it over and ended it).
+  s.rerender({ chatVisible: true });
+  act(() => s.hook.result.current.conversationEnded());
+  await s.wait(REDIRECT_SETTLE_MS);
+  expect(s.line()?.phase).toBe('counting');
+  act(() => s.hook.result.current.cancel());
+  act(() => s.hook.result.current.conversationEnded());
+  await s.wait(REDIRECT_SETTLE_MS + 20000);
+  expect(s.line()).toBeNull();
+  expect(s.went).toEqual([]);
+});
+
 it('a restart: the next conversation gets its own', async () => {
   const store = memoryStore();
   const s = setup({ store });
