@@ -229,7 +229,13 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     };
     ask();
     const t = setInterval(ask, QUEUE_POLL_MS);
-    return () => clearInterval(t);
+    // Back from a blip: asked again at once, after the room is joined again
+    // (the socket rejoins first), as the web widget does (#83).
+    const offConnect = socketClient.current?.on('connect', ask);
+    return () => {
+      clearInterval(t);
+      if (typeof offConnect === 'function') offConnect();
+    };
   }, [waitingForPerson]);
 
   // The handover step's max wait: once it passes with nobody joined, the
