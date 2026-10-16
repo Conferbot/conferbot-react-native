@@ -10,6 +10,7 @@
 import React, { useMemo } from 'react';
 import { Linking, ScrollView, Text, View, StyleSheet } from 'react-native';
 import { parseChatMarkdown, blocksToPlainText, type Inline } from '../../utils/chatMarkdown';
+import { useChatFont } from '../../hooks/useChatFont';
 
 export interface ChatTextProps {
   text: string;
@@ -37,13 +38,16 @@ const HEADING_SCALE = { 3: 1.17, 4: 1.07, 5: 1.07, 6: 1.07 } as const;
 export const ChatText: React.FC<ChatTextProps> = ({ text, color, fontSize, lineHeight, linkColor, onLinkPress, muted }) => {
   const blocks = useMemo(() => parseChatMarkdown(text), [text]);
   const open = (url: string) => (onLinkPress ? onLinkPress(url) : Linking.openURL(url).catch(() => {}));
-  const base = { color, fontSize, lineHeight, ...(muted ? { fontStyle: 'italic' as const } : null) };
+  // The chat's font (core/ownerFont.ts): its bold face for bold runs, the display one for headings.
+  const font = useChatFont();
+  const base = { color, fontSize, lineHeight, ...(muted ? { fontStyle: 'italic' as const } : null), ...font.body(400) };
+  const bold = [styles.bold, font.body(700)];
   const rule = { borderColor: fade(color, 0.18) };
   const bar = { borderColor: fade(color, 0.4) };
 
   const runs = (inlines: Inline[]) =>
     inlines.map((i, k) => {
-      if (i.kind === 'bold') return <Text key={k} style={styles.bold}>{i.text}</Text>;
+      if (i.kind === 'bold') return <Text key={k} style={bold}>{i.text}</Text>;
       if (i.kind === 'italic') return <Text key={k} style={styles.italic}>{i.text}</Text>;
       if (i.kind === 'code') return <Text key={k} style={styles.code}>{i.text}</Text>;
       if (i.kind === 'strike') return <Text key={k} style={styles.strike}>{i.text}</Text>;
@@ -64,7 +68,7 @@ export const ChatText: React.FC<ChatTextProps> = ({ text, color, fontSize, lineH
         if (b.kind === 'heading') {
           const size = Math.round(fontSize * HEADING_SCALE[b.level]);
           return (
-            <Text key={k} style={[base, gap, styles.bold, { fontSize: size, lineHeight: Math.round(size * 1.3) }]} accessibilityRole="header">
+            <Text key={k} style={[base, gap, styles.bold, font.display(700), { fontSize: size, lineHeight: Math.round(size * 1.3) }]} accessibilityRole="header">
               {runs(b.inlines)}
             </Text>
           );
@@ -84,13 +88,13 @@ export const ChatText: React.FC<ChatTextProps> = ({ text, color, fontSize, lineH
           );
         }
         if (b.kind === 'table') {
-          const cell = { color, fontSize: Math.round(fontSize * 0.92), lineHeight: Math.round(fontSize * 0.92 * 1.35) };
+          const cell = { color, fontSize: Math.round(fontSize * 0.92), lineHeight: Math.round(fontSize * 0.92 * 1.35), ...font.body(400) };
           return (
             <ScrollView key={k} horizontal style={gap} showsHorizontalScrollIndicator={false} testID="cb-md-table">
               <View>
                 <View style={[styles.tr, styles.th, rule]}>
                   {b.head.map((c, j) => (
-                    <Text key={j} style={[cell, styles.cell, styles.bold]}>{runs(c)}</Text>
+                    <Text key={j} style={[cell, styles.cell, ...bold]}>{runs(c)}</Text>
                   ))}
                 </View>
                 {b.rows.map((r, ri) => (
