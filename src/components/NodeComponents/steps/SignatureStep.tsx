@@ -14,6 +14,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Text } from 'react-native';
 import { cleanSignatureName, markdownLitePlain, signatureConfig, smoothSegments, strokeBounds, trimRect } from '../../../core/flow/rich';
+import { t } from '../../../core/i18n';
 import { StepButton, StepCard, StepField, StepLink, StepRow, StepStatus, StepViewProps, useStepLook } from './stepKit';
 
 let Svg: any = null;
@@ -87,10 +88,10 @@ export const SignatureStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, tes
       {cfg.requireName ? (
         <StepField
           look={look}
-          label="Full name"
+          label={t('signature.fullName')}
           value={fullName}
           onChangeText={setFullName}
-          placeholder="Your full name"
+          placeholder={t('signature.namePlaceholder')}
           autoComplete="name"
           autoCapitalize="words"
           testID={`${testID}-fullname`}
@@ -100,10 +101,10 @@ export const SignatureStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, tes
         <View style={{ gap: 8 }}>
           <StepField
             look={look}
-            label="Type your full name to sign"
+            label={t('signature.typeToSign')}
             value={typed}
             onChangeText={setTyped}
-            placeholder="Your full name"
+            placeholder={t('signature.namePlaceholder')}
             autoComplete="name"
             autoCapitalize="words"
             returnKeyType="done"
@@ -132,7 +133,7 @@ export const SignatureStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, tes
             const p = at(e);
             setStrokes((cur) => (cur.length ? [...cur.slice(0, -1), [...cur[cur.length - 1], p]] : [[p]]));
           }}
-          accessibilityLabel="Signature pad: draw your signature with a finger"
+          accessibilityLabel={t('sdk.signature.pad')}
           testID={`${testID}-pad`}
           style={{
             height: PAD_HEIGHT,
@@ -145,7 +146,7 @@ export const SignatureStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, tes
         >
           {strokes.length === 0 ? (
             <View pointerEvents="none" style={{ position: 'absolute', alignSelf: 'center', top: PAD_HEIGHT / 2 - 10 }}>
-              <Text style={{ color: '#9ca3af', fontSize: look.fontSize - 1 }}>Sign here</Text>
+              <Text style={{ color: '#9ca3af', fontSize: look.fontSize - 1 }}>{t('signature.here')}</Text>
             </View>
           ) : null}
           <View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: 30, borderBottomWidth: 1, borderBottomColor: '#d1d5db' }} />
@@ -171,12 +172,12 @@ export const SignatureStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, tes
       <StepRow>
         {!typing ? (
           <>
-            <StepLink look={look} title="Undo" disabled={busy || !strokes.length} onPress={() => setStrokes((cur) => cur.slice(0, -1))} testID={`${testID}-undo`} />
-            <StepLink look={look} title="Clear" disabled={busy || !strokes.length} onPress={() => setStrokes([])} testID={`${testID}-clear`} />
+            <StepLink look={look} title={t('signature.undo')} disabled={busy || !strokes.length} onPress={() => setStrokes((cur) => cur.slice(0, -1))} testID={`${testID}-undo`} />
+            <StepLink look={look} title={t('signature.clear')} disabled={busy || !strokes.length} onPress={() => setStrokes([])} testID={`${testID}-clear`} />
           </>
         ) : null}
         {cfg.allowTyped && canDraw ? (
-          <StepLink look={look} title={typing ? 'Draw instead' : 'Type instead'} disabled={busy} onPress={() => setTyping((v) => !v)} testID={`${testID}-mode`} />
+          <StepLink look={look} title={typing ? t('signature.drawInstead') : t('signature.typeInstead')} disabled={busy} onPress={() => setTyping((v) => !v)} testID={`${testID}-mode`} />
         ) : null}
       </StepRow>
       {cfg.consentText ? <Text style={{ color: look.muted, fontSize: look.fontSize - 2 }}>{markdownLitePlain(cfg.consentText)}</Text> : null}
