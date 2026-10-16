@@ -3,6 +3,8 @@ import { decideGreeting, frequencyAllows, greetingHead, normalizeGreetingStyle }
 import type { GreetingClick, GreetingStyle, SeenState } from '../../core/greeting';
 import { ChatState } from '../../core/state/ChatState';
 import { installedAsyncStorage } from '../../utils/deviceStorage';
+import { mascotLookOf, type MascotLook } from '../../core/mascotArt';
+import { normalizeMascotMotion, type MascotMotion } from '../../core/mascotMotion';
 
 /** Seen state per bot for this app session (the "session" frequency, the phone text's typing moment). */
 const session: Record<string, { shownThisSession?: boolean; typed?: boolean; counted?: boolean }> = {};
@@ -78,6 +80,10 @@ export interface GreetingCardData {
   firstShow: boolean;
   click: GreetingClick;
   linkUrl: string;
+  /** The owner's mascot in place of the avatar (mascotInGreeting), by its name. */
+  mascot: { look: MascotLook; accent: string } | null;
+  /** How the card and its figure move (mascotMotion). */
+  motion: MascotMotion;
 }
 
 /**
@@ -144,10 +150,16 @@ export function useGreeting(opts: { customizations: Record<string, any> | null; 
         seen.current = { ...st, shownAt: now, shows, last: g.key };
         write(botId, seen.current);
         const c = decided;
+        // The owner's mascot greets in place of the avatar, by its name (firstImpression.ts).
+        const look = mascotLookOf(c);
+        const withMascot = c.mascotInGreeting === true;
+        const head0 = agentBot ? { ...greetingHead(c), name: agentBot.displayName || greetingHead(c).name } : greetingHead(c);
         setCard({
           style: normalizeGreetingStyle(c.greetingStyle),
           text: g.text,
-          head: agentBot ? { ...greetingHead(c), name: agentBot.displayName || greetingHead(c).name } : greetingHead(c),
+          head: withMascot ? { ...head0, avatar: null, name: look.name || head0.name } : head0,
+          mascot: withMascot ? { look, accent: c.widgetIconBgColor || c.headerBgColor || '#4f46e5' } : null,
+          motion: normalizeMascotMotion(c.mascotMotion),
           starters: (g.starters.length ? g.starters : agentBot?.starters || []).slice(0, 3),
           bubble: greetingBubble(c),
           accent: greetingAccent(c),
