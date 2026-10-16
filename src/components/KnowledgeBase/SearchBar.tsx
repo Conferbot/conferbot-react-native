@@ -15,6 +15,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 
 export interface SearchBarProps {
@@ -50,7 +51,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onFocus,
   onBlur,
   onSubmit,
-  placeholder = 'Search for articles...',
+  placeholder: placeholderProp,
   debounceMs = 300,
   autoFocus = false,
   disabled = false,
@@ -60,6 +61,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   accessibilityLabel,
   testID,
 }) => {
+  const placeholder = placeholderProp ?? t('kb.searchPlaceholder');
   const theme = useTheme();
   const styles = createStyles(theme);
 
@@ -176,8 +178,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         autoCorrect={false}
         clearButtonMode="never"
         accessible={true}
-        accessibilityLabel="Search input"
-        accessibilityHint="Type to search knowledge base articles"
+        accessibilityLabel={t('sdk.kb.searchInput')}
+        accessibilityHint={t('sdk.kb.searchHint')}
         testID={`${testID}-input`}
       />
 
@@ -195,7 +197,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           onPress={handleClear}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessible={true}
-          accessibilityLabel="Clear search"
+          accessibilityLabel={t('kb.clearSearch')}
           accessibilityRole="button"
           testID={`${testID}-clear`}
         >
