@@ -28,6 +28,8 @@ import { resolveWidgetTheme, withThemePalette } from '../core/widgetTheme';
 import { useAgentBot } from './hooks/useAgentBot';
 import { useLiveChatExtras } from './hooks/useLiveChatExtras';
 import { useHandoverLifecycle } from './hooks/useHandoverLifecycle';
+import { useRequestsPortal } from './hooks/useRequestsPortal';
+import { asyncStorageFor } from '../utils/deviceStorage';
 import { useWaitingExtras, isScreenOnlyEntry, type WaitingExtras } from './hooks/useWaitingExtras';
 
 // ********** Context Creation ********** //
@@ -624,6 +626,25 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     socketClient.current.off(event, callback);
   }, []);
 
+  // ********** Your requests ********** //
+  // The visitor's conversations with the team (core/requests.ts,
+  // core/requestsPortal.ts; web ts/home/requests/).
+  const requests = useRequestsPortal({
+    botId,
+    socketClient,
+    isConnected,
+    isOpen,
+    chatSessionId,
+    record,
+    user,
+    // The id the records carry (useFlowEngine `_visitorId`), else the handshake's.
+    visitorId: () => (chatStateRef.current?.getVariable('_visitorId') as string | undefined) || socketClient.current?.getVisitorId(),
+    storage: config?.enablePersistence === false ? null : asyncStorageFor(config),
+    openChat: () => {
+      openChat();
+    },
+  });
+
   // ********** Context Value ********** //
   const contextValue: ExtendedConferBotContext = {
     isInitialized,
@@ -719,6 +740,14 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     openArticle: waiting.openArticle,
     closeArticle: waiting.closeArticle,
     interceptPlay: waiting.interceptPlay,
+    // Your requests
+    requestsPortal: requests.portal,
+    requestsOpen: requests.requestsOpen,
+    requests: requests.requests,
+    requestsUnread: requests.requestsUnread,
+    openRequests: requests.openRequests,
+    closeRequests: requests.closeRequests,
+    refreshRequests: requests.refreshRequests,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
