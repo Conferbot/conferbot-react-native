@@ -231,6 +231,8 @@ export function useSocketListeners({
             const engine = flowEngine.current;
             // redactSensitive, chatLeaveMessage...: the steps read them.
             engine.setCustomizations?.(customizations);
+            // The bot's bookings: a calendar's taken slots (web index.ts setCalendarBookings).
+            engine.setCalendarBookings?.(chatbotData.calendarBookings);
             engine.loadFlow(flowDefinition);
             const startFlow = () =>
               engine.start().catch((error) => {
