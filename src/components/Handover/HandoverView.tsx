@@ -25,6 +25,7 @@ import type {
   AgentInfo,
   QueueInfo,
 } from './types';
+import { t, widgetLanguage } from '../../core/i18n';
 
 // ========================================
 // COMPONENT PROPS
@@ -82,40 +83,41 @@ export interface HandoverViewProps {
 // DEFAULT CONFIGURATIONS
 // ========================================
 
-const defaultPreChatConfig: PreChatFormConfig = {
-  title: 'Before we connect you',
-  subtitle: 'Please provide the following information',
+// In the language being drawn in (core/i18n), read when the view mounts.
+const defaultPreChatConfig = (): PreChatFormConfig => ({
+  title: t('sdk.prechat.title'),
+  subtitle: t('sdk.prechat.subtitle'),
   fields: [
     {
       id: 'name',
-      label: 'Name',
+      label: t('sdk.prechat.name'),
       type: 'text',
       required: true,
-      placeholder: 'Enter your name',
+      placeholder: t('sdk.prechat.namePlaceholder'),
     },
     {
       id: 'email',
-      label: 'Email',
+      label: t('sdk.prechat.email'),
       type: 'email',
       required: true,
-      placeholder: 'Enter your email',
+      placeholder: t('sdk.prechat.emailPlaceholder'),
     },
   ],
-  submitButtonText: 'Start Chat',
-};
+  submitButtonText: t('sdk.prechat.start'),
+});
 
-const defaultSurveyConfig: PostChatSurveyConfig = {
+const defaultSurveyConfig = (): PostChatSurveyConfig => ({
   enabled: true,
-  title: 'How was your experience?',
-  ratingQuestion: 'Please rate your conversation',
+  title: t('csat.title'),
+  ratingQuestion: t('sdk.survey.ratingQuestion'),
   ratingStyle: 'stars',
   maxRating: 5,
-  feedbackQuestion: 'Any additional feedback? (optional)',
-  feedbackPlaceholder: 'Tell us more about your experience...',
-  submitButtonText: 'Submit',
-  skipButtonText: 'Skip',
-  thankYouMessage: 'Thank you for your feedback!',
-};
+  feedbackQuestion: t('sdk.survey.feedbackQuestion'),
+  feedbackPlaceholder: t('sdk.survey.feedbackPlaceholder'),
+  submitButtonText: t('common.submit'),
+  skipButtonText: t('common.skip'),
+  thankYouMessage: t('csat.thanks'),
+});
 
 // ========================================
 // MAIN COMPONENT
@@ -149,13 +151,15 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
 }) => {
   // Memoize configs to prevent unnecessary re-renders
   const effectivePreChatConfig = useMemo(
-    () => preChatConfig || defaultPreChatConfig,
-    [preChatConfig]
+    () => preChatConfig || defaultPreChatConfig(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [preChatConfig, widgetLanguage()]
   );
 
   const effectiveSurveyConfig = useMemo(
-    () => surveyConfig || defaultSurveyConfig,
-    [surveyConfig]
+    () => surveyConfig || defaultSurveyConfig(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [surveyConfig, widgetLanguage()]
   );
 
   // Handler for pre-chat form submission
@@ -209,7 +213,7 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
         return (
           <View style={styles.connectedContainer}>
             <HandoverConnected
-              agent={agent || { id: '', name: 'Agent' }}
+              agent={agent || { id: '', name: t('agent.agent') }}
               message={connectedMessage}
               onEndChat={onEndChat}
             />
@@ -236,7 +240,7 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
         return (
           <HandoverError
             errorType="no_agents"
-            message={endedMessage || 'The conversation has ended. Thank you for chatting with us!'}
+            message={endedMessage || t('sdk.handover.endedMessage')}
             onContinue={onContinue}
           />
         );
@@ -293,7 +297,7 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
   return (
     <View
       style={styles.container}
-      accessibilityLabel={accessibilityLabel || `Handover view - ${stage}`}
+      accessibilityLabel={accessibilityLabel || t('sdk.handover.label')}
       testID={testID}
     >
       {renderContent()}
