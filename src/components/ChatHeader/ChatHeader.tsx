@@ -5,6 +5,7 @@ import { Avatar } from '../Avatar';
 import { ConnectionStatus } from '../ConnectionStatus';
 import type { ConferBotTheme } from '../../theme/types';
 import type { Agent } from '../../types';
+import { t } from '../../core/i18n';
 
 /**
  * ChatHeader Props
@@ -78,7 +79,7 @@ export interface ChatHeaderProps {
  * @component
  */
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
-  title = 'Chat',
+  title = t('sdk.header.chat'),
   tagline,
   subtitle,
   agent,
@@ -86,7 +87,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   logoUrl,
   hideLogo = false,
   showOnline = false,
-  statusText = 'Online',
+  statusText = t('status.online'),
   showConnectionStatus = true,
   onBack,
   onClose,
@@ -111,7 +112,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       accessible={true}
       accessibilityLabel={
         accessibilityLabel ||
-        `Chat header. ${displayTitle}${displaySubtitle ? `. ${displaySubtitle}` : ''}`
+        t('sdk.header.label', { title: displayTitle }) + (displaySubtitle ? `. ${displaySubtitle}` : '')
       }
       testID={testID}
     >
@@ -121,7 +122,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           onPress={onBack}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
           accessible={true}
-          accessibilityLabel="Back"
+          accessibilityLabel={t('common.back')}
           accessibilityRole="button"
           testID={`${testID}-back`}
         >
@@ -135,7 +136,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         onPress={onAvatarPress}
         disabled={!onAvatarPress}
         accessible={true}
-        accessibilityLabel={agent ? `Agent ${agent.name}` : `Bot ${displayTitle}`}
+        accessibilityLabel={agent ? `${t('agent.agent')} ${agent.name}` : `${t('transcript.bot')} ${displayTitle}`}
         accessibilityRole="button"
         testID={`${testID}-avatar`}
       >
@@ -209,7 +210,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           onPress={onClose}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessible={true}
-          accessibilityLabel="Close chat"
+          accessibilityLabel={t('launcher.close')}
           accessibilityRole="button"
           testID={`${testID}-close`}
         >
