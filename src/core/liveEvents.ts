@@ -15,6 +15,8 @@
  */
 
 /** Its own id per event entry: two in the same millisecond must not merge (web liveEventId). */
+import { t, localized } from './i18n';
+
 export const liveEventId = (kind: string, now: number = Date.now(), rand: string = Math.random().toString(36).slice(2, 9)): string =>
   `${kind}-${now}-${rand}`;
 
@@ -22,12 +24,13 @@ export const liveEventId = (kind: string, now: number = Date.now(), rand: string
 // Back in the queue (live-chat-requeued)
 // ---------------------------------------------------------------------------
 
+/** The record entry's English text (the web's en takeover.requeued); drawn with `requeuedText`. */
 export const REQUEUED_TEXT = 'Connecting you to another agent...';
 
 /** What the visitor reads when the chat goes back to the queue (web requeuedText). */
 export const requeuedText = (teamName?: unknown): string => {
   const team = typeof teamName === 'string' ? teamName.replace(/[<>]/g, '').trim().slice(0, 60) : '';
-  return team ? `Connecting you to ${team}...` : REQUEUED_TEXT;
+  return team ? t('takeover.requeuedTeam', { team }) : t('takeover.requeued');
 };
 
 /** The requeued line's record entry (web: id, type, time, text). */
@@ -102,13 +105,24 @@ export const CLOSED_TEXT = 'This conversation has been closed.';
 export const CHAT_ENDED_TEXT = 'Chat ended';
 export const NEW_CHAT_TEXT = 'Start a new chat';
 
+/**
+ * The same words in the active language (web system.closed,
+ * system.chatEnded; "Start a new chat" is the SDK's own button). The
+ * English constants above stay as what the record and the server say.
+ */
+export const LIVE_TEXT = localized({
+  closed: 'system.closed',
+  chatEnded: 'system.chatEnded',
+  newChat: 'sdk.live.newChat',
+});
+
 /** The handshake refused a blocked visitor (connect_error "visitor_blocked"). */
 export const isBlockedError = (err: any): boolean => err?.message === 'visitor_blocked';
 
 /** The visitor-blocked event's line: the server's words, else ours. */
 export const blockedText = (data: any): string => {
   const m = typeof data?.message === 'string' ? data.message.trim().slice(0, 200) : '';
-  return m || CLOSED_TEXT;
+  return m || LIVE_TEXT.closed;
 };
 
 export interface ClosedState {
@@ -136,5 +150,5 @@ export const closedStateOf = (
   if (o.blocked) return { kind: 'blocked', text: o.blocked, newChat: false, inputOff: true };
   if (o.stepWaiting || o.live) return null;
   if (!endedSinceLastLive(record)) return null;
-  return { kind: 'ended', text: CHAT_ENDED_TEXT, newChat: true, inputOff: true };
+  return { kind: 'ended', text: LIVE_TEXT.chatEnded, newChat: true, inputOff: true };
 };
