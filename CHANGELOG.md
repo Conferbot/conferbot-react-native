@@ -32,6 +32,8 @@ These only matter if you registered or subclassed handlers yourself. `registerAl
 
 **Deprecated.** `registerPushToken(token)` still works but is deprecated: it is now `setPushToken(token)`. Use `setPushToken(token, 'fcm' | 'apns')`. A token is now registered with the current conversation (`chatSessionId`, `tokenType`), not on its own, so nothing is registered until the visitor has a conversation. The 1.1.0 call sent a body the server rejects (#77).
 
+**Deprecated.** `config.enableNotifications` has no effect, and a development warning says so (#81). Push is switched on by `setPushToken(token)` and off by `unregisterPush()`.
+
 **Behaviour that changed by default.** No code change is needed unless you want the old behaviour.
 
 - **The conversation is kept across restarts when `@react-native-async-storage/async-storage` is installed** (#12). Before, it was kept only if you passed `config.asyncStorage`. To opt out, pass `config={{ enablePersistence: false }}`.
@@ -40,6 +42,8 @@ These only matter if you registered or subclassed handlers yourself. `registerAl
 - **The chat opens on the home screen when the owner turns it on** (Customize > Welcome, `enableInitialPage`) (#68). The header's back button and Android's back button return to it.
 - **The owner's post-chat redirect is followed** (#74). After the conversation ends, the visitor sees a 10-second countdown with Cancel, then the URL opens in the browser. To turn it off, use `config.disablePostChatRedirect: true`. To handle the URL yourself, use `config.onPostChatRedirect`.
 - **The post-chat rating is offered 1.5 s after a flow ends** (#76), not only when an agent ends the chat, when the owner has post-chat feedback on. It is offered once per conversation.
+- **The floating widget follows the provider's open state** (#79). `openChat()`, `closeChat()` and a push tap (`handlePushNotification`) now open and close `ConferBotWidget`'s chat. If you mounted a `ChatWidget visible={isOpen}` next to the launcher to get this, remove it: both would open.
+- **A message sent while offline waits and is sent on reconnect** (#80), as the web widget does, instead of being dropped. The queue is kept on the device when AsyncStorage is installed. To turn it off, pass `config={{ enableOfflineMode: false }}`.
 - **The floating widget opens itself when the owner turns auto-open on** (`botAutoOpen`, #55). This happens once per launch, only before a first conversation.
 - **While a person is in the chat, the agent sees what the visitor is typing** (`visitorDraftPreview`, on unless the owner turns it off; #55). It is never sent from a secure field.
 - **The app's `user` (with `metadata`) and the phone's language are sent with every conversation record**, as the web widget sends them (#26, #51).
@@ -71,6 +75,8 @@ These only matter if you registered or subclassed handlers yourself. `registerAl
 - **Push notifications**: `setPushToken(token, type)`, `unregisterPush()`, `handlePushNotification(data, { open })`, `parseConferbotPush`, `isConferbotPush`, `pushTokenTypeOf` and `PUSH_CHANNEL_ID` (#77).
 - **Identity verification**: `user.hash` (#26).
 - **Post-chat redirect**: `config.onPostChatRedirect` and `config.disablePostChatRedirect` (#74).
+- **Offline state on `useConferBot()`** (#80): `isOnline` (the socket, and the device's network with `@react-native-community/netinfo`), `pendingMessageCount`, `failedMessageCount`, `retryFailedMessage(messageId)`, `retryAllFailedMessages()` and `clearFailedMessages()`. They were on the type but never filled in.
+- **`SocketEvents` is exported as a value** (#82): `on(SocketEvents.BOT_RESPONSE, ...)` instead of a cast string.
 - **New on `useConferBot()`**: `customizations`, `widgetTheme`, `widgetLanguage`, `agentBot`, the live chat extras, `waitEndsAt`, the while-you-wait, requests and home state, `chatFont`, `soundOn` / `toggleSound`, and `emailTranscript`. About 180 new root exports in all.
 
 ### Changed
@@ -102,6 +108,10 @@ These only matter if you registered or subclassed handlers yourself. `registerAl
 - Post-chat survey questions are asked (#67).
 - "Published on" now appears in the visitor's language (#75).
 - Push registration now matches the server (#77).
+- Push taps and `openChat()` open the floating launcher's chat (#79).
+- `isOnline`, `pendingMessageCount` and the retry actions are filled in; `isConnected` follows disconnects and reconnects (#80).
+- `config.reconnectionAttempts` and `config.reconnectionDelay` reach the socket; `enableOfflineMode` and `offlineQueueConfig` drive the offline queue (#81).
+- `import { SocketEvents }` works as a value (#82).
 
 ### Security
 
