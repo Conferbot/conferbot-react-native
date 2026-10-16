@@ -163,6 +163,10 @@ export namespace NodeUIState {
     awaitInput?: boolean;
     /** Why the last answer was refused, shown with the step. */
     errorMessage?: string;
+    /** The step this state belongs to, stamped by the engine ("otp-node"...), so its own view can draw it. */
+    stepType?: string;
+    /** That step's builder data (node.data). */
+    stepData?: Record<string, any>;
   }
 
   /** Simple text message */
