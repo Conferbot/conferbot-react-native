@@ -31,54 +31,73 @@
  *
  * Pure: everything the view needs comes out of `homeModel`.
  */
+import { t, localized, ownerTextOr, stockText } from './i18n';
 import { mascotLookOf, type MascotLook } from './mascotArt';
 import { answersFor, flattenArticles, helpCentreOn, isRealQuestion, keywordsOf, searchArticles, tokenize, type HelpArticle } from './waitArticles';
 import { homePeople, STRINGS as REPLY, type Tone } from './replyTime';
 import { isNewReply, ordered, rowLine, stateOf, requestsAccent, ON_HOME, type RequestState, type RequestSummary } from './requests';
 
-// ------------------------------------------------------------ words (web ts/i18n/en.ts)
+// ------------------------------------------------------------ words (web ts/i18n home.*, trust.*, requests.*)
 
-export const HOME_TEXT = {
-  title: 'Hi there 👋',
-  description: "Ask us anything - we're here to help.",
-  onlineNow: 'Online now',
-  support: 'Support',
-  chatWithUs: 'Chat with us',
-  ourAssistant: 'Our assistant',
-  resume: 'Pick up where you left off',
-  continueConversation: 'Continue the conversation',
-  askAgain: "Ask it again - we'll answer right away",
-  helpCentre: 'Help centre',
-  recentArticles: 'Recent articles',
-  seeAll: 'See all',
-  searchPlaceholder: 'Search for help',
-  searchLabel: 'Search help articles',
-  noMatch: (query: string) => `No articles match “${query}”.`,
-  askInstead: 'Ask us instead',
-  chatInstead: 'Chat with us instead',
-  askPlaceholder: 'Ask a question…',
-  askLabel: (name: string) => `Ask ${name} a question`,
-  /** "Ask “<query>”": the query is drawn bold. */
-  askQuery: 'Ask',
-  answersRightAway: (name: string) => `${name} answers right away`,
-  wellHelp: "We'll help you with it",
-  articles: 'Articles',
-  goodMorning: 'Good morning',
-  goodAfternoon: 'Good afternoon',
-  goodEvening: 'Good evening',
-  hello: 'Hello',
-  welcomeBackName: (name: string) => `Welcome back, ${name}`,
-  welcomeBack: 'Welcome back',
-  requestsTitle: 'Your requests',
-  requestsSeeAll: (n: number) => `See all (${n})`,
-  review: 'review',
-  reviews: 'reviews',
-  rated: (avg: string, count: number, reviews: string) => `Rated ${avg} out of 5 from ${count} ${reviews}`,
-  ourTeam: 'Our team',
-  customerLogo: 'Customer logo',
-  close: 'Close',
-  back: 'Back',
-} as const;
+const homeWords = Object.assign(
+  localized({
+    title: 'home.title',
+    description: 'home.description',
+    onlineNow: 'home.onlineNow',
+    support: 'home.support',
+    chatWithUs: 'home.chatWithUs',
+    ourAssistant: 'home.ourAssistant',
+    resume: 'home.resume',
+    continueConversation: 'home.continueConversation',
+    askAgain: 'home.askAgain',
+    helpCentre: 'home.helpCentre',
+    recentArticles: 'home.recentArticles',
+    seeAll: 'home.seeAll',
+    searchPlaceholder: 'home.searchPlaceholder',
+    searchLabel: 'kb.searchLabel',
+    askInstead: 'home.askInstead',
+    chatInstead: 'home.chatInstead',
+    askPlaceholder: 'home.askPlaceholder',
+    wellHelp: 'home.wellHelp',
+    articles: 'tabs.articles',
+    goodMorning: 'home.goodMorning',
+    goodAfternoon: 'home.goodAfternoon',
+    goodEvening: 'home.goodEvening',
+    hello: 'home.hello',
+    welcomeBack: 'home.welcomeBack',
+    requestsTitle: 'requests.title',
+    review: 'trust.review',
+    reviews: 'trust.reviews',
+    ourTeam: 'trust.ourTeam',
+    customerLogo: 'trust.customerLogo',
+    close: 'common.close',
+    back: 'common.back',
+  }),
+  {
+    noMatch: (query: string): string => t('kb.noMatch', { query }),
+    askLabel: (name: string): string => t('home.askLabel', { name }),
+    answersRightAway: (name: string): string => t('home.answersRightAway', { name }),
+    welcomeBackName: (name: string): string => t('home.welcomeBackName', { name }),
+    requestsSeeAll: (n: number): string => t('requests.seeAll', { n }),
+    rated: (avg: string, count: number, reviews: string): string => t('trust.rated', { avg, count, reviews }),
+  }
+);
+
+/** The home screen's words, read in the active language when drawn. */
+export const HOME_TEXT = homeWords as typeof homeWords & {
+  /** "Ask" before the bold query (see askQueryParts for languages that put it after). */
+  readonly askQuery: string;
+};
+
+/**
+ * "Ask “<query>”": the words around the query, which is drawn bold (web
+ * home.askQuery "Ask {query}"): ["Ask ", ""] in English.
+ */
+export const askQueryParts = (): [string, string] => {
+  const [before, after = ''] = t('home.askQuery').split('{query}');
+  return [before, after];
+};
+Object.defineProperty(HOME_TEXT, 'askQuery', { enumerable: true, get: () => askQueryParts()[0].trim() });
 
 // ------------------------------------------------------------ on or off
 
@@ -199,11 +218,6 @@ export const homeCopy = (c: any, name: string): HomeCopy => {
 };
 
 const plainText = (v: string) => v.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-/** The owner's words, or the stock ones (web i18n.ts ownerTextOr). */
-const ownerTextOr = (value: unknown, stock: string): string => {
-  const v = typeof value === 'string' ? plainText(value) : '';
-  return !v || v === plainText(stock) ? stock : String(value);
-};
 
 // ------------------------------------------------------------ colours
 
@@ -607,7 +621,8 @@ export const homeModel = (input: HomeInput): HomeModel | null => {
     status,
     tone: people.tone,
     dot: !hideStatus,
-    button: ownerTextOr(c.initialPageCardButtonText, HOME_TEXT.chatWithUs),
+    // The owner's words, or the stock ones in the visitor's language (web core/customizations.ts ownerTextOr).
+    button: ownerTextOr(c.initialPageCardButtonText, 'home.chatWithUs'),
     starters: agent ? (Array.isArray(agent.starters) ? agent.starters : []).filter((s) => typeof s === 'string' && s.trim()).slice(0, 3) : [],
     faces: trustImages(c.homeTeamPhotos, 3),
     rating: ratingLine(c.homeRating),
@@ -676,7 +691,8 @@ export const homeModel = (input: HomeInput): HomeModel | null => {
   return {
     hello: back ? back.hello : salutation(input.hour ?? new Date(now).getHours()),
     brand: homeBrand(c, agent?.displayName || input.botName || ''),
-    title: typeof c.initialPageTitle === 'string' ? c.initialPageTitle.trim() : '',
+    // The stock "Hi there 👋" in the visitor's language (web core/customizations.ts stockText).
+    title: stockText(typeof c.initialPageTitle === 'string' ? c.initialPageTitle.trim() : '', 'home.title'),
     description: copy.description,
     message: typeof c.initialPageMessage === 'string' ? plainText(c.initialPageMessage) : '',
     band: [a, b],
