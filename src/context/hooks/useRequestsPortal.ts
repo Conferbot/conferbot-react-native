@@ -65,6 +65,8 @@ export interface RequestsPortalExtras {
   requests: RequestSummary[] | null;
   /** Requests with a team reply not read here. */
   requestsUnread: number;
+  /** When each request was last read on this device (the home card's "new"). */
+  requestsSeen: Record<string, number>;
   openRequests: (requestId?: string) => void;
   closeRequests: () => void;
   refreshRequests: (force?: boolean) => Promise<void>;
@@ -201,5 +203,5 @@ export const useRequestsPortal = (o: Options): RequestsPortalExtras => {
 
   const requestsUnread = useMemo(() => unreadCount(requests, seen), [requests, seen]);
 
-  return { portal, requestsOpen, requests, requestsUnread, openRequests, closeRequests, refreshRequests };
+  return { portal, requestsOpen, requests, requestsUnread, requestsSeen: seen, openRequests, closeRequests, refreshRequests };
 };
