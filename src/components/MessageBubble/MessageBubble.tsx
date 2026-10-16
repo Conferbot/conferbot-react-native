@@ -28,6 +28,8 @@ import { MessageStatus } from '../../types/messageStatus';
 import type { ConferBotTheme } from '../../theme/types';
 import type { RecordItem, Agent, Reaction, ReactionEmoji } from '../../types';
 import { t, widgetLanguage } from '../../core/i18n';
+import { useChatFont } from '../../hooks/useChatFont';
+import { ChangeAnswerLink, ConfettiBurst, ReactionBadge } from '../Delight/Delight';
 
 /**
  * MessageBubble Props
@@ -166,6 +168,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // The owner's bubble and avatar settings (core/customizations), when a bot is loaded.
   const look = conferBot?.serverCustomizations ? conferBot.customizations : null;
   const styles = createStyles(theme);
+  const font = useChatFont();
 
   // State for reaction picker
   const [showReactionPicker, setShowReactionPicker] = useState(false);
@@ -436,6 +439,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const textColor = getTextColor();
 
+  // The bot's tapback, the burst and "Edit" on the visitor's answer (core/delight.ts).
+  const rowKey = String((message as any)._id ?? (message as any).id ?? '');
+  const touch = isUser ? conferBot?.answerTouches?.[rowKey] : undefined;
+  const showChange = isUser && !!rowKey && conferBot?.changeAnswerRowId === rowKey;
+
   const bubbleContent = (
     <View style={[styles.container, isUser && { alignSelf: 'flex-end' }]}>
       {/* Avatar for non-user messages */}
@@ -452,10 +460,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
       <View style={styles.messageContainer}>
         {/* Message bubble */}
-        <View ref={bubbleRef} style={[styles.bubble, getBubbleStyle()]}>
+        <View ref={bubbleRef} style={[styles.bubble, getBubbleStyle(), touch?.reaction ? { marginBottom: 18, overflow: 'visible' } : null]}>
           {/* Agent name for agent messages */}
           {isAgent && agentDetails && (
-            <Text style={[styles.agentName, { color: textColor }]}>{agentDetails.name}</Text>
+            <Text style={[styles.agentName, { color: textColor }, font.body(700)]}>{agentDetails.name}</Text>
           )}
 
           {handoverPending ? <PendingDots color={textColor} /> : null}
@@ -478,7 +486,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               renderTextWithLinks(parsedText.segments, textColor)
             ) : (
               <Text
-                style={[styles.messageText, { color: textColor }, isDeleted && { fontStyle: 'italic', opacity: 0.7 }]}
+                style={[styles.messageText, { color: textColor }, font.body(), isDeleted && { fontStyle: 'italic', opacity: 0.7 }]}
                 accessible={true}
                 accessibilityLabel={t('sdk.bubble.label', { text: messageText })}
                 accessibilityRole="text"
@@ -544,7 +552,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               )}
             </View>
           )}
+          {touch?.celebrate ? (
+            <ConfettiBurst
+              key={touch.celebrate}
+              accent={look?.accent || theme.colors.primary}
+              onDone={() => conferBot?.clearAnswerTouch?.(rowKey)}
+              testID={`${testID || 'cb-message'}-confetti`}
+            />
+          ) : null}
+          {touch?.reaction ? (
+            <ReactionBadge
+              emoji={touch.reaction}
+              card={theme.colors.surface}
+              ring={theme.colors.background}
+              testID={`${testID || 'cb-message'}-tapback`}
+            />
+          ) : null}
         </View>
+        {showChange ? (
+          <ChangeAnswerLink
+            onPress={() => conferBot?.changeAnswer?.()}
+            muted={theme.colors.textSecondary}
+            font={font.body(500)}
+            testID={`${testID || 'cb-message'}-edit`}
+          />
+        ) : null}
 
         {/* Message Reactions */}
         {shouldShowReactions && (
