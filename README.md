@@ -34,6 +34,7 @@ The complete flow recorded live on an Android emulator against production: open 
 - **AI answers as on the web** - Tables, headings, quotes, code blocks and strikethrough in replies; "Helpful?" under each answer (a No is sent at once, then reasons, a comment, "Talk to a person", "Ask another way"; the vote can change); a notice when a reply takes longer than 45s; the device language sent so short messages are answered in it
 - **While you wait** - As on the web widget: 6s into a wait for a person, the help articles that may answer the visitor's question (or the server's own pick, with "That solved it" leaving the queue); 2.5s after the waiting signal, an offer of seven small games (owner setting `waitingGames`) that saves a game and steps aside the moment a person joins
 - **Email me this chat** - From the chat menu, the visitor gets the whole conversation in their inbox (`POST /api/v1/mobile/chat/transcript-email`)
+- **Your requests** - As on the web widget's home screen: the visitor's own conversations with the team, each saying where it stands ("We replied", "We're on it", "Solved"), a new reply marked, and a reply box (a reply to a solved one opens it again). In the chat menu once they have one, and as `useRequests()` + `<RequestsPortal />` for your own screens
 - **Offline Support** - Messages are queued locally and retried when connectivity returns
 - **Session Persistence** - Conversations survive app restarts via AsyncStorage
 - **Push Token Registration** - Register device tokens for background message delivery
@@ -428,6 +429,30 @@ const { getMessageStatus, markMessageAsRead, markVisibleMessagesAsRead } = useCo
 ```
 
 `MessageList` accepts `messageStatuses` and `showReadReceipts` props, and `MessageStatusIndicator` renders the tick marks.
+
+## Your requests
+
+A visitor who has asked the team something can follow it: the list of their requests, each one's conversation with the team, and a reply box. Team replies arrive live while a request is open. It is the web widget's "Your requests" (its home screen card); this SDK has no home screen yet, so it opens from the chat menu ("Your requests", once there is one) and from your own UI:
+
+```tsx
+import { useRequests, RequestsPortal } from '@conferbot/react-native';
+
+function SupportButton() {
+  const { requests, unread, open } = useRequests();
+  if (!requests?.length) return null;               // a first-time visitor has none
+  return <Button title={unread ? `Your requests (${unread} new)` : 'Your requests'} onPress={() => open()} />;
+}
+
+// Somewhere inside ConferBotProvider, filling the screen it is placed in:
+<View style={{ flex: 1 }}>
+  <SupportButton />
+  <RequestsPortal />
+</View>
+```
+
+`open(requestId?)` opens the list or one request; `back()` / `close()`; `refresh(force?)` reads the list again (at most every 15s otherwise). `useConferBot()` has the same as `requests`, `requestsUnread`, `openRequests`, `closeRequests`, `refreshRequests` and `requestsPortal` (the screens' state, `getState()` / `subscribe()`).
+
+Which requests are the visitor's: the server lists a conversation only when its id is one this device started (kept per bot in AsyncStorage, the last 30) **and** its visitor id matches, or, for a signed-in user with an identity hash (see [Identity verification](#identity-verification)), their verified conversations from any device. Only conversations a person on the team handled count. Replies are text (the web has no attachments here either).
 
 ## Knowledge Base
 
