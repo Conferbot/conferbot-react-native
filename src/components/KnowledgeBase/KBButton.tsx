@@ -13,6 +13,7 @@ import {
   Animated,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 
 export interface KBButtonProps {
@@ -31,12 +32,13 @@ export interface KBButtonProps {
 export const KBButton: React.FC<KBButtonProps> = ({
   onPress,
   variant = 'icon',
-  label = 'Help',
+  label: labelProp,
   showBadge = false,
   badgeCount = 0,
   disabled = false,
   testID,
 }) => {
+  const label = labelProp ?? t('kb.help');
   const theme = useTheme();
   const styles = createStyles(theme, variant);
 
@@ -71,7 +73,7 @@ export const KBButton: React.FC<KBButtonProps> = ({
         disabled={disabled}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         accessible={true}
-        accessibilityLabel={`Open ${label}`}
+        accessibilityLabel={t('sdk.kb.open', { label })}
         accessibilityRole="button"
         accessibilityState={{ disabled }}
         testID={testID}
