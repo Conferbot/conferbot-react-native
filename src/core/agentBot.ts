@@ -210,6 +210,33 @@ export const normalizeAgentSources = (raw: unknown): AgentSource[] => {
   return out;
 };
 
+/**
+ * Where a source opens (web agentSources.ts chip): a help article in the
+ * app's help centre when it can open there (the help centre is on and the
+ * host can show an article), else its public page, else nowhere (drawn,
+ * not tappable).
+ */
+export type OpenTarget = { kind: 'article'; id: string; title: string } | { kind: 'url'; url: string } | null;
+
+export const sourceTarget = (s: AgentSource | null | undefined, canOpenArticles: boolean): OpenTarget => {
+  if (!s) return null;
+  if (s.articleId && OBJECT_ID.test(s.articleId) && canOpenArticles) return { kind: 'article', id: s.articleId, title: s.title || '' };
+  if (s.url && httpUrl(s.url)) return { kind: 'url', url: s.url };
+  return null;
+};
+
+/**
+ * Where the agent's rich article card opens (web agentRich.ts): its public
+ * page when it has one, else the article in the app's help centre.
+ */
+export const richArticleTarget = (rich: any, canOpenArticles: boolean): OpenTarget => {
+  if (!rich || rich.kind !== 'article') return null;
+  if (typeof rich.url === 'string' && httpUrl(rich.url)) return { kind: 'url', url: rich.url };
+  const id = typeof rich.articleId === 'string' ? rich.articleId : '';
+  if (id && OBJECT_ID.test(id) && canOpenArticles) return { kind: 'article', id, title: rich.title || '' };
+  return null;
+};
+
 /** "https://www.conferbot.com/pricing" -> "conferbot.com" */
 export const sourceHost = (url: string): string => {
   const m = /^https?:\/\/([^/?#:]+)/i.exec(String(url || ''));
