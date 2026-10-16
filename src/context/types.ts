@@ -138,6 +138,16 @@ export interface ExtendedConferBotContext extends ConferBotContextType {
   skipLeaveMessage: () => void;
   dismissCsat: () => void;
   dismissFileRequest: () => void;
+  /** The workspace blocked this visitor: the closed line's words (core/liveEvents.ts), else null. */
+  visitorBlocked: string | null;
+  /** "Email me this chat" (core/emailTranscript.ts): the card is up. */
+  emailTranscriptOpen: boolean;
+  /** Where the transcript went, once sent. */
+  emailTranscriptSentTo: string | null;
+  openEmailTranscript: () => void;
+  closeEmailTranscript: () => void;
+  /** Send the transcript to this address; `{ ok, message }` as the server answered. */
+  emailTranscript: (email: string) => Promise<{ ok: boolean; message?: string }>;
   /**
    * Leave the queue (the wait card's Cancel): queue-self-resolve, then the
    * flow carries on. False when a person already picked the chat up.
