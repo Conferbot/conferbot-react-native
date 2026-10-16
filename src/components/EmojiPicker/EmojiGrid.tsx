@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import { SKIN_TONE_SUPPORTED_EMOJIS } from './emojiData';
 
@@ -62,9 +63,9 @@ const EmojiItem: React.FC<EmojiItemProps> = ({
         borderRadius: theme.borderRadius.md,
       }}
       accessible={true}
-      accessibilityLabel={`Emoji ${emoji}`}
+      accessibilityLabel={t('games.emoji.label', { emoji })}
       accessibilityRole="button"
-      accessibilityHint={supportsSkinTone ? 'Long press for skin tone options' : undefined}
+      accessibilityHint={supportsSkinTone ? t('sdk.emoji.toneHint') : undefined}
       testID={testID}
     >
       <Text style={{ fontSize: size * 0.65 }}>{emoji}</Text>
@@ -86,7 +87,7 @@ export const EmojiGrid: React.FC<EmojiGridProps> = ({
   if (emojis.length === 0) {
     return (
       <View style={styles.emptyContainer} testID={`${testID}-empty`}>
-        <Text style={styles.emptyText}>No emojis found</Text>
+        <Text style={styles.emptyText}>{t('sdk.emoji.none')}</Text>
       </View>
     );
   }
