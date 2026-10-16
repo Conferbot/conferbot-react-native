@@ -34,7 +34,9 @@ import { isAudioRecorderAvailable } from '../../utils/AudioRecorder';
 import { getApiOrigin } from '../../config/constants';
 import { visitorUploadsOn } from '../../core/liveChat';
 import {
+  ClosedChatCard,
   CsatCard,
+  EmailTranscriptCard,
   FileRequestCard,
   HandoverWaitingCard,
   LeadCard,
@@ -45,6 +47,8 @@ import {
 } from '../LiveChat/LiveChatCards';
 import { handoverPhase, talkToPersonAllowed } from '../../core/handoverState';
 import { headerStatus } from '../../core/replyTime';
+import { closedStateOf } from '../../core/liveEvents';
+import { MAILCHAT_TEXT } from '../../core/emailTranscript';
 import type { VoiceRecordingResult } from '../VoiceRecorder';
 import type { ConferBotTheme } from '../../theme/types';
 import type { SocketEvents, RecordItem } from '../../types';
@@ -238,6 +242,10 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
     leadCardOpen,
     csatOpen,
     sendLiveFile,
+    visitorBlocked,
+    emailTranscriptOpen,
+    emailTranscriptSentTo,
+    openEmailTranscript,
     // Actions
     resetConversation,
   } = useConferBot();
@@ -391,7 +399,19 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
       icon: '↗',
       onPress: handleDownloadTranscript,
     },
+    // The conversation to the visitor's inbox (web chat menu, emailTranscript.ts).
+    ...(chatSessionId && !visitorBlocked
+      ? [{ id: 'email-transcript', label: MAILCHAT_TEXT.menu, icon: '✉', onPress: () => openEmailTranscript?.() }]
+      : []),
   ];
+
+  // Blocked, or the live chat ended with nothing going on: the closed
+  // state (core/liveEvents.ts), with a new chat for an ended one.
+  const closed = closedStateOf(record, {
+    blocked: visitorBlocked,
+    stepWaiting: !!currentUIState || isNodeProcessing,
+    live: isLiveChatMode && !!currentAgent,
+  });
 
   const handleClose = () => {
     // Clear any selected attachment
@@ -949,7 +969,7 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           showTypingIndicator={isAgentTyping || isNodeProcessing || awaitingReply}
           showTimestamps={showTimestamps}
           testID={`${testID}-messages`}
-          activeNodeUI={shouldShowNodeRenderer() && currentUIState ? currentUIState : null}
+          activeNodeUI={!visitorBlocked && shouldShowNodeRenderer() && currentUIState ? currentUIState : null}
           onNodeSubmit={handleNodeResponse}
           isNodeLoading={isNodeProcessing}
           footerExtras={
@@ -960,6 +980,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
               <FileRequestCard onUpload={canPickFiles ? handleAttachmentPress : undefined} />
               <LeadCard />
               <CsatCard />
+              <EmailTranscriptCard />
+              <ClosedChatCard closed={closed} onNewChat={() => resetConversation()} />
             </>
           }
           footerExtrasKey={[
@@ -969,6 +991,9 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
             fileRequestedBy || '',
             leadCardOpen,
             csatOpen,
+            emailTranscriptOpen,
+            emailTranscriptSentTo || '',
+            closed?.kind || '',
           ].join(':')}
         />
         </View>
@@ -985,8 +1010,8 @@ const ChatWidgetInner: React.FC<ChatWidgetProps> = ({
           <ChatBottomBar
             onSend={handleSendMessage}
             onTyping={handleTyping}
-            placeholder={lockedBy || !visitorInputEnabled ? 'Replies are turned off for now' : placeholder}
-            disabled={!isConnected || !!lockedBy || !visitorInputEnabled}
+            placeholder={closed?.inputOff ? closed.text : lockedBy || !visitorInputEnabled ? 'Replies are turned off for now' : placeholder}
+            disabled={!isConnected || !!lockedBy || !visitorInputEnabled || !!closed?.inputOff}
             onAttach={
               isLiveChatMode && canPickFiles && (visitorUploadsOn(serverCustomizations) || !!fileRequestedBy)
                 ? handleAttachmentPress
