@@ -14,6 +14,7 @@ import {
   Animated,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { t, tPlural } from '../../core/i18n';
 import type { ConferBotTheme } from '../../theme/types';
 import type { KBCategoryWithArticles } from './types';
 
@@ -50,7 +51,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   onSelectCategory,
   onCategorySelect,
   showAllOption = true,
-  allLabel = 'All',
+  allLabel: allLabelProp,
   allOptionText,
   showIcons = true,
   showDescriptions = false,
@@ -59,6 +60,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   accessibilityLabel,
   testID,
 }) => {
+  const allLabel = allLabelProp ?? t('sdk.kb.all');
   const theme = useTheme();
   const styles = createStyles(theme);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -234,7 +236,7 @@ const CategoryChip: React.FC<CategoryChipProps> = ({
         onPressOut={handlePressOut}
         activeOpacity={0.8}
         accessible={true}
-        accessibilityLabel={`${label} category${articleCount ? `, ${articleCount} articles` : ''}`}
+        accessibilityLabel={articleCount ? `${label}, ${tPlural('kb.articles', articleCount)}` : label}
         accessibilityRole="button"
         accessibilityState={{ selected: isSelected }}
         testID={testID}
