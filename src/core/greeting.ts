@@ -10,6 +10,7 @@
  * that need what only a browser knows (where the visitor came from, pages
  * viewed, the visitor's country, page attributes) never apply here.
  */
+import { stockText } from './i18n';
 
 export type GreetingStyle =
   | 'card' | 'note' | 'imessage' | 'postcard' | 'sticky' | 'typewriter'
@@ -139,7 +140,8 @@ const applies = (rule: any, facts: GreetingFacts): boolean => {
 export function decideGreeting(c: Record<string, any> | null | undefined, facts: GreetingFacts): ResolvedGreeting | null {
   const raw = c || {};
   let on = raw.chatIconCta === true;
-  let text = str(raw.chatIconCtaText).trim();
+  // The stock "Hi👋, how can I help?" in the visitor's language; the owner's own words as written (web core/customizations.ts stockText).
+  let text = stockText(str(raw.chatIconCtaText).trim(), 'greeting.stock', ['Hi 👋, how can I help?']);
   let delay = num(raw.greetingDelay, DEFAULT_GREETING_DELAY, 0, 3600);
   let click: GreetingClick = raw.greetingClickAction === 'send' || raw.greetingClickAction === 'link' ? raw.greetingClickAction : 'open';
   // Smart greetings with the owner's own greeting off: no default message.
