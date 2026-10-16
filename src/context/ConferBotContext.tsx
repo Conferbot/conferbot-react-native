@@ -39,6 +39,7 @@ import { useDelight } from './hooks/useDelight';
 import { useChatFontLoader } from '../hooks/useChatFont';
 import { createDraftSender, draftPreviewOn, isSensitiveField } from '../core/typingPreview';
 import { handoverPhase } from '../core/handoverState';
+import { usePostChatRedirect } from './hooks/usePostChatRedirect';
 
 // ********** Context Creation ********** //
 const ConferBotContext = createContext<ExtendedConferBotContext | null>(null);
@@ -75,6 +76,11 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
   const [record, setRecord] = useState<RecordItem[]>([]);
   const [chatbotConfig, setChatbotConfig] = useState<ChatbotConfig | undefined>(undefined);
   const [serverCustomizations, setServerCustomizations] = useState<Record<string, any> | null>(null);
+  // The owner's post-chat redirect (the bot's redirectUrl, core/postChatRedirect.ts).
+  const [redirectUrl, setRedirectUrl] = useState<string>('');
+  // Late-bound: the conversation's end reaches the redirect, set up below.
+  const conversationEndRef = useRef<() => void>(() => {});
+  const onConversationEnd = useCallback(() => conversationEndRef.current(), []);
 
   // ********** Service References ********** //
   const apiClient = useRef<ConferBotAPI | null>(null);
@@ -111,6 +117,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setRecord,
     persistAnswerVariables,
     persistFlowState,
+    onConversationEnd,
   });
 
   // ********** Reactions Hook ********** //
@@ -423,6 +430,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setAgentBot,
     onChatbotData: (chatbotData: any, knowledgeBaseData?: any) => {
       liveChatExtras.setChatbotData(chatbotData);
+      setRedirectUrl(typeof chatbotData?.redirectUrl === 'string' ? chatbotData.redirectUrl : '');
       waiting.setKnowledgeBase(knowledgeBaseData);
       home.setKnowledgeBase(knowledgeBaseData);
       setChatbotConfig((prev) => ({ ...(prev || {}), id: botId, name: chatbotData?.name, csatConfig: chatbotData?.csatConfig } as any));
@@ -437,7 +445,26 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
       waiting.setupWaitingListeners();
     },
     handover,
+    onConversationEnd,
   });
+
+  // ********** Post-chat redirect ********** //
+  // The conversation ended and the rating is done (or there is none): the
+  // app's onPostChatRedirect, else "Taking you to example.com in 10s" with
+  // Cancel, then the system browser (core/postChatRedirect.ts; web
+  // ts/chat/postChatRedirect.ts).
+  const postChatRedirect = usePostChatRedirect({
+    redirectUrl,
+    chatSessionId,
+    chatVisible: isOpen && home.view === 'chat',
+    blocked: !!liveChatExtras.blocked,
+    live: isLiveChatMode || handoverPhase(record) !== 'none',
+    ratingPending: !!liveChatExtras.csatConfig && liveChatExtras.csatOpen && !liveChatExtras.csatSent,
+    disabled: config?.disablePostChatRedirect === true,
+    onPostChatRedirect: config?.onPostChatRedirect,
+    store: config?.enablePersistence === false ? null : asyncStorageFor(config),
+  });
+  conversationEndRef.current = postChatRedirect.conversationEnded;
 
   // ********** Reset Conversation ********** //
   const resetConversation = useCallback(async () => {
@@ -450,6 +477,7 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     setIsLiveChatMode(false);
     setAgentTyping(false);
     resetAgent();
+    postChatRedirect.resetRedirect();
     liveChatExtras.resetLiveChatExtras();
     handover.resetHandover();
     waiting.resetWaiting();
@@ -891,6 +919,10 @@ export const ConferBotProvider: React.FC<ConferBotProviderProps> = ({
     // Typing preview (core/typingPreview.ts)
     updateVisitorDraft,
     clearVisitorDraft: () => draftSender.clear(),
+    // Post-chat redirect (core/postChatRedirect.ts)
+    postChatRedirect: postChatRedirect.line,
+    cancelPostChatRedirect: postChatRedirect.cancel,
+    continuePostChatRedirect: postChatRedirect.continueNow,
   };
 
   return <ConferBotContext.Provider value={contextValue}>{children}</ConferBotContext.Provider>;
