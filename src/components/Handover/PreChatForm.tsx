@@ -29,6 +29,7 @@ import type {
   PreChatField,
   PreChatFieldOption,
 } from './types';
+import { t, widgetLanguage } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -60,14 +61,19 @@ const validators = {
   },
 };
 
-const defaultErrorMessages: Record<string, string> = {
-  required: 'This field is required',
-  email: 'Please enter a valid email address',
-  phone: 'Please enter a valid phone number',
-  minLength: 'Input is too short',
-  maxLength: 'Input is too long',
-  pattern: 'Invalid format',
+// Read in the language being drawn in (core/i18n) each time one shows.
+const defaultErrorMessages = {
+  get required() { return t('sdk.validation.required'); },
+  get email() { return t('validation.email'); },
+  get phone() { return t('validation.phone'); },
+  get minLength() { return t('sdk.prechat.tooShort'); },
+  get maxLength() { return t('sdk.prechat.tooLong'); },
+  get pattern() { return t('sdk.prechat.invalidFormat'); },
 };
+
+/** "Enter your email": the owner's label, lower-cased in English only (German nouns keep their capital). */
+const enterYour = (label: string): string =>
+  t('sdk.prechat.enterYour', { field: widgetLanguage() === 'en' ? label.toLowerCase() : label });
 
 // ========================================
 // FIELD COMPONENTS
@@ -102,13 +108,13 @@ const TextField: React.FC<FieldProps> = ({ field, value, error, onChange, theme 
       ]}
       value={value}
       onChangeText={onChange}
-      placeholder={field.placeholder || `Enter your ${field.label.toLowerCase()}`}
+      placeholder={field.placeholder || enterYour(field.label)}
       placeholderTextColor={theme.colors.textDisabled}
       keyboardType={keyboardType}
       autoCapitalize={autoCapitalize}
       autoComplete={autoComplete}
       accessibilityLabel={field.label}
-      accessibilityHint={field.required ? 'Required field' : undefined}
+      accessibilityHint={field.required ? t('sdk.prechat.requiredField') : undefined}
       testID={`prechat-field-${field.id}`}
     />
   );
@@ -129,7 +135,7 @@ const TextAreaField: React.FC<FieldProps> = ({ field, value, error, onChange, th
       ]}
       value={value}
       onChangeText={onChange}
-      placeholder={field.placeholder || `Enter your ${field.label.toLowerCase()}`}
+      placeholder={field.placeholder || enterYour(field.label)}
       placeholderTextColor={theme.colors.textDisabled}
       multiline
       numberOfLines={4}
@@ -299,7 +305,7 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
   title,
   description,
   submitButtonText,
-  cancelButtonText = 'Cancel',
+  cancelButtonText = t('common.cancel'),
   accessibilityLabel,
   testID,
 }) => {
@@ -344,11 +350,11 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
       }
 
       if (value && field.validation?.minLength && !validators.minLength(value, field.validation.minLength)) {
-        return field.validation.errorMessage || `Minimum ${field.validation.minLength} characters required`;
+        return field.validation.errorMessage || t('sdk.validation.minLength', { n: field.validation.minLength });
       }
 
       if (value && field.validation?.maxLength && !validators.maxLength(value, field.validation.maxLength)) {
-        return field.validation.errorMessage || `Maximum ${field.validation.maxLength} characters allowed`;
+        return field.validation.errorMessage || t('sdk.validation.maxLength', { n: field.validation.maxLength });
       }
 
       if (value && field.validation?.pattern && !validators.pattern(value, field.validation.pattern)) {
@@ -543,7 +549,7 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
                 { color: theme.colors.text, fontSize: theme.typography.fontSize.xl },
               ]}
             >
-              {title || config.title || 'Before we connect you'}
+              {title || config.title || t('sdk.prechat.title')}
             </Text>
             {(description || config.subtitle) && (
               <Text
@@ -586,7 +592,7 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
               onPress={handleSubmit}
               disabled={isSubmitting}
               accessibilityRole="button"
-              accessibilityLabel={submitButtonText || config.submitButtonText || 'Start Chat'}
+              accessibilityLabel={submitButtonText || config.submitButtonText || t('sdk.prechat.start')}
               accessibilityState={{ disabled: isSubmitting }}
             >
               {isSubmitting ? (
@@ -598,7 +604,7 @@ export const PreChatForm: React.FC<PreChatFormProps> = ({
                     { color: theme.colors.textInverse, fontSize: theme.typography.fontSize.md },
                   ]}
                 >
-                  {submitButtonText || config.submitButtonText || 'Start Chat'}
+                  {submitButtonText || config.submitButtonText || t('sdk.prechat.start')}
                 </Text>
               )}
             </TouchableOpacity>
