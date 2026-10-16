@@ -61,7 +61,8 @@ const GLYPHS = { replied: '…', waiting: '◷', solved: '✓' };
 const SOLVED = '#16a34a';
 const ERROR = '#dc2626';
 
-const StateIcon = ({ state, color }) =>
+/** A request's state icon (also the home screen's requests card). */
+export const StateIcon = ({ state, color }) =>
   SvgXml ? (
     <SvgXml xml={STATE_ICONS[state].replace(/currentColor/g, color)} width={20} height={20} />
   ) : (
