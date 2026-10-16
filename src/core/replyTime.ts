@@ -12,6 +12,8 @@
  * bot's name. Pure.
  */
 
+import { t, localized, widgetLocale, I18nKey } from './i18n';
+
 export interface ReplyTime {
   mode?: 'auto' | 'fixed' | 'hide';
   handover?: boolean;
@@ -31,25 +33,30 @@ export interface ReplyLine {
   tone: Tone;
 }
 
-/** "The team typically replies <phrase>" */
-export const PHRASES: Record<string, string> = {
-  under_minute: 'in under a minute',
-  few_minutes: 'in a few minutes',
-  under_15_minutes: 'in under 15 minutes',
-  under_hour: 'in under an hour',
-  few_hours: 'in a few hours',
-  day: 'within a day',
-  few_days: 'in a few days',
-};
+const BUCKETS = ['under_minute', 'few_minutes', 'under_15_minutes', 'under_hour', 'few_hours', 'day', 'few_days'] as const;
 
+/** "The team typically replies <phrase>", per bucket, in the active language (web reply.phrase.*). */
+export const PHRASES: Record<string, string> = localized(
+  BUCKETS.reduce((out, b) => ({ ...out, [b]: `reply.phrase.${b}` as I18nKey }), {} as Record<string, I18nKey>)
+);
+
+/** The header's words, read when drawn (web replyTime.ts STRINGS). */
 export const STRINGS = {
-  statusOnline: 'Online',
-  typicallyShort: (phrase: string) => `Typically replies ${phrase}`,
-  teamBack: (when: string) => `team back ${when}`,
-  teamByEmail: 'team replies by email',
-  teamAwayNow: 'team away right now',
-  atTime: (time: string) => `at ${time}`,
-  tomorrow: 'tomorrow',
+  get statusOnline() {
+    return t('status.online');
+  },
+  typicallyShort: (phrase: string) => t('reply.typicallyShort', { phrase }),
+  teamBack: (when: string) => t('reply.teamBack', { when }),
+  get teamByEmail() {
+    return t('reply.teamByEmail');
+  },
+  get teamAwayNow() {
+    return t('reply.teamAwayNow');
+  },
+  atTime: (time: string) => t('reply.atTime', { time }),
+  get tomorrow() {
+    return t('reply.tomorrow');
+  },
   sep: ' · ',
 };
 
@@ -69,15 +76,27 @@ const fmt = (locale: string, d: Date, o: Intl.DateTimeFormatOptions, fallback: (
  * When the team is back, in the visitor's time: "at 9 AM" (today),
  * "tomorrow 9 AM", "Monday 9:30 AM", "Mon, Oct 12 9 AM".
  */
-export const backWhen = (backAt: string | null | undefined, now: Date = new Date(), locale = 'en-US'): string => {
+export const backWhen = (backAt: string | null | undefined, now: Date = new Date(), locale?: string): string => {
   if (!backAt) return '';
   const d = new Date(backAt);
   if (Number.isNaN(d.getTime())) return '';
+  // The visitor's language and region (web: locale || widgetLocale() || "en-US").
+  locale = locale || (widgetLocale() === 'en' ? 'en-US' : widgetLocale()) || 'en-US';
   const time = fmt(locale, d, d.getMinutes() ? { hour: 'numeric', minute: '2-digit' } : { hour: 'numeric' }, () => d.toLocaleTimeString());
   const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const days = Math.round((day(d) - day(now)) / 86400000);
   if (days <= 0) return STRINGS.atTime(time);
-  if (days === 1) return `${STRINGS.tomorrow} ${time}`;
+  if (days === 1) {
+    let tomorrow = STRINGS.tomorrow;
+    try {
+      // "morgen", "demain" (web: Intl.RelativeTimeFormat when there is one).
+      const rtf = (Intl as any).RelativeTimeFormat;
+      if (rtf) tomorrow = new rtf(locale, { numeric: 'auto' }).format(1, 'day');
+    } catch {
+      /* the table's word */
+    }
+    return `${tomorrow} ${time}`;
+  }
   if (days < 7) return `${fmt(locale, d, { weekday: 'long' }, () => d.toDateString())} ${time}`;
   return `${fmt(locale, d, { weekday: 'short', month: 'short', day: 'numeric' }, () => d.toDateString())} ${time}`;
 };
@@ -90,7 +109,7 @@ export const backWhen = (backAt: string | null | undefined, now: Date = new Date
  */
 export const headerLine = (
   rt: ReplyTime | null | undefined,
-  { agent = false, now = new Date(), locale = 'en-US' }: { agent?: boolean; now?: Date; locale?: string } = {}
+  { agent = false, now = new Date(), locale }: { agent?: boolean; now?: Date; locale?: string } = {}
 ): ReplyLine | null => {
   if (!live(rt) || !rt.handover || agent) return null;
   if (rt.state === 'away' || rt.state === 'offline') {
@@ -110,7 +129,7 @@ export const headerLine = (
  */
 export const headerStatus = (
   rt: ReplyTime | null | undefined,
-  { personInChat = false, agentBot = false, hidden = false, now = new Date(), locale = 'en-US' }:
+  { personInChat = false, agentBot = false, hidden = false, now = new Date(), locale }:
     { personInChat?: boolean; agentBot?: boolean; hidden?: boolean; now?: Date; locale?: string } = {}
 ): ReplyLine | null => {
   if (hidden) return null;
@@ -120,22 +139,40 @@ export const headerStatus = (
 
 // ------------------------------------------------------------ the home card (web homeLine, homePeople)
 
-/** The home card's words (web ts/i18n/en.ts reply.*). */
+/** The home card's words (web replyTime.ts STRINGS, reply.*), read when drawn. */
 export const HOME_STRINGS = {
-  typically: (phrase: string) => `The team typically replies ${phrase}`,
-  teamReplies: (phrase: string) => `team replies ${phrase}`,
-  answersInstantly: 'Answers instantly',
-  answersAlways: 'Answers instantly, day or night',
-  away: "We're away right now",
-  back: (when: string) => `back ${when}`,
-  offline: 'The team is offline',
-  byEmail: "we'll reply by email",
-  offlineNow: 'The team is offline right now',
-  usually: (phrase: string) => `Usually replies ${phrase}`,
-  usuallyInstantly: 'Usually replies instantly',
-  teamBackAt: (when: string) => `Team back ${when}`,
-  teamRepliesByEmail: 'Team replies by email',
-  teamAwayRightNow: 'Team away right now',
+  typically: (phrase: string) => t('reply.typically', { phrase }),
+  teamReplies: (phrase: string) => t('reply.teamReplies', { phrase }),
+  get answersInstantly() {
+    return t('reply.answersInstantly');
+  },
+  get answersAlways() {
+    return t('reply.answersAlways');
+  },
+  get away() {
+    return t('reply.away');
+  },
+  back: (when: string) => t('reply.back', { when }),
+  get offline() {
+    return t('reply.offline');
+  },
+  get byEmail() {
+    return t('reply.byEmail');
+  },
+  get offlineNow() {
+    return t('reply.offlineNow');
+  },
+  usually: (phrase: string) => t('reply.usually', { phrase }),
+  get usuallyInstantly() {
+    return t('reply.usuallyInstantly');
+  },
+  teamBackAt: (when: string) => t('reply.teamBackAt', { when }),
+  get teamRepliesByEmail() {
+    return t('reply.teamRepliesByEmail');
+  },
+  get teamAwayRightNow() {
+    return t('reply.teamAwayRightNow');
+  },
 };
 
 /**
@@ -144,7 +181,7 @@ export const HOME_STRINGS = {
  */
 export const homeLine = (
   rt: ReplyTime | null | undefined,
-  { agent = false, now = new Date(), locale = 'en-US' }: { agent?: boolean; now?: Date; locale?: string } = {}
+  { agent = false, now = new Date(), locale }: { agent?: boolean; now?: Date; locale?: string } = {}
 ): (ReplyLine & { hide?: false }) | { hide: true } | null => {
   if (rt && rt.mode === 'hide') return agent ? null : { hide: true };
   if (!live(rt) || !rt.handover) return null;
@@ -185,7 +222,7 @@ export interface PeopleLine {
  */
 export const homePeople = (
   rt: ReplyTime | null | undefined,
-  { agent = false, now = new Date(), locale = 'en-US' }: { agent?: boolean; now?: Date; locale?: string } = {}
+  { agent = false, now = new Date(), locale }: { agent?: boolean; now?: Date; locale?: string } = {}
 ): PeopleLine => {
   const H = HOME_STRINGS;
   const line = homeLine(rt, { agent, now, locale });
