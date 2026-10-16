@@ -209,6 +209,34 @@ export type { RequestsPortalProps } from './components/Requests/RequestsPortal';
 export { useRequests } from './hooks/useRequests';
 export type { UseRequestsReturn } from './hooks/useRequests';
 
+// ========== Home screen (core/home.ts, web ts/home/) ========== //
+export {
+  HOME_TEXT,
+  homeOn,
+  homeModel,
+  homeCopy,
+  homePalette,
+  salutation,
+  askBoxOn,
+  askRows,
+  askDefault,
+  helpSearch,
+  ratingLine,
+  trustImages,
+  welcomeBack,
+  showsRecentArticles,
+  safeHomeView,
+} from './core/home';
+export type { HomeModel, HomeInput, HomeView, HomeSection, AskRow, VisitorMemory, HomePalette } from './core/home';
+export { viewMotion, normalizeViewTransition, VIEW_TRANSITIONS } from './core/viewTransition';
+export type { ViewTransition, ViewMotion } from './core/viewTransition';
+export { homePeople, homeLine } from './core/replyTime';
+export { personalize, personalizeCustomizations, visitorVars } from './core/personalize';
+export { HomeScreen, ViewSwitch } from './components/Home';
+export type { HomeScreenProps, ViewSwitchProps } from './components/Home';
+export { useHome } from './hooks/useHome';
+export type { UseHomeReturn } from './hooks/useHome';
+
 // ========== Theme System ========== //
 export { ThemeProvider, useTheme, defaultTheme, darkTheme } from './theme';
 export type { ConferBotTheme, ConferBotThemeOverride } from './theme';
