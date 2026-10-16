@@ -20,6 +20,7 @@ import {
 
 import { useTheme } from '../../theme';
 import type { AgentTypingProps, AgentInfo } from './types';
+import { t } from '../../core/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.75;
@@ -145,7 +146,7 @@ const AgentAvatar: React.FC<AvatarProps> = ({
             borderRadius: size / 2,
           },
         ]}
-        accessibilityLabel={agent.name ? `${agent.name}'s avatar` : 'Agent avatar'}
+        accessibilityLabel={agent.name ? t('sdk.agent.avatarOf', { name: agent.name }) : t('sdk.agent.avatar')}
       />
     );
   }
@@ -163,7 +164,7 @@ const AgentAvatar: React.FC<AvatarProps> = ({
           backgroundColor,
         },
       ]}
-      accessibilityLabel={agent?.name ? `${agent.name}'s avatar` : 'Agent avatar'}
+      accessibilityLabel={agent?.name ? t('sdk.agent.avatarOf', { name: agent.name }) : t('sdk.agent.avatar')}
     >
       <Text style={[styles.avatarInitial, { color: textColor, fontSize: size * 0.45 }]}>
         {initial}
@@ -236,11 +237,11 @@ export const AgentTyping: React.FC<AgentTypingProps> = ({
 
   // Resolve the typing message: custom message supports a {name} placeholder,
   // default is "<agent name> is typing...". Empty string hides the text.
-  const agentName = agent?.name || 'Agent';
+  const agentName = agent?.name || t('agent.agent');
   const resolvedMessage =
     typingMessage !== undefined
       ? typingMessage.replace(/\{name\}/g, agentName)
-      : `${agentName} is typing...`;
+      : `${t('typing.named', { name: agentName })}...`;
 
   const avatarSize = compact ? 24 : 32;
 
@@ -255,7 +256,7 @@ export const AgentTyping: React.FC<AgentTypingProps> = ({
       ]}
       accessibilityRole="text"
       accessibilityLabel={
-        accessibilityLabel || (agent?.name ? `${agent.name} is typing` : 'Agent is typing')
+        accessibilityLabel || t('typing.named', { name: agent?.name || t('agent.agent') })
       }
       accessibilityLiveRegion="polite"
       testID={testID}
