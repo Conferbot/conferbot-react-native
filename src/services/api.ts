@@ -90,6 +90,20 @@ class ConferBotAPI {
     return response.data;
   }
 
+  /**
+   * One published help article of this bot, by id (embed-server
+   * GET /mobile/knowledge-base/article/:id), for one the help centre data
+   * on hand does not hold (a queue-help pick). Null when it is not there.
+   */
+  async getKBArticle(articleId: string): Promise<any | null> {
+    try {
+      const response = await this.client.get(`/knowledge-base/article/${encodeURIComponent(articleId)}`);
+      return response.data?.success ? response.data.data || null : null;
+    } catch {
+      return null;
+    }
+  }
+
   // ********** Session Methods ********** //
   // Initialize a new chat session
   async initSession(userId?: string): Promise<ApiResponse<ChatSession>> {
