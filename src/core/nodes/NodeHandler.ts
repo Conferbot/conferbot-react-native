@@ -347,6 +347,8 @@ export namespace NodeUIState {
     availableSlots?: Array<{
       date: string;
       times: string[];
+      /** Of `times`, the ones already booked (shown, not pickable). */
+      booked?: string[];
     }>;
     showTimeSlots?: boolean;
   }
