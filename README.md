@@ -370,7 +370,7 @@ Everything you configure in the Conferbot dashboard (Widget Customization / flow
 - **Auto-open** (`botAutoOpen`, `botAutoOpenDelay` seconds): the floating widget opens the chat on its own once per app launch, only before the visitor has a conversation and not within 2 minutes of them closing it.
 - **Typing preview** (`visitorDraftPreview`, on unless turned off): while a person is chatting with the visitor, the agent sees what is being typed (`visitor-draft`, at most every 300ms, never for a secure field).
 - **Calendar**: slots already booked (the bot's bookings) show greyed out and cannot be picked; a day with every slot taken is not offered.
-- **Waiting for a person**: the wait card says the live estimate in the visitor's language, else the team's usual wait ("Typical wait: a few minutes"), unless the owner hides the reply time.
+- **Waiting for a person**: the wait card says the live estimate in the visitor's language, else the team's usual wait ("Typical wait: a few minutes"), unless the owner hides the reply time, and counts down the handover step's max wait ("Max wait 1:05"; after an app restart, from the server's time left).
 
 ### Precedence - be aware of how merging works
 
@@ -527,6 +527,15 @@ The public API surface for knowledge base in v1.1.0 is intentionally small:
 
 Full knowledge base browsing screens (`KnowledgeBaseScreen`, `KBButton`, `ChatWidgetWithKB`) exist in the source tree under `src/components/KnowledgeBase/` but are **not exported from the package root yet** - unlike the Flutter SDK's `KnowledgeBaseScreen`. If you need them today, they are visible in the shipped `src/` folder, but treat them as unstable until they are officially exported.
 
+`ChatWidgetWithKB` follows the owner's help centre switch, as the web widget does. Precedence:
+
+1. Your `enableKnowledgeBase` prop, when you set it (`true` or `false` overrides the owner).
+2. Otherwise the owner's `enableKnowledgeBase` in the dashboard: the help centre tab, header button and modal show only when it is on (and not before the bot's settings arrive).
+
+It browses your `kbCategories` when you pass any, else the bot's own help centre (published articles only). `hideRecentArticles` applies to the home screen's recent list (see Home screen).
+
+Help articles an AI reply cites (its sources) and the agent's article cards open in the chat, by article id, while the help centre is on; a source with a public page opens in the browser otherwise, and an article card with a public page opens that page.
+
 ## Analytics
 
 Wrap your app with `ConferBotWithAnalyticsProvider` to get session, message, node, and drop-off tracking with batched uploads:
@@ -602,6 +611,8 @@ How a handover reads in the chat:
 - When the agent ends a chat that a flow's handover step started, the flow carries on from that step. If the step has post-chat survey questions switched on (`enablePostChatSurveyQuestions`), they are asked one by one first, each answer kept in the conversation's record and its answer variable; then the flow follows the step's next edge.
 - The same end twice (an agent's double click) draws one "Chat ended" line and one survey. Once the chat has ended and nothing is going on, the composer turns off and "Start a new chat" starts a fresh conversation.
 - A visitor the workspace blocked sees "This conversation has been closed." (mid-chat, or at connect: the visitor id goes with the socket handshake) and can't type or start a new chat.
+- When an AI agent lets an idle visitor go (the agent's inactivity settings), the chat draws "Chat paused" with "Send a message to pick up where you left off": the composer stays on and the visitor's next message brings the AI back. With "continue the flow" as the agent's close action (and a flow bot), it draws "Chat ended" instead and the flow carries on from its handover step. An agent bot is always only paused.
+- After an AI agent passes the visitor to the team, the server owns the wait. If nothing has come back from it within the handover step's max wait plus 30 seconds, the SDK nudges it (`handover-timeout`) and draws nothing itself.
 
 ### While you wait
 
