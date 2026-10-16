@@ -282,7 +282,7 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
               <Text style={styles.authorName}>
                 {article.author?.name || t('sdk.kb.unknownAuthor')}
               </Text>
-              <Text style={styles.publishedDate}>Published on {formattedDate}</Text>
+              <Text style={styles.publishedDate}>{t('sdk.kb.publishedOn', { date: formattedDate })}</Text>
             </View>
           </View>
 
