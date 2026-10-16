@@ -7,12 +7,12 @@
  * connection, an agent asking for a file, the post-chat rating, "Email me
  * this chat" and the closed chat (blocked, or ended with a new chat).
  */
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
 import { conversionEventOf, isAIAgentDetails, quickActionsOf } from '../../core/agentBot';
-import { backAtLabel, isEmail, knownEmail, lastQuestion, queueLine, waitCardLines, type CsatConfig } from '../../core/liveChat';
+import { backAtLabel, isEmail, knownEmail, lastQuestion, maxWaitText, queueLine, secondsLeft, waitCardLines, type CsatConfig } from '../../core/liveChat';
 import { MAILCHAT_TEXT, isTranscriptEmail, transcriptEmailError } from '../../core/emailTranscript';
 import { LIVE_TEXT, type ClosedState } from '../../core/liveEvents';
 import { t } from '../../core/i18n';
@@ -26,6 +26,31 @@ const WaitLines: React.FC<{ q: any; ctx: any; s: any }> = ({ q, ctx, s }) => {
       <Text style={s.sub}>{lines.estimate}</Text>
       {lines.typical ? <Text style={s.sub} testID="cb-wait-typical">{lines.typical}</Text> : null}
     </>
+  );
+};
+
+/**
+ * The max-wait countdown on the wait card: "Max wait 1:05", once a second
+ * (web queueCard.ts setRemaining). Not a live region: it would talk every
+ * second.
+ */
+const MaxWaitLine: React.FC<{ endsAt: number | null | undefined; s: any }> = ({ endsAt, s }) => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!endsAt) return;
+    setNow(Date.now());
+    const timer = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= endsAt) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [endsAt]);
+  if (!endsAt) return null;
+  return (
+    <Text style={s.sub} testID="cb-wait-countdown" accessibilityLiveRegion="none">
+      {maxWaitText(secondsLeft(endsAt, now))}
+    </Text>
   );
 };
 
@@ -215,6 +240,7 @@ export const HandoverWaitCard: React.FC<{ onCancel?: () => void }> = ({ onCancel
         <View style={{ flex: 1 }}>
           <Text style={s.title}>{q ? queueLine(q) : t('queue.connecting')}</Text>
           <WaitLines q={q} ctx={ctx} s={s} />
+          <MaxWaitLine endsAt={ctx?.waitEndsAt} s={s} />
         </View>
         {onCancel ? (
           <TouchableOpacity onPress={onCancel} accessibilityRole="button" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
