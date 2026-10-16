@@ -22,7 +22,7 @@ import {
   safeRich,
   replyTimeoutNotice,
   AWAIT_REPLY_MS,
-  DEFAULT_AGENT_GREETING,
+  defaultAgentGreeting,
   type AgentBot,
 } from '../../core/agentBot';
 import { buildHandoverPayload } from '../../core/handoverPayload';
@@ -132,7 +132,7 @@ export function useAgentBot({
       }
 
       agentPendingRef.current = true;
-      const greeting = bot.greeting || DEFAULT_AGENT_GREETING;
+      const greeting = bot.greeting || defaultAgentGreeting();
       const { welcome, handover } = agentShellNodes(nodes, bot.agentId);
       const now = new Date().toISOString();
 
