@@ -20,6 +20,8 @@ import {
   isAgentAIActive,
   isAIAgentDetails,
   safeRich,
+  replyTimeoutNotice,
+  AWAIT_REPLY_MS,
   DEFAULT_AGENT_GREETING,
   type AgentBot,
 } from '../../core/agentBot';
@@ -29,8 +31,6 @@ import { handoverPhase } from '../../core/handoverState';
 import { deduplicateMessages, trimMessages } from '../types';
 import { htmlToMarkdown } from '../../utils/chatMarkdown';
 
-// How long the "writing a reply" dots may wait for the AI before giving up.
-export const AWAIT_REPLY_MS = 45000;
 
 interface UseAgentBotParams {
   socketClient: React.MutableRefObject<ConferBotSocket | null>;
@@ -76,7 +76,14 @@ export function useAgentBot({
 
   const setAwaitingReply = useCallback((on: boolean) => {
     if (awaitTimer.current) clearTimeout(awaitTimer.current);
-    awaitTimer.current = on ? setTimeout(() => setAwaitingReplyState(false), AWAIT_REPLY_MS) : null;
+    awaitTimer.current = on
+      ? setTimeout(() => {
+          awaitTimer.current = null;
+          setAwaitingReplyState(false);
+          // Say so, instead of silently dropping the dots (web agentListeners.ts).
+          setRecord((prev) => deduplicateMessages(trimMessages([...prev, replyTimeoutNotice() as any])));
+        }, AWAIT_REPLY_MS)
+      : null;
     setAwaitingReplyState(on);
   }, []);
 
@@ -301,6 +308,14 @@ export function useAgentBot({
     socket.on('agent-message-edited', change(false));
     socket.on('agent-message-deleted', change(true));
 
+    // The AI left or the chat ended: no reply is coming, so no "took too
+    // long" notice either (web endAwaitingReply).
+    socket.on('agent-left', (data: any) => {
+      if (own(data)) setAwaitingReply(false);
+    });
+    socket.on('chat-ended', (data: any) => {
+      if (own(data)) setAwaitingReply(false);
+    });
     // Closed for inactivity; a later message from the visitor reopens it.
     socket.on('ai-agent-inactive-close', (data: any) => {
       if (!own(data)) return;
