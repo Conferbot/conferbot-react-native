@@ -43,6 +43,9 @@ export function usePostChatRedirect(p: Params) {
   const [line, setLine] = useState<RedirectLine | null>(null);
   // The conversation that ended (the flow's end, an agent ending it).
   const [endedSession, setEndedSession] = useState<string | null>(null);
+  // Each end tries once (an agent ending it again tries again; an offered
+  // conversation is never offered twice: the controller and the store).
+  const [endTick, setEndTick] = useState(0);
   const live = useRef(p);
   live.current = p;
 
@@ -57,7 +60,7 @@ export function usePostChatRedirect(p: Params) {
 
   const endedRef = useRef<string | null>(null);
   endedRef.current = endedSession;
-  // One try per ended conversation, as the web's _afterPostChat.
+  // One try per end, as the web's _afterPostChat.
   const tried = useRef(new Set<string>());
 
   const stillHere = (session: string) => () => {
@@ -75,7 +78,10 @@ export function usePostChatRedirect(p: Params) {
   /** The conversation on screen ended (useFlowEngine onFlowComplete, useSocketListeners chat-ended). */
   const conversationEnded = useCallback(() => {
     const session = live.current.chatSessionId || '';
-    if (session) setEndedSession(session);
+    if (!session) return;
+    tried.current.delete(session);
+    setEndedSession(session);
+    setEndTick((n) => n + 1);
   }, []);
 
   // Once the rating is answered or put away (or there is none), after the
@@ -104,7 +110,7 @@ export function usePostChatRedirect(p: Params) {
         .catch(() => {});
     }, REDIRECT_SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [endedSession, p.ratingPending, p.chatSessionId]);
+  }, [endedSession, endTick, p.ratingPending, p.chatSessionId]);
 
   // A new conversation, the chat closed, a block, a person back in it: it stops.
   useEffect(() => {
