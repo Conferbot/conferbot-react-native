@@ -10,6 +10,7 @@
 
 import React from 'react';
 import { View, Text, Image, ScrollView, Linking } from 'react-native';
+import { t } from '../../../core/i18n';
 import { StepButton, StepViewProps, useStepLook } from './stepKit';
 
 const CARD_W = 230;
@@ -55,7 +56,7 @@ export const CardsStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID 
                     title={b.label}
                     leading={b.url ? '↗' : undefined}
                     disabled={busy && !b.url}
-                    accessibilityLabel={b.url ? `${b.label} (opens in the browser)` : b.label}
+                    accessibilityLabel={b.url ? `${b.label} ${t('sdk.link.opensBrowser')}` : b.label}
                     onPress={() => {
                       if (b.url) Linking.openURL(b.url).catch(() => undefined);
                       else onSubmit({ buttonId: b.id, cardId: card.id, label: b.label });
@@ -70,7 +71,7 @@ export const CardsStep: React.FC<StepViewProps> = ({ ui, onSubmit, busy, testID 
       </ScrollView>
       {showContinue ? (
         <View style={{ paddingLeft: look.indent, paddingRight: look.gutter, flexDirection: 'row' }}>
-          <StepButton look={look} primary title="Continue" disabled={busy} onPress={() => onSubmit({ action: 'continue' })} testID={`${testID}-continue`} />
+          <StepButton look={look} primary title={t('common.continue')} disabled={busy} onPress={() => onSubmit({ action: 'continue' })} testID={`${testID}-continue`} />
         </View>
       ) : null}
     </View>
