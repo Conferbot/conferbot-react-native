@@ -44,9 +44,13 @@ interface Params {
   handoverWait?: () => { data: Record<string, any> | undefined; workspaceId: string };
   /** "Email me this chat": the server's transcript email (services/api.ts). */
   postTranscriptEmail?: (chatSessionId: string, email: string) => Promise<TranscriptEmailResult>;
+  /** Every queue-status as the server sent it, the event or the poll's answer (its `help`: useWaitingExtras). */
+  onQueueStatus?: (data: any) => void;
 }
 
-export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow, handoverWait, postTranscriptEmail }: Params) {
+export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow, handoverWait, postTranscriptEmail, onQueueStatus }: Params) {
+  const onQueueStatusRef = useRef(onQueueStatus);
+  onQueueStatusRef.current = onQueueStatus;
   const [queue, setQueue] = useState<QueueStatus | null>(null);
   const [waiting, setWaiting] = useState<HandoverWaiting | null>(null);
   const [noAgents, setNoAgents] = useState(false);
@@ -96,7 +100,9 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     if (!socket) return;
 
     socket.on('queue-status', (data: any) => {
-      if (own(data)) setQueue(queueStatusOf(data));
+      if (!own(data)) return;
+      setQueue(queueStatusOf(data));
+      onQueueStatusRef.current?.(data);
     });
     socket.on('handover-waiting', (data: any) => {
       if (!own(data)) return;
@@ -173,7 +179,9 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
       const id = sid();
       if (!id) return;
       socketClient.current?.emitWithAck('queue-status', { chatSessionId: id }, 10000).then((res) => {
-        if (res) setQueue(queueStatusOf(res));
+        if (!res) return;
+        setQueue(queueStatusOf(res));
+        onQueueStatusRef.current?.(res);
       });
     };
     ask();
