@@ -122,7 +122,8 @@ describe('liveChat', () => {
         subtitleText: 'Your feedback helps us improve',
         thankYouText: 'Thank you for your feedback!',
         showFeedbackInput: true,
-        feedbackPlaceholder: 'Tell us more...',
+        // The web's placeholder (i18n csat.placeholder).
+        feedbackPlaceholder: 'Tell us more (optional)',
       });
     });
     it('builds the rating payload per type', () => {
