@@ -509,7 +509,7 @@ How a handover reads in the chat:
 
 ## Bot Flows
 
-The SDK runs a bot's flow the way the web widget does. The shared flow-node spec in `scripts/parity/flows/` is the reference, and `__tests__/parity/flows.test.ts` runs all 156 of its cases through the engine.
+The SDK runs a bot's flow the way the web widget does. The shared flow-node spec in `scripts/parity/flows/` is the reference, and `__tests__/parity/flows.test.ts` runs all 156 of its cases through the engine. `__tests__/components/FlowStepViews.test.tsx` plays the cases for the step cards on the cards themselves.
 
 - **Routing:** the chat starts at the first welcome step. A step that doesn't branch follows its first edge. A branch (a choice, a condition, an AI intent) follows its own handle, and the chat ends when that handle has no edge. Unknown step types are passed along their first edge.
 - **Answers:** a question with an answer variable saves into it, so `{name}` / `${name}` / `{{name}}` fill later messages. An unknown variable shows nothing.
@@ -519,6 +519,17 @@ The SDK runs a bot's flow the way the web widget does. The shared flow-node spec
 - **Privacy:** card numbers, IBANs, ids and passwords in answers are masked before they are stored or sent (`redactSensitive`, on unless the owner turns it off).
 - **Pacing:** typing dots last as long as the web's (`paceFor`). Pass `typingDelay` to `NodeFlowEngine` for a fixed delay instead. Images move on once they load, after 4 s at most.
 - **No page in an app:** a hidden-fields step captures nothing, unless you run `NodeFlowEngine` yourself and pass `page: { url, referrer }` (for example from a deep link).
+- **Step cards:** the steps the web draws as cards have native cards under the bot's question, in the bot's option colours, corner radius and font size:
+  - consent: a box to tick, the text's links open in the browser;
+  - OTP: the e-mail, six digit boxes, Resend once its wait is over, Change email, Skip when allowed;
+  - address: suggestions as you type, then confirm; or the fields by hand;
+  - signature: a pad to sign on with a finger (drawn with `react-native-svg`, sent as an SVG image), or the name typed;
+  - ranking: drag a row by its handle, or move it with the arrows;
+  - matrix: each row's columns, with how many rows are answered;
+  - payment: Pay now opens Stripe Checkout in the browser, then I've paid and Cancel, with the time left;
+  - slider, date / time, carousel and product cards (link buttons open their page, Continue when no card has a path), picture choices.
+
+  Without `react-native-svg` the signature step takes the typed name. Custom renderers can reuse the cards (`stepViewFor(uiState)`); each waiting state carries its step's `stepType` and `stepData`.
 
 The engine also reports every step it enters, every handle it takes and the end, through `onTrace` (`FlowTraceEvent`).
 
