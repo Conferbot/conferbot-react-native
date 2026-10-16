@@ -16,6 +16,7 @@ import {
 import type { Reaction, ReactionEmoji } from '../../types';
 import { fillVariables } from '../flow/text';
 import { maskRecordEntry, maskValue } from '../privacy/redact';
+import { deviceLocale, visitorInsightsOf } from '../deviceLanguage';
 
 // ========================================
 // TYPES
@@ -979,7 +980,11 @@ export class ChatState {
 
   buildResponseData(): Record<string, any> {
     const ctx = ChatState.visitorContext;
+    // The device's language, as the web's visitorInsights.language.browser:
+    // the AI answers a short message in it (core/deviceLanguage.ts).
+    const insights = visitorInsightsOf(deviceLocale());
     return {
+      ...(insights ? { visitorInsights: insights } : {}),
       ...(ctx ? { visitorContext: ctx } : {}),
       ...(ctx?.name ? { visitorName: ctx.name } : {}),
       ...(ctx?.email ? { visitorEmail: ctx.email } : {}),
