@@ -237,6 +237,42 @@ export type { HomeScreenProps, ViewSwitchProps } from './components/Home';
 export { useHome } from './hooks/useHome';
 export type { UseHomeReturn } from './hooks/useHome';
 
+// ========== Mascots (core/mascotArt, mascotMoods, mascotMotion; web art3d.ts, home/mascotMotion.ts) ========== //
+export {
+  mascotLayers,
+  mascotLookOf,
+  mascotScaleOf,
+  mascotColorOf,
+  mascotOrigins,
+  mascotViewBox,
+  mascotPoint,
+  MASCOT_SHAPES,
+  MASCOT_EYES,
+  MASCOT_ACCESSORIES,
+  MASCOT_DEFAULT_NAMES,
+  MASCOT_LAYER_ORDER,
+  MASCOT_SCALE_MIN,
+  MASCOT_SCALE_MAX,
+  MASCOT_SCALE_DEFAULT,
+} from './core/mascotArt';
+export type { MascotLook, MascotShape, MascotEyes, MascotAccessory, MascotArm, MascotLayers } from './core/mascotArt';
+export { moodPlan, typingLabel, MASCOT_MOODS, MASCOT_KEYFRAMES, TYPING_MASCOT, TYPING_PENCIL } from './core/mascotMoods';
+export type { MascotMood, MoodPlan } from './core/mascotMoods';
+export {
+  createMascotDirector,
+  normalizeMascotMotion,
+  gestureFrames,
+  gestureTrack,
+  cardEnterTrack,
+  cardLeaveTrack,
+  wordFade,
+  MASCOT_MOTIONS,
+  DEFAULT_MASCOT_MOTION,
+} from './core/mascotMotion';
+export type { MascotMotion, MascotDirector, MascotStage, Gesture } from './core/mascotMotion';
+export { Mascot, MascotFigure } from './components/Mascot';
+export type { MascotProps } from './components/Mascot';
+
 // ========== Theme System ========== //
 export { ThemeProvider, useTheme, defaultTheme, darkTheme } from './theme';
 export type { ConferBotTheme, ConferBotThemeOverride } from './theme';
