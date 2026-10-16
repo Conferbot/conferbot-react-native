@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 
 import { NodeUIState } from '../../core/nodes/NodeHandler';
+import { RatingSparks } from '../Delight/Delight';
 import { useTheme } from '../../theme';
 import { t } from '../../core/i18n';
 
@@ -51,8 +52,13 @@ export const StarRating: React.FC<StarRatingProps> = ({
   allowHalf = false,
   onSubmit,
   testID,
+  ...rest
 }) => {
   const theme = useTheme();
+  // The words for each value ("Good"), when the step gives them (web ratingFx.ts caption).
+  const labels: string[] = Array.isArray((rest as any).labels) ? (rest as any).labels : [];
+  // The pick's sparks (web ratingFx.ts burst): a new key each pick.
+  const [spark, setSpark] = useState<{ value: number; n: number } | null>(null);
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,6 +111,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
       ]).start();
 
       setRating(value);
+      setSpark((prev) => ({ value, n: (prev?.n || 0) + 1 }));
     },
     [isSubmitting, scaleAnim]
   );
@@ -188,6 +195,9 @@ export const StarRating: React.FC<StarRatingProps> = ({
         >
           {getIcon(isFilled, isHalf)}
         </Animated.Text>
+        {spark && spark.value === value ? (
+          <RatingSparks key={spark.n} top={value === maxRating} color={getFilledColor()} testID={testID ? `${testID}-sparks` : undefined} />
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -232,7 +242,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
             },
           ]}
         >
-          {rating} / {maxRating}
+          {labels[rating - 1] || `${rating} / ${maxRating}`}
         </Text>
       )}
 
