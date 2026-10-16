@@ -5,7 +5,8 @@
  * follow-up email card, the queue position, the "nobody could join" email
  * ask, leave a message, a locked conversation, an agent's dropped
  * connection, an agent asking for a file, the post-chat rating, "Email me
- * this chat" and the closed chat (blocked, or ended with a new chat).
+ * this chat", the closed chat (blocked, or ended with a new chat) and the
+ * post-chat redirect's countdown.
  */
 import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
@@ -410,6 +411,49 @@ export const ClosedChatCard: React.FC<{ closed: ClosedState | null; onNewChat?: 
   );
 };
 
+/**
+ * The owner's post-chat redirect under the ended conversation
+ * (core/postChatRedirect.ts; web .cb-redirect): "Taking you to example.com
+ * in 10s" with Cancel. A screen reader hears the first sentence once; the
+ * ticking number is hidden from it. When the system could not open the
+ * URL, a "Continue to example.com" button.
+ */
+export const PostChatRedirectLine: React.FC = () => {
+  const { s } = useStyles();
+  const ctx = useContext(ConferBotContext);
+  const line = ctx?.postChatRedirect;
+  if (!line) return null;
+  if (line.phase === 'continue') {
+    return (
+      <View style={s.redirectLine} testID="cb-redirect">
+        <TouchableOpacity onPress={() => ctx.continuePostChatRedirect?.()} accessibilityRole="link" testID="cb-redirect-go">
+          <Text style={s.redirectGo}>{line.text}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  return (
+    <View style={s.redirectLine} testID="cb-redirect">
+      <View accessible accessibilityLabel={line.said} style={{ flexShrink: 1 }}>
+        <Text style={s.systemText} testID="cb-redirect-text" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          {line.text}
+        </Text>
+      </View>
+      {line.phase === 'counting' ? (
+        <TouchableOpacity
+          onPress={() => ctx.cancelPostChatRedirect?.()}
+          accessibilityRole="button"
+          accessibilityLabel={line.cancelLabel}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          testID="cb-redirect-cancel"
+        >
+          <Text style={s.redirectCancel}>{line.cancelText}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+};
+
 /** A centred system line (locked, connection dropped, file asked for). */
 export const SystemLine: React.FC<{ text: string; testID?: string }> = ({ text, testID }) => {
   const { s } = useStyles();
@@ -579,6 +623,9 @@ const createStyles = (theme) =>
     stripText: { color: theme.colors.botBubbleText, fontSize: theme.typography.fontSize.sm, fontWeight: '500' },
     systemLine: { alignSelf: 'center', marginVertical: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.systemBubble },
     systemText: { fontSize: theme.typography.fontSize.xs, color: theme.colors.systemBubbleText, textAlign: 'center' },
+    redirectLine: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 8, marginHorizontal: theme.spacing.chatContentPadding },
+    redirectCancel: { fontSize: theme.typography.fontSize.xs, color: theme.colors.text, textDecorationLine: 'underline' },
+    redirectGo: { fontSize: theme.typography.fontSize.xs, color: theme.colors.primary, textDecorationLine: 'underline' },
     ratingRow: { flexDirection: 'row', gap: 6, marginTop: 10 },
     star: { paddingHorizontal: 2 },
     ratingPill: {
