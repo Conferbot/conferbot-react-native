@@ -8,6 +8,7 @@ import { ownsChatBackground } from './widgetTheme';
 import type { ResolvedWidgetTheme } from './widgetTheme';
 import { mascotLookOf, mascotScaleOf, type MascotLook } from './mascotArt';
 import { normalizeMascotMotion, type MascotMotion } from './mascotMotion';
+import { stockText } from './i18n';
 
 export interface Corners {
   topLeft: number;
@@ -100,7 +101,9 @@ export function resolveCustomizations(
 ): ResolvedCustomizations {
   const c = raw || {};
   const name = str(c.logoText) || str(c.botName) || botName || 'Chat';
-  const tagline = c.enableTagline === true && str(c.tagline) ? str(c.tagline) : null;
+  // The stock "We're here to help" a new bot has is shown in the visitor's
+  // language (web core/customizations.ts stockText "header.tagline").
+  const tagline = c.enableTagline === true && str(c.tagline) ? stockText(str(c.tagline), 'header.tagline') : null;
 
   const avatarSet = num(c.avatarSize);
   const avatarSize = avatarSet && avatarSet !== 40 ? avatarSet : 32;
