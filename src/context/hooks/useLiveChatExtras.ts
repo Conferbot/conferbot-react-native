@@ -28,8 +28,15 @@ import { blockedText, endedSinceLastLive } from '../../core/liveEvents';
 import type { TranscriptEmailResult } from '../../core/emailTranscript';
 import { buildHandoverTimeoutPayload } from '../../core/handoverPayload';
 import { waitDeadline } from '../../core/liveChat';
+import type { RedirectStore } from '../../core/postChatRedirect';
 
 export const QUEUE_POLL_MS = 20000;
+
+/** As the web (index.ts): the post-chat rating shows 1.5 s after the flow's end. */
+export const FLOW_END_RATING_MS = 1500;
+
+/** A conversation already asked for its post-chat rating ("1"), kept across restarts. */
+export const RATING_OFFERED_KEY_PREFIX = 'conferbot_rating_offered_';
 
 interface Params {
   socketClient: React.MutableRefObject<ConferBotSocket | null>;
@@ -47,9 +54,11 @@ interface Params {
   postTranscriptEmail?: (chatSessionId: string, email: string) => Promise<TranscriptEmailResult>;
   /** Every queue-status as the server sent it, the event or the poll's answer (its `help`: useWaitingExtras). */
   onQueueStatus?: (data: any) => void;
+  /** Where a conversation's rating, once asked, is remembered (the SDK's storage; none: in memory only). */
+  store?: RedirectStore | null;
 }
 
-export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow, handoverWait, postTranscriptEmail, onQueueStatus }: Params) {
+export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecord, isOpen, waitingForPerson, continueFlow, handoverWait, postTranscriptEmail, onQueueStatus, store }: Params) {
   const onQueueStatusRef = useRef(onQueueStatus);
   onQueueStatusRef.current = onQueueStatus;
   const [queue, setQueue] = useState<QueueStatus | null>(null);
@@ -79,9 +88,34 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
   const [mailOpen, setMailOpen] = useState(false);
   const [mailSentTo, setMailSentTo] = useState<string | null>(null);
   const reported = useRef({ delivered: '', seen: '' });
+  // The flow's end asked for the rating: it shows 1.5 s later (web index.ts),
+  // and the post-chat redirect already waits for it.
+  const [csatDue, setCsatDue] = useState(false);
+  const csatDueTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The conversation already asked for its rating (#76): never twice.
+  const ratingAskedFor = useRef<string | null>(null);
+  const storeRef = useRef(store);
+  storeRef.current = store;
+  // The latest state, for the flow's end and its timer.
+  const now = useRef({ csatConfig: null as CsatConfig | null, csatOpen: false, csatSent: false, blocked: null as string | null });
+  now.current = { csatConfig, csatOpen, csatSent, blocked };
 
   const sid = () => socketClient.current?.chatSessionId || chatStateRef.current?.sessionId || '';
   const own = (data: any) => !data?.chatSessionId || !sid() || data.chatSessionId === sid();
+
+  /** Remembered so a restart does not ask this conversation again. */
+  const rememberAsked = (id: string) => {
+    ratingAskedFor.current = id;
+    if (!id || !storeRef.current) return;
+    Promise.resolve()
+      .then(() => storeRef.current?.setItem(RATING_OFFERED_KEY_PREFIX + id, '1'))
+      .catch(() => {});
+  };
+  const cancelCsatDue = () => {
+    if (csatDueTimer.current) clearTimeout(csatDueTimer.current);
+    csatDueTimer.current = null;
+    setCsatDue(false);
+  };
 
   const addRecord = useCallback(
     (ui: any, server?: any) => {
@@ -157,6 +191,8 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
       setLockedBy(null);
       setFileRequestedBy(null);
       setCsatOpen(true);
+      // The flow's end that may follow asks no second time (#76).
+      rememberAsked(sid());
     });
     // Blocked by the workspace, mid-chat or at the handshake (web
     // _applyVisitorBlock): the chat closes with a neutral line, whatever
@@ -170,6 +206,7 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
       setLeadCardOpen(false);
       setFileRequestedBy(null);
       setCsatOpen(false);
+      cancelCsatDue();
       setMailOpen(false);
     });
     socket.on('agent-message', (data: any) => {
@@ -299,7 +336,48 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     if (!csatConfig) return;
     socketClient.current?.emitToServer('submit-chat-rating', ratingPayload(sid(), csatConfig.ratingType, value, feedback));
     setCsatSent(true);
+    rememberAsked(sid());
   }, [csatConfig]);
+
+  /**
+   * The flow reached its end (web index.ts, the end of a path that is not a
+   * sub-flow's): the post-chat rating [delayMs] later, as an agent ending the
+   * chat opens it, when the bot has one on, the visitor is not blocked, none
+   * is up or sent, and this conversation was not asked before (kept in the
+   * SDK's storage, so a restart does not ask again) (#76).
+   */
+  const flowEnded = useCallback((delayMs: number = FLOW_END_RATING_MS) => {
+    const can = () => {
+      const c = now.current;
+      return !!c.csatConfig && !c.blocked && !c.csatOpen && !c.csatSent;
+    };
+    const id = sid();
+    if (!can() || ratingAskedFor.current === id) return;
+    ratingAskedFor.current = id;
+    if (csatDueTimer.current) clearTimeout(csatDueTimer.current);
+    csatDueTimer.current = null;
+    setCsatDue(true);
+    const st = storeRef.current;
+    Promise.resolve(id && st ? st.getItem(RATING_OFFERED_KEY_PREFIX + id) : null)
+      .catch(() => null)
+      .then((asked) => {
+        // Asked before a restart, or another conversation by now: nothing.
+        if (asked === '1' || ratingAskedFor.current !== id) {
+          if (ratingAskedFor.current === id) setCsatDue(false);
+          return;
+        }
+        rememberAsked(id);
+        csatDueTimer.current = setTimeout(() => {
+          csatDueTimer.current = null;
+          setCsatDue(false);
+          if (can() && ratingAskedFor.current === id) setCsatOpen(true);
+        }, delayMs);
+      });
+  }, []);
+
+  useEffect(() => () => {
+    if (csatDueTimer.current) clearTimeout(csatDueTimer.current);
+  }, []);
 
   /** "Email me this chat" from the menu: the card, once at a time (web mountEmailTranscript). */
   const openEmailTranscript = useCallback(() => {
@@ -346,6 +424,8 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     setReceiptMarks({ deliveredMessageId: '', seenMessageId: '' });
     setLeadCardOpen(false);
     setCsatOpen(false);
+    cancelCsatDue();
+    ratingAskedFor.current = null;
     setLeftMessageTo(null);
     setLeadEmail(null);
     setCsatSent(false);
@@ -372,6 +452,9 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     leftMessageTo,
     leadEmail,
     csatSent,
+    csatDue,
+    // The rating is up (or about to be) and not answered: the redirect waits for it.
+    ratingPending: !!csatConfig && ((csatOpen && !csatSent) || csatDue),
     blocked,
     mailOpen,
     mailSentTo,
@@ -380,6 +463,7 @@ export function useLiveChatExtras({ socketClient, chatStateRef, record, setRecor
     emailTranscript,
     setChatbotData,
     setupLiveChatListeners,
+    flowEnded,
     leaveMessage,
     shareEmailForReply,
     captureLeadEmail,
