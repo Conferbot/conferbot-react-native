@@ -18,6 +18,12 @@ export interface ConferBotConfig {
   readReceiptConfig?: ReadReceiptConfig;
   /** Offline queue configuration */
   offlineQueueConfig?: OfflineQueueConfig;
+  /**
+   * The language the SDK draws its own words in: "en", "nl", "fr", "de",
+   * "es", or "auto" (the phone's languages). Wins over the owner's
+   * `widgetLanguage` setting, as the web's host-page customizations do.
+   */
+  widgetLanguage?: 'auto' | 'en' | 'nl' | 'fr' | 'de' | 'es';
 }
 
 // ********** Read Receipt Configuration ********** //
