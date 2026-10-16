@@ -140,6 +140,26 @@ export const helpOn = (c: any, categories: any[] | null | undefined, recent: any
   return inCategories || publishedArticles(recent).length > 0;
 };
 
+/**
+ * ChatWidgetWithKB's help centre (its tab, header button and modal):
+ * follows the owner's switch, as the web does (core/helpCentre.ts rule 1).
+ * Precedence: the host's `enableKnowledgeBase` prop when it is set (true or
+ * false: an explicit override), else the owner's `enableKnowledgeBase`
+ * (on only when true), else off - also before the bot's settings arrive.
+ */
+export const kbWidgetOn = (override: boolean | null | undefined, c: any): boolean =>
+  typeof override === 'boolean' ? override : helpCentreOn(c);
+
+/**
+ * The categories ChatWidgetWithKB browses: the host's `kbCategories` when it
+ * passes any, else the bot's help centre (fetched-chatbot-data
+ * knowledgeBaseData), drafts left out and empty topics dropped.
+ */
+export const kbWidgetCategories = (hostCategories: any[] | null | undefined, kbCategories: any[] | null | undefined): any[] => {
+  if (Array.isArray(hostCategories) && hostCategories.length) return hostCategories;
+  return publishedCategories(kbCategories).filter((cat) => cat && Array.isArray(cat.articles) && cat.articles.length);
+};
+
 /** The home screen's Recent articles list (web core/helpCentre.ts showsRecentArticles). */
 export const showsRecentArticles = (c: any, articles: any[] | null | undefined): boolean =>
   !!c && c.enableInitialPage === true && helpCentreOn(c) && c.hideRecentArticles !== true && publishedArticles(articles).length > 0;
