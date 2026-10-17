@@ -16,24 +16,19 @@
  * The visitor's own Sound off (chat menu) is checked before every sound.
  */
 import { renderWav, toBase64, type SoundCue } from '../core/messageSound';
+import { loadExpoAv } from '../optional/expoAv';
+import { loadExpoFileSystemLegacy } from '../optional/expoFileSystemLegacy';
+import { loadExpoFileSystem } from '../optional/expoFileSystem';
 
 let expoAV: any = null;
 let fileSystem: any = null;
 try {
-  // Optional peer dependencies: Metro allows a require in try/catch to be missing.
-  expoAV = require('expo-av');
+  // Optional peer dependencies, null when the app does not have them (src/optional).
+  expoAV = loadExpoAv();
 } catch {
   expoAV = null;
 }
-try {
-  fileSystem = require('expo-file-system/legacy');
-} catch {
-  try {
-    fileSystem = require('expo-file-system');
-  } catch {
-    fileSystem = null;
-  }
-}
+fileSystem = loadExpoFileSystemLegacy() || loadExpoFileSystem();
 
 /** Whether this app can play the chat's sounds at all. */
 export const canPlaySounds = (): boolean => !!expoAV?.Audio?.Sound?.createAsync;
