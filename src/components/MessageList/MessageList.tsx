@@ -131,6 +131,18 @@ export interface MessageListProps {
  *
  * @component
  */
+
+/**
+ * An answered choice step's pills: the picked one in the visitor's bubble
+ * colours (it is their answer, the same pair as the answer bubble under it),
+ * the others in the option colours. The picked one used the bot bubble colour
+ * on the theme's page colour, which can be the same colour (#89).
+ */
+export const frozenChoiceColors = (theme: ConferBotTheme, isSelected: boolean) =>
+  isSelected
+    ? { background: theme.colors.userBubble, text: theme.colors.userBubbleText }
+    : { background: theme.colors.optionBubble, text: theme.colors.optionBubbleText };
+
 export const MessageList: React.FC<MessageListProps> = ({
   transparent = false,
   messages,
@@ -288,7 +300,7 @@ export const MessageList: React.FC<MessageListProps> = ({
               <TouchableOpacity
                 key={button.id}
                 style={{
-                  backgroundColor: isSelected ? theme.colors.primary : theme.colors.optionBubble,
+                  backgroundColor: frozenChoiceColors(theme, isSelected).background,
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                   borderRadius: theme.borderRadius.button,
@@ -300,7 +312,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 accessibilityLabel={button.label}
               >
                 <Text style={{
-                  color: isSelected ? theme.colors.textInverse : theme.colors.optionBubbleText,
+                  color: frozenChoiceColors(theme, isSelected).text,
                   fontSize: theme.typography.fontSize.md,
                   fontWeight: '500',
                 }}>
