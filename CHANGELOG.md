@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The app no longer crashes at `ConferBotProvider` in a release build when an optional peer (NetInfo, expo-av, expo-font, expo-file-system, a file picker, the audio recorder, react-native-svg, AsyncStorage) is not installed. Metro 0.80 (React Native 0.73 to 0.75) moved a module's later dependencies down by one past a missing optional require; each optional peer is now required, once, from its own module in `src/optional` (#85).
 - The home screen's brand band runs down behind the middle of "Talk to us" again; it stopped under the header, leaving the greeting white on the page colour (#86).
 - After a choice step (n-choices, image choice, yes or no, opinion scale, select or check options) the conversation goes on: the answer kept the step's data with the live socket in it, and socket.io overflowed the stack on every record sent after it, so a handover that followed never started and messages failed (#87).
+- An answered choice step's picked pill is drawn in the visitor's bubble colours. It used the bot bubble colour on the theme's page colour, which can be the same colour, so the picked answer could not be seen (#89).
 
 ## [2.0.0] - 2026-10-16
 
