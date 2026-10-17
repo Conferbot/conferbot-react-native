@@ -29,6 +29,10 @@
 // @ts-ignore
 import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
 import { t } from '../core/i18n';
+import { loadDocumentPicker } from '../optional/documentPicker';
+import { loadImagePicker } from '../optional/imagePicker';
+import { loadExpoDocumentPicker } from '../optional/expoDocumentPicker';
+import { loadExpoImagePicker } from '../optional/expoImagePicker';
 
 // ========================================
 // TYPES
@@ -189,28 +193,28 @@ let expoImagePicker: ExpoImagePickerModule | null = null;
 
 // Attempt to load react-native-document-picker
 try {
-  documentPicker = require('react-native-document-picker');
+  documentPicker = loadDocumentPicker();
 } catch {
   // Not installed
 }
 
 // Attempt to load react-native-image-picker
 try {
-  imagePicker = require('react-native-image-picker');
+  imagePicker = loadImagePicker();
 } catch {
   // Not installed
 }
 
 // Attempt to load expo-document-picker
 try {
-  expoDocumentPicker = require('expo-document-picker');
+  expoDocumentPicker = loadExpoDocumentPicker();
 } catch {
   // Not installed
 }
 
 // Attempt to load expo-image-picker
 try {
-  expoImagePicker = require('expo-image-picker');
+  expoImagePicker = loadExpoImagePicker();
 } catch {
   // Not installed
 }
