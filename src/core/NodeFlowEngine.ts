@@ -583,9 +583,20 @@ export class NodeFlowEngine {
   }
 
   private nodeWithContext(node: BaseNode, via: string, token: number): Record<string, any> {
+    const data: Record<string, any> = { ...(node.data || {}) };
+    // Handlers read data.socketClient, but it is not enumerable: a choice
+    // step saves its data in the answer (choices: node.data, as the web), and
+    // the live socket's cycles there overflowed socket.io's hasBinary on the
+    // next response-record (#87). A spread or JSON copy leaves it out.
+    Object.defineProperty(data, 'socketClient', {
+      value: this.config.socketClient,
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
     return {
       ...node,
-      data: { ...(node.data || {}), socketClient: this.config.socketClient },
+      data,
       ctx: this.contextFor(node, via, token),
     };
   }
