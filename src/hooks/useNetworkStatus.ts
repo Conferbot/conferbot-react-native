@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { loadNetInfo } from '../optional/netinfo';
 
 // ========================================
 // TYPES
@@ -194,7 +195,7 @@ export function useNetworkStatus(
         } else {
           // Try to dynamically import @react-native-community/netinfo
           try {
-            const NetInfo = require('@react-native-community/netinfo');
+            const NetInfo = loadNetInfo();
             netInfoRef.current = NetInfo.default || NetInfo;
           } catch (importError) {
             if (__DEV__) {
