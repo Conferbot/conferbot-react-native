@@ -6,6 +6,7 @@ import { TYPING_MASCOT, TYPING_PENCIL } from '../../core/mascotMoods';
 import { boxTransform, curve, FxClock, sample } from '../FloatingWidget/fxAnimated';
 import { MascotFigure, useMascotLayers, type SvgXmlComponent } from './MascotFigure';
 import { partStyle } from './useMascotMood';
+import { loadSvg } from '../../optional/svg';
 
 /** A track looping on its own clock (after its delay), as a style. */
 const useLoop = (make: (clock: FxClock) => any, period: number, intro: number, on: boolean) => {
@@ -65,7 +66,7 @@ let AnimatedPath: any = null;
 let SvgRoot: any = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const svg = require('react-native-svg');
+  const svg = loadSvg();
   SvgRoot = svg.Svg || svg.default;
   AnimatedPath = svg.Path ? Animated.createAnimatedComponent(svg.Path) : null;
 } catch {
