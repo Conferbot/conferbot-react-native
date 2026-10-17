@@ -15,11 +15,12 @@
  * a later open retries.
  */
 import { faceName, googleFontUrl, parseFontFaces, type FontPick } from '../core/ownerFont';
+import { loadExpoFont } from '../optional/expoFont';
 
 let expoFont: any = null;
 try {
-  // Optional peer dependency: Metro allows a require in try/catch to be missing.
-  expoFont = require('expo-font');
+  // Optional peer dependency, null when the app does not have it (src/optional).
+  expoFont = loadExpoFont();
 } catch {
   expoFont = null;
 }
