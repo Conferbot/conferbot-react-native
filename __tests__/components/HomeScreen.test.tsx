@@ -4,6 +4,7 @@
  * enhanceHome): every tap goes where the web sends it.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import ConferBotContext from '../../src/context/ConferBotContext';
 import { ThemeProvider } from '../../src/theme';
@@ -69,6 +70,22 @@ describe('HomeScreen', () => {
     expect(value.showChat).toHaveBeenCalledWith();
     fireEvent.press(getByTestId('cb-home-close'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('the brand band runs down to the middle of "Talk to us", its Rise\'s offset included (#86)', () => {
+    const { getByTestId } = setup();
+    const talk = getByTestId('cb-home-talk');
+    let rise: any = talk.parent;
+    while (rise && typeof rise.props?.onLayout !== 'function') rise = rise.parent;
+    const card = talk.findAll((n: any) => n !== talk && typeof n.props?.onLayout === 'function')[0];
+    const layout = (y: number, height = 0) => ({ nativeEvent: { layout: { x: 0, y, width: 320, height } } });
+    act(() => {
+      card.props.onLayout(layout(0, 120));
+      talk.props.onLayout(layout(0));
+      rise.props.onLayout(layout(180));
+    });
+    // 180 down the content, the card 120 high: the band ends 60 into it.
+    expect(StyleSheet.flatten(getByTestId('cb-home-band').props.style).height).toBe(240);
   });
 
   it('an agent: ask anything goes to the chat with the question; a starter asks it', () => {
