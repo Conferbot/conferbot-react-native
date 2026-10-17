@@ -97,14 +97,14 @@ const reduceMotion = (): Promise<boolean> => {
 };
 
 /** The web's cb-rise: up 8pt and in, once, after `delay`. */
-const Rise = ({ delay = 0, still, children, style }: any) => {
+const Rise = ({ delay = 0, still, children, style, onLayout }: any) => {
   const v = useRef(new Animated.Value(still ? 1 : 0)).current;
   useEffect(() => {
     if (still) return v.setValue(1);
     Animated.timing(v, { toValue: 1, duration: 450, delay, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: true }).start();
   }, [still]);
   return (
-    <Animated.View style={[style, { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }]}>
+    <Animated.View onLayout={onLayout} style={[style, { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }]}>
       {children}
     </Animated.View>
   );
@@ -137,7 +137,14 @@ const HomeView: React.FC<HomeScreenProps> = ({ onClose, renderMascot, testID = '
   const [still, setStill] = useState(true);
   const [broken, setBroken] = useState<Record<string, true>>({});
   const [logosReady, setLogosReady] = useState(false);
-  const talkAt = useRef({ y: 0, cardY: 0, h: 0 });
+  // Where "Talk to us" sits in the scroll content: its Rise's offset, the
+  // wrapper's offset in that Rise, the card's offset in the wrapper (#86).
+  const talkAt = useRef({ rise: 0, y: 0, cardY: 0, h: 0 });
+  // The band runs down to the middle of the card (at most 72 into it).
+  const fitBand = () => {
+    const t = talkAt.current;
+    if (t.h > 0) setBand(Math.round(t.rise + t.y + t.cardY + Math.min(72, t.h / 2)));
+  };
 
   useEffect(() => {
     let gone = false;
@@ -403,7 +410,13 @@ const HomeView: React.FC<HomeScreenProps> = ({ onClose, renderMascot, testID = '
     talk: () => {
       const t = m.talk;
       return (
-        <View onLayout={(e) => (talkAt.current.y = e.nativeEvent.layout.y)} testID={`${testID}-talk`}>
+        <View
+          onLayout={(e) => {
+            talkAt.current.y = e.nativeEvent.layout.y;
+            fitBand();
+          }}
+          testID={`${testID}-talk`}
+        >
           {m.message ? <Text style={[{ color: bandInk, fontSize: 14, marginBottom: 8 }, ff]}>{m.message}</Text> : null}
           <View
             style={[cardStyle, { padding: 16 }]}
@@ -411,8 +424,7 @@ const HomeView: React.FC<HomeScreenProps> = ({ onClose, renderMascot, testID = '
               const { y, height } = e.nativeEvent.layout;
               talkAt.current.cardY = y;
               talkAt.current.h = height;
-              // The band runs down to the middle of the card (at most 72 into it).
-              setBand(Math.round(talkAt.current.y + y + Math.min(72, height / 2)));
+              fitBand();
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
@@ -655,7 +667,19 @@ const HomeView: React.FC<HomeScreenProps> = ({ onClose, renderMascot, testID = '
       {shown.map((p) => {
         const node = parts[p]();
         return node ? (
-          <Rise key={p} delay={delays[p]} still={still}>
+          <Rise
+            key={p}
+            delay={delays[p]}
+            still={still}
+            onLayout={
+              p === 'talk'
+                ? (e) => {
+                    talkAt.current.rise = e.nativeEvent.layout.y;
+                    fitBand();
+                  }
+                : undefined
+            }
+          >
             {node}
           </Rise>
         ) : null;
