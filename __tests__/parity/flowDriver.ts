@@ -185,6 +185,9 @@ const makeSocket = (server: any) => {
     },
     getUserId: () => 'qa-visitor',
   };
+  // A real socket.io client is full of cycles (socket.io.nsps, ...): nothing
+  // the flow saves may hold it (#87).
+  (socket as any).self = socket;
   return { socket, emits };
 };
 
@@ -406,6 +409,11 @@ export const runFixture = async (fx: Fixture, opts: { answer?: ViewAnswer } = {}
         }
       });
     const record = state.getRecord() as any[];
+    try {
+      JSON.stringify(record);
+    } catch (e: any) {
+      problems.push(`the record does not serialize (it is sent with every response-record): ${e.message}`);
+    }
     const nodeRecords = record.filter((r) => r && r.type && !r.shape && r.source === undefined && r.renderedText !== undefined);
     const st = engine.getState();
     const crash = trace.find((e) => e.kind === 'crash') as any;
