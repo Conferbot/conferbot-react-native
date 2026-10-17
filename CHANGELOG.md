@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The app no longer crashes at `ConferBotProvider` in a release build when an optional peer (NetInfo, expo-av, expo-font, expo-file-system, a file picker, the audio recorder, react-native-svg, AsyncStorage) is not installed. Metro 0.80 (React Native 0.73 to 0.75) moved a module's later dependencies down by one past a missing optional require; each optional peer is now required, once, from its own module in `src/optional` (#85).
+
 ## [2.0.0] - 2026-10-16
 
 Everything since 1.1.0. The SDK now matches the web widget: the same flows, live chat, customisation, launcher, languages and help, checked against the widget's own code (see [docs/PARITY.md](docs/PARITY.md)).
