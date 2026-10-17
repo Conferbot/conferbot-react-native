@@ -5,14 +5,15 @@
  * wins; none installed and none passed means nothing is kept.
  */
 import type { AsyncStorageInterface } from '../services/StorageService';
+import { loadAsyncStorage } from '../optional/asyncStorage';
 
 let detected: AsyncStorageInterface | null | undefined;
 
 export const installedAsyncStorage = (): AsyncStorageInterface | null => {
   if (detected !== undefined) return detected;
   try {
-    // Optional peer dependency: Metro allows a require in try/catch to be missing.
-    const mod = require('@react-native-async-storage/async-storage');
+    // Optional peer dependency, null when the app does not have it (src/optional).
+    const mod = loadAsyncStorage();
     const storage = mod?.default || mod;
     detected = storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function' ? storage : null;
   } catch {
