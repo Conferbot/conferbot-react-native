@@ -40,10 +40,11 @@ import {
   whenWords,
 } from '../../core/requests';
 import { useRequestsOf } from '../../hooks/useRequests';
+import { loadSvg } from '../../optional/svg';
 
 let SvgXml: any = null;
 try {
-  SvgXml = require('react-native-svg').SvgXml;
+  SvgXml = loadSvg().SvgXml;
 } catch {
   SvgXml = null;
 }
