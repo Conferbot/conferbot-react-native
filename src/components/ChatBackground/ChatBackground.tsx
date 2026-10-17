@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { backgroundSvg, type ChatBackground } from '../../core/chatBackground';
+import { loadSvg } from '../../optional/svg';
 
 // Gradients and patterns draw with react-native-svg when the app has it
 // installed (an optional peer); without it the background stays solid.
 let SvgXml: React.ComponentType<{ xml: string; width: number; height: number }> | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  SvgXml = require('react-native-svg').SvgXml;
+  SvgXml = loadSvg().SvgXml;
 } catch {
   SvgXml = null;
 }
