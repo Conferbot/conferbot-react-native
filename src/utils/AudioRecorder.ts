@@ -29,6 +29,8 @@
 // @ts-ignore
 import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
 import { t } from '../core/i18n';
+import { loadExpoAv } from '../optional/expoAv';
+import { loadAudioRecorderPlayer } from '../optional/audioRecorderPlayer';
 
 // ========================================
 // TYPES
@@ -203,14 +205,14 @@ let audioRecorderPlayer: AudioRecorderPlayerModule | null = null;
 
 // Attempt to load expo-av
 try {
-  expoAV = require('expo-av');
+  expoAV = loadExpoAv();
 } catch {
   // Not installed
 }
 
 // Attempt to load react-native-audio-recorder-player
 try {
-  audioRecorderPlayer = require('react-native-audio-recorder-player');
+  audioRecorderPlayer = loadAudioRecorderPlayer();
 } catch {
   // Not installed
 }
