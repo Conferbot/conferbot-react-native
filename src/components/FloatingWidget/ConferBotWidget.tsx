@@ -30,6 +30,7 @@ import { WAVING_HAND } from '../../core/launcherAttention';
 import { linearBox, radialDisc, stops } from '../../core/fxPaint';
 import { t } from '../../core/i18n';
 import { autoOpenPlan } from '../../core/autoOpen';
+import { loadSvg } from '../../optional/svg';
 
 // Auto-open happens once per launch of the app per bot; a close blocks it
 // for 2 minutes (core/autoOpen.ts; web: once per page load, the
@@ -41,7 +42,7 @@ const closedAt = new Map<string, number>();
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  SvgXml = require('react-native-svg').SvgXml;
+  SvgXml = loadSvg().SvgXml;
 } catch {
   SvgXml = null;
 }
