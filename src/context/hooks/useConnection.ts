@@ -13,6 +13,7 @@ import type ConferBotSocket from '../../services/socket';
 import { OfflineQueueService } from '../../services/OfflineQueueService';
 import type { OfflineQueueConfig, OfflineQueueEvent } from '../../services/OfflineQueueService';
 import type { AsyncStorageInterface } from '../../services/StorageService';
+import { loadNetInfo } from '../../optional/netinfo';
 
 /** The queued event: a response record (the conversation's record). */
 export const OFFLINE_RECORD_EVENT = 'response-record';
@@ -64,7 +65,7 @@ const installedNetInfo = (): NetInfoLike | null => {
   try {
     // Optional peer: without it, online is the socket's state alone.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('@react-native-community/netinfo');
+    const mod = loadNetInfo();
     const lib = mod?.default || mod;
     return lib && typeof lib.addEventListener === 'function' ? lib : null;
   } catch {
