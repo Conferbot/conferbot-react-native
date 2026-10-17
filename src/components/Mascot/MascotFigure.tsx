@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { mascotLayers, type MascotArm, type MascotLayers, type MascotLook } from '../../core/mascotArt';
+import { loadSvg } from '../../optional/svg';
 
 export type SvgXmlComponent = React.ComponentType<{ xml: string; width: number | string; height: number | string }>;
 
@@ -8,7 +9,7 @@ export type SvgXmlComponent = React.ComponentType<{ xml: string; width: number |
 let SvgXmlImpl: SvgXmlComponent | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  SvgXmlImpl = require('react-native-svg').SvgXml;
+  SvgXmlImpl = loadSvg().SvgXml;
 } catch {
   SvgXmlImpl = null;
 }
