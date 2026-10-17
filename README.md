@@ -7,12 +7,13 @@
 
 Add your Conferbot chatbot, live chat and help centre to an iOS and Android React Native app. Every screen is a native view, with no WebView. The bot runs the flows, AI agents and live chat you build in the Conferbot dashboard, and they work the same as in the web widget.
 
-<!-- TODO(video): record the quickstart (install, find the bot ID, add the launcher, sign a user in), save it as docs/media/quickstart.gif and replace VIDEO_ID with the YouTube video id. -->
 <p align="center">
-  <a href="https://youtu.be/VIDEO_ID"><img src="docs/media/quickstart.gif" width="320" alt="Quickstart video: add Conferbot to a React Native app" /></a>
-  <br />
-  <a href="https://youtu.be/VIDEO_ID">Watch the quickstart on YouTube</a>
+  <a href="https://github.com/Conferbot/conferbot-react-native/releases/download/2.0.0/sdk-react-native.mp4">
+    <img src="docs/media/quickstart.gif" width="400" alt="Adding Conferbot to a React Native app: the package, the bot ID, then the chat opening and answering" />
+  </a>
 </p>
+
+<p align="center"><a href="https://github.com/Conferbot/conferbot-react-native/releases/download/2.0.0/sdk-react-native.mp4">Watch the full walkthrough</a> (MP4, 1080p, about 1.5 minutes): install, the bot ID, then the example app on an Android emulator with the launcher, the bot's flow, the AI agent answering from the knowledge base and the handover to a person.</p>
 
 **Contents:** [Requirements](#requirements) · [Install](#install) · [Get your bot ID](#get-your-bot-id) · [Add the chat](#add-the-chat) · [Sign users in](#sign-users-in) · [Push notifications](#push-notifications) · [Customising](#customising) · [Help centre](#help-centre) · [Your requests](#your-requests) · [In the conversation](#in-the-conversation) · [API reference](#api-reference) · [Troubleshooting](#troubleshooting) · [Example app](#example-app) · [Contributing and testing](#contributing-and-testing)
 
