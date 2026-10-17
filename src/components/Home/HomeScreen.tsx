@@ -45,10 +45,11 @@ import {
   remoteQueryFor,
   type HomeModel,
 } from '../../core/home';
+import { loadSvg } from '../../optional/svg';
 
 let SvgXml: any = null;
 try {
-  SvgXml = require('react-native-svg').SvgXml;
+  SvgXml = loadSvg().SvgXml;
 } catch {
   SvgXml = null;
 }
