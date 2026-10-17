@@ -16,11 +16,12 @@ import { MascotFigure, MascotSvg, useMascotLayers } from '../Mascot/MascotFigure
 import { useMascotMood } from '../Mascot/useMascotMood';
 import { useGreetingMotion } from '../Mascot/useGreetingMotion';
 import { t } from '../../core/i18n';
+import { loadSvg } from '../../optional/svg';
 
 let SvgXml: React.ComponentType<{ xml: string; width: number | string; height: number | string }> | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  SvgXml = require('react-native-svg').SvgXml;
+  SvgXml = loadSvg().SvgXml;
 } catch {
   SvgXml = null;
 }
