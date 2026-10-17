@@ -16,12 +16,13 @@ import { View, Text } from 'react-native';
 import { cleanSignatureName, markdownLitePlain, signatureConfig, smoothSegments, strokeBounds, trimRect } from '../../../core/flow/rich';
 import { t } from '../../../core/i18n';
 import { StepButton, StepCard, StepField, StepLink, StepRow, StepStatus, StepViewProps, useStepLook } from './stepKit';
+import { loadSvg } from '../../../optional/svg';
 
 let Svg: any = null;
 let SvgPath: any = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const svg = require('react-native-svg');
+  const svg = loadSvg();
   Svg = svg.default || svg.Svg;
   SvgPath = svg.Path;
 } catch {
