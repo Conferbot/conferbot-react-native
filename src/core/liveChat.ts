@@ -174,7 +174,12 @@ export const backAtLabel = (iso: string | null, now = new Date()): string | null
 /** Visitor uploads in a live chat: on unless the owner turned them off. */
 export const visitorUploadsOn = (customizations: any): boolean => customizations?.enableVisitorFileUpload !== false;
 
-/** Post-chat rating: from the bot's csatConfig; an explicit enabled:false turns it off. */
+/**
+ * Post-chat rating, as the web widget decides it (index.ts postChatFeedbackOff):
+ * asked unless the owner turned it off (enabled:false). Bots that never set
+ * it ({} or absent) get the stock stars and wording; the owner's type and
+ * words apply only once they switched it on (enabled:true).
+ */
 export interface CsatConfig {
   ratingType: 'stars' | 'thumbs' | 'emoji' | 'nps';
   titleText: string;
@@ -184,8 +189,9 @@ export interface CsatConfig {
   feedbackPlaceholder: string;
 }
 
-export const csatConfigOf = (raw: any): CsatConfig | null => {
-  if (!raw || typeof raw !== 'object' || raw.enabled === false || raw.enabled !== true) return null;
+export const csatConfigOf = (input: any): CsatConfig | null => {
+  if (input && typeof input === 'object' && input.enabled === false) return null;
+  const raw = input && typeof input === 'object' && input.enabled === true ? input : {};
   const type = ['stars', 'thumbs', 'emoji', 'nps'].includes(raw.ratingType) ? raw.ratingType : 'stars';
   // The owner's words, else the web's (postChatRating.ts csat.*) in the visitor's language.
   const s = (v: unknown, key: I18nKey, stock: string[] = []) => ownerTextOr(typeof v === 'string' ? v.trim() : v, key, stock);
