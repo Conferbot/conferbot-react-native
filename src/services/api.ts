@@ -129,19 +129,9 @@ class ConferBotAPI {
     return response.data;
   }
 
-  // Send a message
-  async sendMessage(
-    chatSessionId: string,
-    message: string,
-    metadata?: Record<string, any>
-  ): Promise<ApiResponse<any>> {
-    const response = await this.client.post(`/session/${chatSessionId}/message`, {
-      message,
-      metadata,
-      timestamp: Date.now(),
-    });
-    return response.data;
-  }
+  // No REST send: messages go over the socket (response-record). The mobile
+  // route POST /session/:id/message is store-only ({ record, answerVariables })
+  // and never runs the bot (embed-server #194), so the SDK does not use it.
 
   // ********** Handover Methods ********** //
   // Request live agent handover
