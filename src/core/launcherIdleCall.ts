@@ -136,14 +136,18 @@ export interface IdleCallPerformance {
 const POP = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
 
 /** Slide out past the facing edge, hold, slide back - fading in from behind. */
-const slide = (dx: number, dy: number, total: number, rotate = '0deg'): Track => {
+const slide = (inward: 1 | -1, dx: number, dy: number, total: number, rotate = '0deg'): Track => {
   const inAt = 380 / total;
+  // The animated scale replaces the mirror (base sx -1) a left-hand
+  // launcher's mascot is drawn with, so the mirror rides along in it.
+  const small = inward === 1 ? '-0.7 0.7' : 0.7;
+  const full = inward === 1 ? '-1 1' : 1;
   return {
     keyframes: [
-      { translate: '0 0', rotate: '0deg', opacity: 0, scale: 0.7, easing: POP },
-      { translate: `${dx}px ${dy}px`, rotate, opacity: 1, scale: 1, offset: inAt },
-      { translate: `${dx}px ${dy}px`, rotate, opacity: 1, scale: 1, offset: 1 - inAt, easing: 'ease-in' },
-      { translate: '0 0', rotate: '0deg', opacity: 0, scale: 0.7 },
+      { translate: '0 0', rotate: '0deg', opacity: 0, scale: small, easing: POP },
+      { translate: `${dx}px ${dy}px`, rotate, opacity: 1, scale: full, offset: inAt },
+      { translate: `${dx}px ${dy}px`, rotate, opacity: 1, scale: full, offset: 1 - inAt, easing: 'ease-in' },
+      { translate: '0 0', rotate: '0deg', opacity: 0, scale: small },
     ],
     options: { duration: total, easing: 'linear', fill: 'forwards' },
   };
@@ -247,7 +251,7 @@ export const idleCallPerformance = (mode: Exclude<LauncherIdleCall, 'off'>, g: I
       sayX: g.edgeX + dx,
       sayY: g.height / 2 - g.unit * 0.1 - w * 0.42,
       mascot: { ...place(-g.unit * 0.1), size: w, arm: 'whisper', base },
-      self: [slide(dx, -g.unit * 0.06, total, `${g.inward * -6}deg`)],
+      self: [slide(g.inward, dx, -g.unit * 0.06, total, `${g.inward * -6}deg`)],
       parts: {
         ...mouth(total, 'o', 0.14, 0.82),
         brow: [brows(total, 0.14, 0.8)],
@@ -321,7 +325,7 @@ export const idleCallPerformance = (mode: Exclude<LauncherIdleCall, 'off'>, g: I
       sayX: g.edgeX + dx,
       sayY: g.height / 2 - g.unit * 0.1 - w * 0.46,
       mascot: { ...place(-g.unit * 0.08), size: w, arm: 'wave', base },
-      self: [slide(dx, -g.unit * 0.1, total)],
+      self: [slide(g.inward, dx, -g.unit * 0.1, total)],
       parts: {
         body: [
           {
@@ -363,7 +367,7 @@ export const idleCallPerformance = (mode: Exclude<LauncherIdleCall, 'off'>, g: I
       sayX: g.edgeX + dx,
       sayY: g.height / 2 - g.unit * 0.08 - w * 0.42,
       mascot: { ...place(-g.unit * 0.04), size: w, arm: 'knock', base },
-      self: [slide(dx, -g.unit * 0.08, total)],
+      self: [slide(g.inward, dx, -g.unit * 0.08, total)],
       parts: {
         arm: [
           {
@@ -429,7 +433,7 @@ export const idleCallPerformance = (mode: Exclude<LauncherIdleCall, 'off'>, g: I
     sayX: g.edgeX + dx,
     sayY: g.height / 2 - w * 0.42,
     mascot: { ...place(-g.unit * 0.02), size: w, arm: 'reach', base },
-    self: [slide(dx, 0, total)],
+    self: [slide(g.inward, dx, 0, total)],
     parts: {
       arm: [
         {
