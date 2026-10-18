@@ -895,7 +895,9 @@ const EFFECTS: Record<Exclude<LauncherEntrance, 'classic'>, Effect> = {
           h: s.h * 1.4,
           leftOf: s.w,
           svg: linearBox(bandW, s.h * 1.4, 100, stops('transparent', 'rgba(255,255,255,0.75)', 'transparent')),
-          tracks: [play([{ left: '-40%' }, { left: '115%' }], { duration: 520, delay: 1050, easing: 'ease-in-out', fill: 'forwards' })],
+          // fill 'both': the band waits off the left edge through the delay,
+          // not at left 0 (its static place), where it showed as a white streak.
+          tracks: [play([{ left: '-40%' }, { left: '115%' }], { duration: 520, delay: 1050, easing: 'ease-in-out', fill: 'both' })],
         },
       ],
     });
