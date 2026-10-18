@@ -134,10 +134,17 @@ describe('liveChat', () => {
   });
 
   describe('csat', () => {
-    it('is off unless enabled', () => {
-      expect(csatConfigOf(undefined)).toBeNull();
-      expect(csatConfigOf({})).toBeNull();
+    it('is on unless the owner turned it off, as on the web', () => {
       expect(csatConfigOf({ enabled: false, ratingType: 'stars' })).toBeNull();
+      // Never set: the stock stars and wording.
+      expect(csatConfigOf(undefined)?.ratingType).toBe('stars');
+      expect(csatConfigOf({})).toEqual(csatConfigOf({ enabled: true }));
+      expect(csatConfigOf({ ratingType: 'nps', titleText: 'Draft' })).toEqual(csatConfigOf({ enabled: true }));
+    });
+    it("uses the owner's type and words once switched on", () => {
+      const c = csatConfigOf({ enabled: true, ratingType: 'nps', titleText: 'How did we do?' });
+      expect(c?.ratingType).toBe('nps');
+      expect(c?.titleText).toBe('How did we do?');
     });
     it('fills the web defaults', () => {
       expect(csatConfigOf({ enabled: true, ratingType: 'bogus' })).toEqual({
