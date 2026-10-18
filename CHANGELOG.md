@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The post-chat rating is asked unless the owner switched Post-chat feedback off, as on the web; bots that never set it get the stock stars and wording instead of no rating (#94).
+
 ## [2.0.2] - 2026-10-18
 
 ### Fixed
