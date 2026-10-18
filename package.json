@@ -1,6 +1,6 @@
 {
   "name": "@conferbot/react-native",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Official React Native SDK for Conferbot - Native mobile chat widget for iOS and Android",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
