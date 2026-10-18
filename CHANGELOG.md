@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The coin entrance's glint waits off the button's left edge through its delay instead of showing as a white streak at its left side before the sweep (#91).
 - An idle call's mascot (psst, wave, knock, tap) keeps facing the screen on a left-side launcher; the slide's scale dropped its mirror, so it faced the edge (#91).
 
+### Removed
+
+- The unused internal REST `sendMessage` helper in `src/services/api.ts`. It posted `{ message, metadata }`, but the mobile route `POST /session/:id/message` takes `{ record, answerVariables }` and only stores the record (it never runs the bot). Messages go over the socket, as before; nothing public changes (#92).
+
 ## [2.0.1] - 2026-10-17
 
 ### Fixed
