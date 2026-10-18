@@ -228,6 +228,17 @@ describe('settings, defaults and rules', () => {
     expect(MASCOT_PART_BASE.lid).toEqual({ sy: 0 });
   });
 
+  it('keeps a left-side mascot mirrored through every slide (#91)', () => {
+    for (const m of ['psst', 'wave', 'knock', 'tap'] as const) {
+      const left = idleCallPerformance(m, idleCallGeometry(50, 50, 'left', false));
+      expect(left.mascot.base.sx).toBe(-1);
+      expect(evaluate(left.self, left.total / 2, left.mascot.base).sx).toBe(-1);
+      expect(evaluate(left.self, 1, left.mascot.base).sx).toBeLessThan(0);
+      const right = idleCallPerformance(m, idleCallGeometry(50, 50, 'right', false));
+      expect(evaluate(right.self, right.total / 2, right.mascot.base).sx).toBe(1);
+    }
+  });
+
   it('draws the blob mascot in layers, its arm in front when it reaches', () => {
     expect(mixColor('#000000', 50, '#ffffff')).toBe('#808080');
     expect(mascotLayers('#4f46e5', 'knock').armFront).toContain('<svg');
@@ -250,6 +261,16 @@ describe('settings, defaults and rules', () => {
         return f.o > 0.02 && !!(sp.svg || sp.fill) && sp.y + f.ty + sp.h > -stage.rect.top;
       };
       expect(p.sprites.filter(shown)).toHaveLength(0);
+    }
+  });
+
+  it('holds the coin glint off the left edge until its sweep starts (#91)', () => {
+    const p = entrancePlan('coin', entranceStage(golden.geometry.right), 7)!;
+    const band = p.sprites.flatMap((sp) => sp.children || []).find((c) => c.leftOf !== undefined && c.tracks.some((t) => t.options.delay === 1050))!;
+    expect(band.tracks[0].options.fill).toBe('both');
+    for (const t of [0, 1049]) {
+      expect(evaluate(band.tracks, t, band.base).left).toBe(-40);
+      expect(spriteFrame(band, t).tx).toBeCloseTo(-0.4 * band.leftOf!);
     }
   });
 });
