@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Source cards (pages and help articles) under AI answers can be turned off: when the bot sends `showAnswerSources: false` none are drawn, for live and restored answers (#96).
 - The post-chat rating is asked unless the owner switched Post-chat feedback off, as on the web; bots that never set it get the stock stars and wording instead of no rating (#94).
 
 ### Changed
