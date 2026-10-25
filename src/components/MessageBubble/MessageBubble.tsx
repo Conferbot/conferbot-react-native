@@ -21,6 +21,7 @@ import { MessageStatus as MessageStatusComponent } from '../MessageStatus';
 import { parseTextForUrls, type TextSegment } from '../../utils/LinkDetector';
 import { ChatText } from '../AgentReply/ChatText';
 import { isAIAgentDetails } from '../../core/agentBot';
+import { stripPlaceholderMarkers } from '../../core/citationMarkers';
 import { inactiveCloseLine } from '../../core/liveEvents';
 import { fileNameOf, fileUrlOf, isImageUrl, resolveMediaUrl, translationLabels } from '../../core/liveChat';
 import { getApiOrigin } from '../../config/constants';
@@ -310,7 +311,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     : translation && showOriginal
       ? translation.original
       : 'text' in message
-        ? message.text
+        ? // An AI answer saved before the server stripped them can carry a "[n]" (live and restored).
+          isAgent && isAIAgentDetails((message as any).agentDetails)
+          ? stripPlaceholderMarkers(message.text)
+          : message.text
         : undefined;
   // An agent's text is formatted (lists, bold, links); an AI reply's pages
   // come as its sources, so no link previews under it.
