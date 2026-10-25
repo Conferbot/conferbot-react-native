@@ -104,3 +104,45 @@ describe('Helpful? under an AI answer', () => {
     ).toBeNull();
   });
 });
+
+describe('source cards under an AI answer (#96)', () => {
+  const ART = '64b7f0c2a1b2c3d4e5f60718';
+  const WITH_SOURCES = { ...ANSWER, sources: [{ title: 'Pricing', url: 'https://example.com/pricing' }, { title: 'Refunds', articleId: ART }] };
+
+  it('page and help-article sources are drawn by default', () => {
+    const { getByTestId } = render(
+      <ThemeProvider>
+        <ConferBotContext.Provider value={{ serverCustomizations: {}, record: [WITH_SOURCES] }}>
+          <AgentReplyExtras message={WITH_SOURCES} testID="x" />
+        </ConferBotContext.Provider>
+      </ThemeProvider>
+    );
+    expect(getByTestId('x-source-0')).toBeTruthy();
+    expect(getByTestId('x-source-1')).toBeTruthy();
+  });
+
+  it('none when the owner turned them off, the rest of the reply stays', () => {
+    const { queryByTestId, queryByText, getByTestId } = render(
+      <ThemeProvider>
+        <ConferBotContext.Provider value={{ serverCustomizations: { showAnswerSources: false }, record: [WITH_SOURCES], sendAnswerFeedback: jest.fn() }}>
+          <AgentReplyExtras message={WITH_SOURCES} testID="x" />
+        </ConferBotContext.Provider>
+      </ThemeProvider>
+    );
+    expect(queryByTestId('x-source-0')).toBeNull();
+    expect(queryByTestId('x-source-1')).toBeNull();
+    expect(queryByText('Pricing')).toBeNull();
+    expect(getByTestId('cb-helpful-ask')).toBeTruthy();
+  });
+
+  it('nothing at all when sources were the only extra', () => {
+    const { toJSON } = render(
+      <ThemeProvider>
+        <ConferBotContext.Provider value={{ serverCustomizations: { showAnswerSources: false }, record: [WITH_SOURCES] }}>
+          <AgentReplyExtras message={WITH_SOURCES} testID="x" />
+        </ConferBotContext.Provider>
+      </ThemeProvider>
+    );
+    expect(toJSON()).toBeNull();
+  });
+});
