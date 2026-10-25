@@ -15,6 +15,7 @@ import {
   quickActionsOf,
   aiReplyExtrasOf,
   conversionEventOf,
+  answerSourcesOn,
   AWAIT_REPLY_MS,
   REPLY_TIMEOUT_TEXT,
   replyTimeoutNotice,
@@ -145,5 +146,14 @@ describe('the reply that took too long (#56)', () => {
     expect(AWAIT_REPLY_MS).toBe(45000);
     expect(REPLY_TIMEOUT_TEXT).toBe('That took too long. Try again, or ask for a human.');
     expect(replyTimeoutNotice(1000)).toEqual({ _id: 'reply-timeout-1000', type: 'system-message', text: REPLY_TIMEOUT_TEXT, time: new Date(1000).toISOString() });
+  });
+});
+
+describe('answer source cards (#96)', () => {
+  it('shown unless the owner set showAnswerSources to false', () => {
+    expect(answerSourcesOn(undefined)).toBe(true);
+    expect(answerSourcesOn({})).toBe(true);
+    expect(answerSourcesOn({ showAnswerSources: true })).toBe(true);
+    expect(answerSourcesOn({ showAnswerSources: false })).toBe(false);
   });
 });
