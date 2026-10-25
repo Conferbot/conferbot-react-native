@@ -9,7 +9,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../theme';
 import ConferBotContext from '../../context/ConferBotContext';
-import { answerFeedbackOn, conversionEventOf, isAIAgentDetails, sourceHost, sourceTarget } from '../../core/agentBot';
+import { answerFeedbackOn, answerSourcesOn, conversionEventOf, isAIAgentDetails, sourceHost, sourceTarget } from '../../core/agentBot';
 import { helpCentreOn } from '../../core/waitArticles';
 import { talkToPersonAllowed } from '../../core/handoverState';
 import {
@@ -46,7 +46,8 @@ export const AgentReplyExtras: React.FC<AgentReplyExtrasProps> = ({ message, tes
   const styles = createStyles(theme);
   const open = (url: string) => url && Linking.openURL(url).catch(() => {});
 
-  const sources = Array.isArray(message.sources) ? message.sources : [];
+  // No source cards when the owner turned them off (live and restored answers alike).
+  const sources = answerSourcesOn(ctx?.serverCustomizations) && Array.isArray(message.sources) ? message.sources : [];
   // A help article opens in the app's help centre when it is on (web
   // agentSources.ts), else its public page.
   const canOpenArticles = helpCentreOn(ctx?.serverCustomizations) && !!ctx?.openArticle;
