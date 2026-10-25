@@ -84,6 +84,14 @@ describe('MessageBubble', () => {
       expect(getByText('Agent Smith')).toBeTruthy();
     });
 
+    it('drops a placeholder "[n]" from an AI answer, not from a person (#96)', () => {
+      const ai = createAgentMessage('Wie Sie zit. [n] Als Kunde', { name: 'Ava' });
+      (ai.agentDetails as any).isAIAgent = true;
+      expect(render(<MessageBubble message={ai} />).getByText('Wie Sie zit. Als Kunde')).toBeTruthy();
+      const person = createAgentMessage('Wie Sie zit. [n] Als Kunde', { name: 'Sam' });
+      expect(render(<MessageBubble message={person} />).getByText('Wie Sie zit. [n] Als Kunde')).toBeTruthy();
+    });
+
     it('should render system message', () => {
       const message = {
         _id: 'sys-1',
