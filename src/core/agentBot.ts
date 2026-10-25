@@ -340,6 +340,9 @@ export const quickActionsOf = (customizations: any): AnswerAction[] =>
 /** "Helpful?" under AI answers unless the owner turned it off. */
 export const answerFeedbackOn = (customizations: any): boolean => customizations?.hideAnswerFeedback !== true;
 
+/** Source cards (pages and help articles) under AI answers unless the owner turned them off. */
+export const answerSourcesOn = (customizations: any): boolean => customizations?.showAnswerSources !== false;
+
 /** The conversion a link stands for, in the analytics vocabulary. */
 export const conversionEventOf = (label: string, url = ''): string => {
   const t = `${label} ${url}`.toLowerCase();
