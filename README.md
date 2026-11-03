@@ -84,12 +84,12 @@ Each package below switches on one feature. Without it, that feature is simply l
 |---|---|
 | `@react-native-async-storage/async-storage` (>= 1.17) | Keeps the conversation across app restarts. Also needed for "Your requests", the "Welcome back" home card, the Sound on / off choice and "once per conversation" rules. The SDK finds it when it is installed, so you don't pass anything. |
 | `react-native-svg` (>= 12) | Launcher icons, gradients, effects and the mascot, chat background gradients and patterns, the signature pad, and the pencil and mascot typing styles. Without it, the SDK uses plain colours, the dots typing style and a typed name for signatures. |
-| `expo-av` | The owner's message sounds, sound pack and launcher sound (without it, the chat is silent). Also voice notes. |
+| `expo-av`, or `expo-audio` on Expo SDK 55+ | The owner's message sounds, sound pack and launcher sound (without either, the chat is silent and a development warning says so). `expo-av` also plays voice notes. Expo SDK 55 removed `expo-av`: install `expo-audio` there and the same sounds play through it; when both are present, `expo-av` is used. |
 | `expo-file-system` | Plays the synthesised sounds on iOS. Without it, the launcher sound still plays, and the synthesised tones play on Android only. |
 | `expo-font` | Loads the owner's Google font and the widget theme's font at run time. Without it, the chat uses the platform font. A system font the owner picked (Georgia, Verdana...) is still used by name. |
 | `@react-native-community/netinfo` | The device's own network in `isOnline` (without it, `isOnline` is the socket's state), and `useNetworkStatus()`. |
 | `react-native-document-picker` + `react-native-image-picker`, or `expo-document-picker` + `expo-image-picker` | Attachments (`enableAttachments`): files, the photo library and the camera. |
-| `react-native-audio-recorder-player` (or `expo-av`) | Voice notes (`enableVoiceMessage`). |
+| `react-native-audio-recorder-player` (or `expo-av`) | Voice notes (`enableVoiceMessage`). On Expo SDK 55+, where `expo-av` is gone, use `react-native-audio-recorder-player` for voice notes. |
 
 ```bash
 # The usual set
@@ -97,6 +97,9 @@ npm install @react-native-async-storage/async-storage react-native-svg
 
 # Sounds and fonts (Expo modules)
 npx expo install expo-av expo-file-system expo-font
+
+# Expo SDK 55 or later (expo-av was removed)
+npx expo install expo-audio expo-file-system expo-font
 ```
 
 **iOS.** The optional packages are native modules. After adding any of them, run:
