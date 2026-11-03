@@ -553,8 +553,8 @@ For plain `http://` targets during development, allow cleartext traffic (`androi
 The [`example/`](../example/) app shows a tab bar with all three integration patterns plus the floating bubble.
 
 ```bash
-git clone https://github.com/conferbot/react-native-sdk.git
-cd react-native-sdk
+git clone https://github.com/Conferbot/conferbot-react-native.git
+cd conferbot-react-native
 npm install && npm run build
 
 cd example
@@ -587,4 +587,4 @@ Screens to compare against:
 | `on('bot_response')` never fires | Event names are kebab-case; use the `SocketEvents` enum (`SocketEvents.BOT_RESPONSE` = `'bot-response'`). |
 | Weird build errors after adding peer deps | `npx react-native start --reset-cache`, then rebuild the native app. |
 
-Still stuck? [Open an issue](https://github.com/conferbot/react-native-sdk/issues) or email [support@conferbot.com](mailto:support@conferbot.com).
+Still stuck? [Open an issue](https://github.com/Conferbot/conferbot-react-native/issues) or email [support@conferbot.com](mailto:support@conferbot.com).
