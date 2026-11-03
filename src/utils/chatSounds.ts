@@ -7,8 +7,10 @@
  * small WAV (renderWav) and written to the cache with expo-file-system when
  * that is installed, else played from a data: URI (Android's player reads
  * those; iOS's does not, so iOS needs expo-file-system for the tones). The
- * owner's launcher sound is a file URL and needs only expo-av. Without
- * expo-av the chat is silent, as before.
+ * owner's launcher sound is a file URL and needs only expo-av. Expo SDK 55
+ * removed expo-av, so apps on it can install expo-audio instead and the same
+ * sounds play through its createAudioPlayer; expo-av still wins when both are
+ * present. With neither the chat is silent, as before (a dev warning says why).
  *
  * Silent and mute: the audio mode is left as the app set it. expo-av's
  * default on iOS follows the ring / silent switch (playsInSilentModeIOS
@@ -17,6 +19,7 @@
  */
 import { renderWav, toBase64, type SoundCue } from '../core/messageSound';
 import { loadExpoAv } from '../optional/expoAv';
+import { loadExpoAudio } from '../optional/expoAudio';
 import { loadExpoFileSystemLegacy } from '../optional/expoFileSystemLegacy';
 import { loadExpoFileSystem } from '../optional/expoFileSystem';
 
@@ -29,9 +32,34 @@ try {
   expoAV = null;
 }
 fileSystem = loadExpoFileSystemLegacy() || loadExpoFileSystem();
+const expoAudio: any = loadExpoAudio();
+
+const hasExpoAv = (): boolean => !!expoAV?.Audio?.Sound?.createAsync;
+const hasExpoAudio = (): boolean => typeof expoAudio?.createAudioPlayer === 'function';
 
 /** Whether this app can play the chat's sounds at all. */
-export const canPlaySounds = (): boolean => !!expoAV?.Audio?.Sound?.createAsync;
+export const canPlaySounds = (): boolean => hasExpoAv() || hasExpoAudio();
+
+let warned = false;
+/** Once, in development: why a configured sound will not play. */
+export const warnNoAudio = (): void => {
+  if (warned || canPlaySounds()) return;
+  warned = true;
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    console.warn('[Conferbot] Chat sounds are off: install expo-audio (Expo SDK 55+) or expo-av to play them.');
+  }
+};
+
+/** Play a URI through expo-audio and release the player when it finishes. */
+const playWithExpoAudio = (uri: string): boolean => {
+  const player = expoAudio.createAudioPlayer({ uri });
+  player.addListener?.('playbackStatusUpdate', (s: any) => {
+    if (s?.didJustFinish) player.remove?.();
+  });
+  if (typeof player.volume === 'number') player.volume = 1.0;
+  player.play();
+  return true;
+};
 
 const uris = new Map<string, Promise<string | null>>();
 
@@ -59,10 +87,15 @@ const toneUri = (key: string, cue: Extract<SoundCue, { kind: 'tone' }>): Promise
 
 /** Play a cue; never throws, resolves false when nothing could play. */
 export const playCue = async (cue: SoundCue | null): Promise<boolean> => {
-  if (!cue || !canPlaySounds()) return false;
+  if (!cue) return false;
+  if (!canPlaySounds()) {
+    warnNoAudio();
+    return false;
+  }
   try {
     const uri = cue.kind === 'url' ? cue.url : await toneUri(cue.key, cue);
     if (!uri) return false;
+    if (!hasExpoAv()) return playWithExpoAudio(uri);
     const { sound } = await expoAV.Audio.Sound.createAsync({ uri }, { shouldPlay: true, volume: 1.0 });
     sound.setOnPlaybackStatusUpdate?.((s: any) => {
       if (s?.didJustFinish || (s && s.isLoaded === false)) sound.unloadAsync?.().catch(() => undefined);

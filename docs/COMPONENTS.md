@@ -416,5 +416,5 @@ Settings > Accessibility > TalkBack
 
 - **Documentation**: [docs.conferbot.com](https://docs.conferbot.com)
 - **Examples**: See `/docs/EXAMPLES.md`
-- **Issues**: [GitHub Issues](https://github.com/conferbot/react-native-sdk/issues)
+- **Issues**: [GitHub Issues](https://github.com/Conferbot/conferbot-react-native/issues)
 - **Email**: support@conferbot.com
